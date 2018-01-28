@@ -29,4 +29,56 @@
     <version>0.0.1-SNAPSHOT</version>
   </parent>
   <artifactId>fugue-example-hello</artifactId>
+  
+  <build>
+  <plugins>
+     <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <configuration>
+          <images>
+            <image>
+              <name>gcr.io/${gcp.project}/fugue-example-hello:${project.version}</name>
+              <alias>presence-server</alias>
+              <build>
+                <from>openjdk:latest</from>
+                <assembly>
+                  <descriptorRef>artifact-with-dependencies</descriptorRef>
+                </assembly>
+                <cmd>java -cp "maven/*" org.symphonyoss.s2.fugue.example.hello.HelloWorld</cmd>
+              </build>
+              <run>
+                <ports>
+                  <port>8080:8080</port>
+                </ports>
+              </run>
+            </image>
+          </images>
+        </configuration>
+        <executions>
+          <execution>
+            <id>docker:build</id>
+            <phase>package</phase>
+            <goals>
+              <goal>build</goal>
+            </goals>
+            <configuration>
+              <showLogs>true</showLogs>
+            </configuration>
+          </execution>
+          <execution>
+            <id>docker:start</id>
+            <phase>install</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <showLogs>true</showLogs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+  </plugins>
+</build>
+
 </project>

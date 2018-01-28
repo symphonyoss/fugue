@@ -51,6 +51,7 @@ public class FugueServer implements IComponent
 
   private final IDIContext                       diContext_;
   private final String                           name_;
+  private final int                              httpPort_;
   private final ScheduledExecutorService         exec_;
   
 //  private IResourcesService                      resourcesService_;
@@ -66,11 +67,13 @@ public class FugueServer implements IComponent
 //  private IApplication                           application_;
   private boolean                                started_;
   private String                                 serverUrl_;
+
   
-  public FugueServer(IDIContext diContext, String name)
+  public FugueServer(IDIContext diContext, String name, int httpPort)
   {
     diContext_ = diContext;
     name_ = name;
+    httpPort_ = httpPort;
     exec_ = Executors.newScheduledThreadPool(0, new LocalThreadFactory());
   }
   
@@ -194,10 +197,9 @@ public class FugueServer implements IComponent
 //          ssl=true;
       
       boolean ssl = false;
-      int httpPort = 0;
       
       httpServerBuilder
-        .setHttpPort(httpPort);
+        .setHttpPort(httpPort_);
 
 //      if(ssl)
 //      {
@@ -294,7 +296,7 @@ public class FugueServer implements IComponent
     {
       if(serverUrl_ != null)
       {
-        String url = serverUrl_ + "/diafanis";
+        String url = serverUrl_ + "/fugue";
         
         log_.info("opening browser on " + url);
         

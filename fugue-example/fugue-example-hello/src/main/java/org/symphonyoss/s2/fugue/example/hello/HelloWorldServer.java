@@ -35,7 +35,7 @@ public class HelloWorldServer extends FugueServer implements IComponent, IServle
 
   public HelloWorldServer(IDIContext diContext, String name)
   {
-    super(diContext, name);
+    super(diContext, name, 8080);
   }
 
   @Override

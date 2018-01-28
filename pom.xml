@@ -183,6 +183,11 @@
 					<artifactId>docker-maven-plugin</artifactId>
 					<version>0.23.0</version>
         </plugin>
+        <plugin>
+	        <groupId>io.fabric8</groupId>
+	        <artifactId>fabric8-maven-plugin</artifactId>
+	        <version>3.5.33</version>
+	      </plugin>
 				<!--This plugin's configuration is used to store Eclipse m2e settings 
 					only. It has no influence on the Maven build itself. -->
 				<plugin>
