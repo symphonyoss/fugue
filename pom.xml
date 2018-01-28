@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <!--
+    ~
+    ~ Copyright 2018 Symphony Communication Services, LLC.
+    ~
+    ~ Licensed to The Symphony Software Foundation (SSF) under one
+    ~ or more contributor license agreements.  See the NOTICE file
+    ~ distributed with this work for additional information
+    ~ regarding copyright ownership.  The SSF licenses this file
+    ~ to you under the Apache License, Version 2.0 (the
+    ~ "License"); you may not use this file except in compliance
+    ~ with the License.  You may obtain a copy of the License at
+    ~
+    ~   http://www.apache.org/licenses/LICENSE-2.0
+    ~
+    ~ Unless required by applicable law or agreed to in writing,
+    ~ software distributed under the License is distributed on an
+    ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    ~ KIND, either express or implied.  See the License for the
+    ~ specific language governing permissions and limitations
+    ~ under the License.
+  -->
+
+  <modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.symphonyoss.s2</groupId>
+		<artifactId>S2-super-pom</artifactId>
+		<version>0.1.3</version>
+	</parent>
+
+	<groupId>org.symphonyoss.s2.fugue</groupId>
+	<artifactId>fugue</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>fugue</name>
+	<description>Kubernetes Based Cloud Platform Abstraction</description>
+	<url>https://github.com/SymphonyOSF/Fuge</url>
+	<packaging>pom</packaging>
+
+	<modules>
+	<module>fugue-core</module>
+	<module>fugue-example</module>
+	<module>fugue-di</module>
+	</modules>
+
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<scm>
+		<connection>scm:git:git://github.com/SymphonyOSF/Fugue.git</connection>
+		<developerConnection>scm:git:git@github.com:SymphonyOSF/Fugue.git</developerConnection>
+		<url>https://github.com/SymphonyOSF/Fugue</url>
+		<tag>HEAD</tag>
+	</scm>
+
+	<developers>
+		<developer>
+			<id>bruceskingle</id>
+			<name>Bruce Skingle</name>
+			<email>bruce.skingle@symphony.com</email>
+			<url>http://github.com/bruceskingle</url>
+			<organization>Symphony Communication Services LLC</organization>
+			<organizationUrl>http://symphony.com</organizationUrl>
+			<roles>
+				<role>Chief Architect</role>
+			</roles>
+		</developer>
+	</developers>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<s2.common.version>0.1.11-SNAPSHOT</s2.common.version>
+
+		<japigen.version>0.0.1-SNAPSHOT</japigen.version>
+		<japigen.template.groupid>org.symphonyoss.s2.japigen</japigen.template.groupid>
+		<japigen.template.java>S2-japigen-template-java</japigen.template.java>
+		<japigen.template.version>${japigen.version}</japigen.template.version>
+		
+		
+    <gcp.project>sym-dev-arch</gcp.project>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>sonatype-oss-public</id>
+			<url>https://oss.sonatype.org/content/groups/public/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.symphonyoss.s2.common</groupId>
+				<artifactId>S2-common-core</artifactId>
+				<version>${s2.common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.symphonyoss.s2.common</groupId>
+				<artifactId>S2-common-http</artifactId>
+				<version>${s2.common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.symphonyoss.s2.common</groupId>
+				<artifactId>S2-common-dom</artifactId>
+				<version>${s2.common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.symphonyoss.s2.common</groupId>
+				<artifactId>S2-common-dom-jackson</artifactId>
+				<version>${s2.common.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.symphonyoss.s2.common</groupId>
+				<artifactId>S2-common-crypto</artifactId>
+				<version>${s2.common.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.symphonyoss.s2.japigen</groupId>
+				<artifactId>S2-japigen-template-java</artifactId>
+				<version>${japigen.template.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.symphonyoss.s2.japigen</groupId>
+				<artifactId>S2-japigen-runtime-java</artifactId>
+				<version>${japigen.template.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>com.google.code.findbugs</groupId>
+				<artifactId>jsr305</artifactId>
+				<version>3.0.2</version>
+			</dependency>
+
+			<!-- <dependency> <groupId>com.networknt</groupId> <artifactId>json-schema-validator</artifactId> 
+				<version>0.1.11</version> </dependency> -->
+
+			<!-- <dependency> <groupId>com.github.java-json-tools</groupId> <artifactId>json-schema-validator</artifactId> 
+				<version>2.2.8</version> </dependency> <dependency> <groupId>org.freemarker</groupId> 
+				<artifactId>freemarker</artifactId> <version>2.3.25-incubating</version> 
+				</dependency> -->
+
+			<dependency>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+				<version>1.0.13</version>
+			</dependency>
+
+
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency> 
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+        <scope>test</scope>
+    </dependency>
+	</dependencies>
+	<build>
+		<pluginManagement>
+			<plugins>
+			  <plugin>
+					<groupId>io.fabric8</groupId>
+					<artifactId>docker-maven-plugin</artifactId>
+					<version>0.23.0</version>
+        </plugin>
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
+					only. It has no influence on the Maven build itself. -->
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>
+											org.symphonyoss.s2.japigen
+										</groupId>
+										<artifactId>
+											S2-japigen-maven-plugin
+										</artifactId>
+										<versionRange>
+											[0.0.1-SNAPSHOT,)
+										</versionRange>
+										<goals>
+											<goal>
+												generate-sources
+											</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore></ignore>
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
