@@ -25,42 +25,16 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.symphonyoss.s2.fugue</groupId>
-    <artifactId>fugue</artifactId>
+    <artifactId>fugue-example</artifactId>
     <version>0.0.1-SNAPSHOT</version>
   </parent>
-  
-  <artifactId>fugue-example</artifactId>
-  <packaging>pom</packaging>
-  
-  <properties>
-    <gcp.project>sym-dev-arch</gcp.project>
-  </properties>
-  
-  <modules>
-	  	<module>fugue-example-hello</module>
-	  	<module>fugue-example-di</module>
-	  	<module>fugue-example-pubsub</module>
-  </modules>
+  <artifactId>fugue-example-pubsub</artifactId>
   
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>fugue-di</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>fugue-core</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.symphonyoss.s2.common</groupId>
-      <artifactId>S2-common-http</artifactId>
-    </dependency>
-    
-    <dependency> 
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-    </dependency>
+		  <groupId>com.google.cloud</groupId>
+		  <artifactId>google-cloud-pubsub</artifactId>
+		  <version>0.32.0-beta</version>
+		</dependency>
   </dependencies>
 </project>
