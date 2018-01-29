@@ -34,15 +34,23 @@ import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 import com.google.api.gax.rpc.ApiException;
 import com.google.cloud.ServiceOptions;
+import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.cloud.pubsub.v1.TopicAdminClient;
+import com.google.pubsub.v1.PushConfig;
+import com.google.pubsub.v1.Subscription;
+import com.google.pubsub.v1.SubscriptionName;
+import com.google.pubsub.v1.Topic;
 import com.google.pubsub.v1.TopicName;
 
 public class PubSubServer extends FugueServer implements IComponent, IServletProvider
 {
-  private static final String TEST_TOPIC = "Test-Topic";
+  public static final String TOPIC_NAME        = "Test-Topic";
+  public static final String SUBSCRIPTION_NAME = "Test-Topic-Subscription";
   
   private static final Logger log_ = LoggerFactory.getLogger(PubSubServer.class);
 
+  private StringBuilder status_ = new StringBuilder("Initializing...\n");
+  
   public PubSubServer(IDIContext diContext, String name)
   {
     super(diContext, name, 8080);
@@ -56,31 +64,92 @@ public class PubSubServer extends FugueServer implements IComponent, IServletPro
 //        .addStart(() -> openBrowser())
         .addStart(() -> startPubSub());
   }
+  
+  public void appendStatus(String message)
+  {
+    status_.append(message);
+    if(!message.endsWith("\n"))
+      status_.append('\n');
+  }
+  
+  public String getStatus()
+  {
+    return status_.toString();
+  }
 
   private void startPubSub()
   {
-    createTopic();
+    // Your Google Cloud Platform project ID
+    String projectId = ServiceOptions.getDefaultProjectId();
+    
+    createTopic(projectId);
   }
 
-  private void createTopic()
+  private void createTopic(String projectId)
   {
     log_.info("About to create topic");
     
-    // Your Google Cloud Platform project ID
-    String projectId = ServiceOptions.getDefaultProjectId();
-
-    // Your topic ID, eg. "my-topic"
-    String topicId = TEST_TOPIC;
+    
 
     // Create a new topic
-    TopicName topic = TopicName.of(projectId, topicId);
+    TopicName topicName = TopicName.of(projectId, TOPIC_NAME);
     try (TopicAdminClient topicAdminClient = TopicAdminClient.create())
     {
-      topicAdminClient.createTopic(topic);
+      Topic topic = topicAdminClient.createTopic(topicName);
+      appendStatus("Created topic");
+      
+      log_.info("Topic {} created.", topic);
+      
+      createSubscription(projectId, topicName);
     }
     catch (ApiException e)
     {
-      // example : code = ALREADY_EXISTS(409) implies topic already exists
+      switch(e.getStatusCode().getCode())
+      {
+        case ALREADY_EXISTS:
+          appendStatus("Topic already exists");
+          break;
+        
+        default:
+          appendStatus("Cannot create topic: " + e.getStatusCode().getCode());
+      }
+      log_.error("Failed to create topic, HTTP {} retryable {}", e.getStatusCode().getCode(), 
+          e.isRetryable(), e);
+    }
+    catch (Exception e)
+    {
+      log_.error("Failed to create topic", e);
+    }
+ 
+    
+  }
+  
+  private void createSubscription(String projectId, TopicName topicName)
+  {
+    log_.info("About to create subscription");
+
+    // Create a new subscription
+    SubscriptionName subscriptionName = SubscriptionName.of(projectId, SUBSCRIPTION_NAME);
+    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
+    {
+      // create a pull subscription with default acknowledgement deadline
+      Subscription subscription =
+          subscriptionAdminClient.createSubscription(
+              subscriptionName, topicName, PushConfig.getDefaultInstance(), 0);
+      
+      log_.info("Subscription {} created.", subscription);
+    }
+    catch (ApiException e)
+    {
+      switch(e.getStatusCode().getCode())
+      {
+        case ALREADY_EXISTS:
+          appendStatus("Subscription already exists");
+          break;
+        
+        default:
+          appendStatus("Cannot create subscription: " + e.getStatusCode().getCode());
+      }
       log_.error("Failed to create topic, HTTP {} retryable {}", e.getStatusCode().getCode(), 
           e.isRetryable(), e);
     }
@@ -90,13 +159,15 @@ public class PubSubServer extends FugueServer implements IComponent, IServletPro
     }
     
 
-    log_.info("Topic {}:{} created.", topic.getProject(), topic.getTopic());
+    
   }
 
   @Override
   public void registerServlets(IServletContainer servletContainer)
   {
-    servletContainer.addServlet("/", new HelloWorldServlet());
+    servletContainer
+      .addServlet("/pub", new PubServlet(this))
+      .addServlet("/", new SubServlet(this));
   }
 
 }
