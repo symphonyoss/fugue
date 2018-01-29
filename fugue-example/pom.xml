@@ -28,11 +28,17 @@
     <artifactId>fugue</artifactId>
     <version>0.0.1-SNAPSHOT</version>
   </parent>
+  
   <artifactId>fugue-example</artifactId>
   <packaging>pom</packaging>
+  
+  <properties>
+    <gcp.project>sym-dev-arch</gcp.project>
+  </properties>
+  
   <modules>
-  	<module>fugue-example-hello</module>
-  	<module>fugue-example-di</module>
+	  	<module>fugue-example-hello</module>
+	  	<module>fugue-example-di</module>
   </modules>
   
   <dependencies>

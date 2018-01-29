@@ -30,8 +30,60 @@
   </parent>
   <artifactId>fugue-example-hello</artifactId>
   
+  <properties>
+    <dist.name>${project.artifactId}-${project.version}</dist.name>
+    <dist.root>${project.build.directory}/${dist.name}</dist.root>
+    <dist.path>${dist.root}/${dist.base}</dist.path>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  
   <build>
+  
+<!--   <resources>
+    <resource>
+      <directory>src/main/kubernetes</directory>
+      <filtering>true</filtering>
+    </resource>
+  </resources> -->
   <plugins>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-antrun-plugin</artifactId>
+      <executions>
+        <execution>
+          <!-- The package assembly chmods scripts 555 so we need to delete them 
+            before we do the dependency plugin otherwise it fails with a permission denied 
+            error -->
+          <phase>prepare-package</phase>
+          <goals>
+            <goal>run</goal>
+          </goals>
+          <configuration>
+            <target>
+              <delete dir="${project.build.directory}/${project.artifactId}-${project.version}-bin" />
+            </target>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
+    <plugin>
+      <artifactId>maven-assembly-plugin</artifactId>
+      <executions>
+        <execution>
+          <id>assemble</id>
+          <phase>package</phase>
+          <goals>
+            <goal>single</goal>
+          </goals>
+          <configuration>
+            <descriptors>
+              <descriptor>../src/main/assembly/assemble.xml</descriptor>
+            </descriptors>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
      <plugin>
         <groupId>io.fabric8</groupId>
         <artifactId>docker-maven-plugin</artifactId>
@@ -49,7 +101,7 @@
               </build>
               <run>
                 <ports>
-                  <port>8080:8080</port>
+                  <port>8080:80</port>
                 </ports>
               </run>
             </image>
@@ -78,6 +130,23 @@
           </execution>
         </executions>
       </plugin>
+      
+      
+      <!-- <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>fabric8-maven-plugin</artifactId>
+        <version>3.2.8</version>
+        <executions>
+          <execution>
+            <id>fmp</id>
+            <goals>
+              <goal>resource</goal>
+              <goal>helm</goal>
+              <goal>build</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin> -->
   </plugins>
 </build>
 
