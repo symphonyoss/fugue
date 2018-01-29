@@ -30,14 +30,6 @@
   </parent>
   <artifactId>fugue-example-hello</artifactId>
   
-  <properties>
-    <dist.name>${project.artifactId}-${project.version}</dist.name>
-    <dist.root>${project.build.directory}/${dist.name}</dist.root>
-    <dist.path>${dist.root}/${dist.base}</dist.path>
-
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-  
   <build>
   
 <!--   <resources>
@@ -90,7 +82,7 @@
         <configuration>
           <images>
             <image>
-              <name>gcr.io/${gcp.project}/fugue-example-hello:${project.version}</name>
+              <name>gcr.io/${gcp.project}/${project.name}:${project.version}</name>
               <alias>presence-server</alias>
               <build>
                 <from>openjdk:latest</from>
@@ -101,7 +93,7 @@
               </build>
               <run>
                 <ports>
-                  <port>8080:80</port>
+                  <port>8080:8080</port>
                 </ports>
               </run>
             </image>

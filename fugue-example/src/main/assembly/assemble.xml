@@ -33,7 +33,7 @@
 
     <fileSets>
         <fileSet>
-            <directory>../src/main/kubernetes</directory>
+            <directory>src/main/kubernetes</directory>
             <outputDirectory>kubernetes</outputDirectory>
             <fileMode>444</fileMode>
             <directoryMode>755</directoryMode>

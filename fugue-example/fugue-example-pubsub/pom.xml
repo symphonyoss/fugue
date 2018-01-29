@@ -36,5 +36,98 @@
 		  <artifactId>google-cloud-pubsub</artifactId>
 		  <version>0.32.0-beta</version>
 		</dependency>
+		<dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-iam</artifactId>
+      <version>v1-rev230-1.23.0</version>
+    </dependency>
   </dependencies>
+  
+  <build>
+    <plugins>
+      <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-antrun-plugin</artifactId>
+      <executions>
+        <execution>
+          <!-- The package assembly chmods scripts 555 so we need to delete them 
+            before we do the dependency plugin otherwise it fails with a permission denied 
+            error -->
+          <phase>prepare-package</phase>
+          <goals>
+            <goal>run</goal>
+          </goals>
+          <configuration>
+            <target>
+              <delete dir="${project.build.directory}/${project.artifactId}-${project.version}-bin" />
+            </target>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
+    <plugin>
+      <artifactId>maven-assembly-plugin</artifactId>
+      <executions>
+        <execution>
+          <id>assemble</id>
+          <phase>package</phase>
+          <goals>
+            <goal>single</goal>
+          </goals>
+          <configuration>
+            <descriptors>
+              <descriptor>../src/main/assembly/assemble.xml</descriptor>
+            </descriptors>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
+     <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <configuration>
+          <images>
+            <image>
+              <name>gcr.io/${gcp.project}/${project.name}:${project.version}</name>
+              <alias>presence-server</alias>
+              <build>
+                <from>openjdk:latest</from>
+                <assembly>
+                  <descriptorRef>artifact-with-dependencies</descriptorRef>
+                </assembly>
+                <cmd>java -cp "maven/*" org.symphonyoss.s2.fugue.example.pubsub.PubSubExmple</cmd>
+              </build>
+              <run>
+                <ports>
+                  <port>8080:8080</port>
+                </ports>
+              </run>
+            </image>
+          </images>
+        </configuration>
+        <executions>
+          <execution>
+            <id>docker:build</id>
+            <phase>package</phase>
+            <goals>
+              <goal>build</goal>
+            </goals>
+            <configuration>
+              <showLogs>true</showLogs>
+            </configuration>
+          </execution>
+          <execution>
+            <id>docker:start</id>
+            <phase>install</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <showLogs>true</showLogs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
