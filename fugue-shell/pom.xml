@@ -26,7 +26,7 @@
 	<parent>
 		<groupId>org.symphonyoss.s2.fugue</groupId>
 		<artifactId>fugue</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
+		<version>0.0.1</version>
 	</parent>
 	<artifactId>fugue-shell</artifactId>
 	<packaging>pom</packaging>
@@ -48,8 +48,7 @@
 						</goals>
 						<configuration>
 							<target>
-								<delete
-									dir="${project.build.directory}/${project.artifactId}-${project.version}-bash" />
+								<delete dir="${project.build.directory}/${project.artifactId}-${project.version}-bash" />
 							</target>
 						</configuration>
 					</execution>
