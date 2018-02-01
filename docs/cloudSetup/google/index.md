@@ -47,7 +47,6 @@ This would normally be done once, by the tech lead, for any given service.
 Choose a name for the cluster, the examples use the name **your-cluster-name**, replace this with a name of your choice and then create a cluster with the following commands:
 
 ```
-your-cluster-name
 $ gcloud container clusters create your-cluster-name
 Creating cluster your-cluster-name.../
 $ 
