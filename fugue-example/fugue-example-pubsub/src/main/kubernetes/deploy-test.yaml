@@ -5,10 +5,12 @@ kind: Deployment
 metadata:
   labels:
     run: ${project.name}
+  annotations:
+    buildTimestamp: ${build.timestamp}
   name: ${project.name}
   namespace: default
 spec:
-  replicas: 1
+  replicas: 4
   selector:
     matchLabels:
       run: ${project.name}
@@ -26,8 +28,10 @@ spec:
       - env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/secrets/google/key.json
-        image: gcr.io/sym-dev-arch/${project.name}:${project.version}
-        imagePullPolicy: IfNotPresent
+        - name: JAVA_ARGS
+          value: -Dfugue.environment=dev -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005
+        image: ${FUGUE_IMAGE_URI}
+        imagePullPolicy: Always
         name: ${project.name}
         ports:
         - containerPort: 8080
@@ -59,9 +63,14 @@ metadata:
 spec:
   externalTrafficPolicy: Cluster
   ports:
-  - port: 80
+  - name: http
+    port: 80
     protocol: TCP
     targetPort: 8080
+  - name: java-debug
+    port: 5005
+    protocol: TCP
+    targetPort: 5005
   selector:
     run: ${project.name}
   sessionAffinity: None

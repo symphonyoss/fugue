@@ -1,0 +1,71 @@
+# Deployment Descriptor for ${project.name}
+#
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: ${project.name}
+  annotations:
+    buildTimestamp: ${build.timestamp}
+  name: ${project.name}
+  namespace: default
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      run: ${project.name}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        run: ${project.name}
+    spec:
+      containers:
+      - env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        image: ${FUGUE_IMAGE_URI}
+        imagePullPolicy: Always
+        name: ${project.name}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/secrets/google
+          name: google-cloud-key
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: google-cloud-key
+        secret:
+          defaultMode: 420
+          secretName: pubsub-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    run: ${project.name}
+  name: ${project.name}
+  namespace: default
+spec:
+  externalTrafficPolicy: Cluster
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    run: ${project.name}
+  sessionAffinity: None
+  type: LoadBalancer

@@ -42,6 +42,7 @@
 	<module>fugue-core</module>
 	<module>fugue-example</module>
 	<module>fugue-di</module>
+	<module>fugue-shell</module>
 	</modules>
 
 	<licenses>

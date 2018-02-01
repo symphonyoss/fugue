@@ -32,7 +32,7 @@ public class PubSubExmple extends DIContext
   public PubSubExmple()
   {
     register(new Slf4jLogComponent())
-      .register(new PubSubServer(this, "HelloWorld"));
+      .register(new PubSubServer(this, "PubSubExmple"));
   }
   
   private void run()

@@ -30,6 +30,10 @@
   </parent>
   <artifactId>fugue-example-pubsub</artifactId>
   
+  <properties>
+    <build.timestamp>${maven.build.timestamp}</build.timestamp>
+  </properties>
+  
   <dependencies>
     <dependency>
 		  <groupId>com.google.cloud</groupId>
@@ -66,36 +70,22 @@
       </executions>
     </plugin>
     <plugin>
-      <artifactId>maven-assembly-plugin</artifactId>
-      <executions>
-        <execution>
-          <id>assemble</id>
-          <phase>package</phase>
-          <goals>
-            <goal>single</goal>
-          </goals>
-          <configuration>
-            <descriptors>
-              <descriptor>../src/main/assembly/assemble.xml</descriptor>
-            </descriptors>
-          </configuration>
-        </execution>
-      </executions>
-    </plugin>
-     <plugin>
         <groupId>io.fabric8</groupId>
         <artifactId>docker-maven-plugin</artifactId>
         <configuration>
           <images>
             <image>
-              <name>gcr.io/${gcp.project}/${project.name}:${project.version}</name>
-              <alias>presence-server</alias>
+              <name>${project.name}:${project.version}</name>
+              <alias>${project.name}</alias>
               <build>
                 <from>openjdk:latest</from>
+                <tags><!-- define additional tags for the image -->
+                    <tag>latest</tag>
+                </tags>
                 <assembly>
-                  <descriptorRef>artifact-with-dependencies</descriptorRef>
+                  <descriptor>${project.basedir}/src/main/assembly/assemble.xml</descriptor>
                 </assembly>
-                <cmd>java -cp "maven/*" org.symphonyoss.s2.fugue.example.pubsub.PubSubExmple</cmd>
+                <cmd>java -cp "maven/*" ${JAVA_ARGS} org.symphonyoss.s2.fugue.example.pubsub.PubSubExmple</cmd>
               </build>
               <run>
                 <ports>

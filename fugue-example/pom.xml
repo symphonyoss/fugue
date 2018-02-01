@@ -33,8 +33,6 @@
   <packaging>pom</packaging>
   
   <properties>
-    <gcp.project>sym-dev-arch</gcp.project>
-    
     <dist.name>${project.artifactId}-${project.version}</dist.name>
     <dist.root>${project.build.directory}/${dist.name}</dist.root>
     <dist.path>${dist.root}/${dist.base}</dist.path>

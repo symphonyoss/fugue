@@ -167,7 +167,7 @@ public class PubSubServer extends FugueServer implements IComponent, IServletPro
   {
     servletContainer
       .addServlet("/pub", new PubServlet(this))
-      .addServlet("/", new SubServlet(this));
+      .addServlet("/sub", new SubServlet(this));
   }
 
 }

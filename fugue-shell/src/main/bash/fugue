@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------------------------------
+# Copyright 2018 Symphony Communication Services, LLC.
+# 
+# Licensed to The Symphony Software Foundation (SSF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The SSF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+# 
+#   http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# -----------------------------------------------------------------------------
+
+scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+set -e
+
+function config()
+{
+  if [[ "$2" == "" ]]
+  then
+    cmd="list"
+  else
+    cmd="$2"
+  fi
+
+  case $cmd in
+    set)
+      requiredConfig="all"
+      . ${scriptDir}/environment.sh
+      
+      cat > ${FUGUE_HOME}/config.properties<<EOF
+FUGUE_CLOUD=${FUGUE_CLOUD}
+FUGUE_PROJECT=${FUGUE_PROJECT}
+FUGUE_IMAGE=${FUGUE_IMAGE}
+FUGUE_IMAGE_VERSION=${FUGUE_IMAGE_VERSION}
+FUGUE_ENV=${FUGUE_ENV}
+EOF
+      
+      echo Configuration updated.
+    ;;
+    
+    list)
+      . ${scriptDir}/environment.sh
+      showConfig
+    ;;
+    
+    *)
+      echo Unknown command config "$2"
+  esac
+}
+
+function deploy()
+{
+  # Remove the "deploy" command from argv
+  shift
+  
+  requiredConfig=""
+  
+  if [[ $# -gt 5 ]]
+  then
+    echo usage: fugue deploy CLOUD PROJECT IMAGE IMAGE_VERSION ENV
+    exit 1
+  fi
+
+  if [[ $# -gt 4 ]]
+  then
+    FUGUE_CLOUD=$1
+    shift
+  else
+    requiredConfig="$requiredConfig CLOUD"
+  fi
+
+  if [[ $# -gt 3 ]]
+  then
+    FUGUE_PROJECT=$1
+    shift
+  else
+    requiredConfig="$requiredConfig PROJECT"
+  fi
+
+  if [[ $# -gt 2 ]]
+  then
+    FUGUE_IMAGE=$1
+    shift
+  else
+    requiredConfig="$requiredConfig IMAGE"
+  fi
+
+  if [[ $# -gt 1 ]]
+  then
+    FUGUE_IMAGE_VERSION=$1
+    shift
+  else
+    requiredConfig="$requiredConfig IMAGE_VERSION"
+  fi
+
+  if [[ $# -gt 0 ]]
+  then
+    FUGUE_ENV=$1
+    shift
+  else
+    requiredConfig="$requiredConfig ENV"
+  fi
+
+
+  
+#   if [[ $# -eq 5 ]]
+#   then
+#     FUGUE_CLOUD=$2
+#     FUGUE_PROJECT=$2
+#     FUGUE_IMAGE=$4
+#     FUGUE_IMAGE_VERSION=$5
+#     requiredConfig=""
+#   else
+#     if [[ $# -eq 3 ]]
+#     then
+#       FUGUE_IMAGE=$2
+#       FUGUE_IMAGE_VERSION=$3
+#       requiredConfig="CLOUD PROJECT"
+#     else
+#       if [[ $# -eq 1 ]]
+#       then
+#         requiredConfig="CLOUD PROJECT IMAGE IMAGE_VERSION"
+#       else
+#         echo usage: fugue deploy CLOUD PROJECT IMAGE IMAGE_VERSION ENV
+#         exit 1
+#       fi
+#     fi
+#   fi
+# 
+#   FUGUE_DESCRIPTOR=deploy-dev.yaml
+  
+  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_ENV}
+  
+  
+  . ${scriptDir}/environment.sh
+  
+  FUGUE_DESCRIPTOR=deploy-${FUGUE_ENV}.yaml
+  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_DESCRIPTOR}
+
+  WORK_DIR=`mktemp -d`
+
+  # check if tmp dir was created
+  if [[ ! "${WORK_DIR}" || ! -d "${WORK_DIR}" ]]; then
+    echo "Could not create temp dir"
+    exit 1
+  fi
+  
+  # deletes the temp directory
+  function cleanup {      
+    rm -rf "${WORK_DIR}"
+    echo "Deleted temp working directory ${WORK_DIR}"
+  }
+  
+  # register the cleanup function to be called on the EXIT signal
+  trap cleanup EXIT
+
+  #layerId=`docker image inspect ${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION} --format "{{ json .RootFS.Layers }}" | sed -e 's/",.*//' | sed -e 's/\["sha256://'`
+  echo extracting ${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}...
+  docker save ${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION} -o ${WORK_DIR}/image.tar
+  echo done
+  
+  tar xf ${WORK_DIR}/image.tar -C ${WORK_DIR} manifest.json
+  layer=`sed -e 's/"]}]//' < ${WORK_DIR}/manifest.json | sed 's/.*"//'`
+  
+  echo Application layer is $layer
+  tar xf ${WORK_DIR}/image.tar -C ${WORK_DIR} ${layer}
+  tar xf ${WORK_DIR}/${layer} -C ${WORK_DIR} maven/kubernetes
+  
+  case $FUGUE_CLOUD in
+    google)
+      sed -e "s!\\\${FUGUE_IMAGE_URI}!gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}!" < ${WORK_DIR}/maven/kubernetes/${FUGUE_DESCRIPTOR} > ${WORK_DIR}/descriptor.yaml
+      
+      docker tag ${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION} gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}
+      gcloud docker -- push gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}
+      
+      if [[ "${FUGUE_IMAGE_VERSION}" == *-SNAPSHOT ]]
+      then
+        echo SNAPSHOT deployment, deleting current deployment to force restart
+        if kubectl delete deployment ${FUGUE_IMAGE}
+        then
+          echo Deployment deleted
+        else
+          echo No current deployment
+        fi
+      fi
+      kubectl apply -f ${WORK_DIR}/descriptor.yaml
+      ;;
+    
+    *)
+      echo UNKNOWN CLOUD PROVIDER $FUGUE_CLOUD
+      exit 1
+  esac
+}
+
+if [[ "$1" == "" ]]
+  then
+    cat <<EOF
+Usage:
+  fugue config set
+  fugue config
+  fugue config list
+EOF
+  fi
+
+case $1 in
+  config)
+    config $@
+    ;;
+  
+  deploy)
+    deploy $@
+    ;;
+    
+  *)
+    echo Unknown command "$1"
+esac
+
