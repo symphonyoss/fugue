@@ -34,15 +34,14 @@
 	<artifactId>fugue</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>fugue</name>
-	<description>Kubernetes Based Cloud Platform Abstraction</description>
-	<url>https://github.com/SymphonyOSF/Fuge</url>
+	<description>Kubernetes based cloud platform abstraction</description>
+	<url>https://github.com/SymphonyOSF/fuge</url>
 	<packaging>pom</packaging>
 
 	<modules>
-	<module>fugue-core</module>
-	<module>fugue-example</module>
-	<module>fugue-di</module>
-	<module>fugue-shell</module>
+		<module>fugue-core</module>
+		<module>fugue-di</module>
+		<module>fugue-shell</module>
 	</modules>
 
 	<licenses>
@@ -53,9 +52,9 @@
 	</licenses>
 
 	<scm>
-		<connection>scm:git:git://github.com/SymphonyOSF/Fugue.git</connection>
-		<developerConnection>scm:git:git@github.com:SymphonyOSF/Fugue.git</developerConnection>
-		<url>https://github.com/SymphonyOSF/Fugue</url>
+		<connection>scm:git:git://github.com/SymphonyOSF/fugue.git</connection>
+		<developerConnection>scm:git:git@github.com:SymphonyOSF/fugue.git</developerConnection>
+		<url>https://github.com/SymphonyOSF/fugue</url>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -78,14 +77,6 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<s2.common.version>0.1.11-SNAPSHOT</s2.common.version>
-
-		<japigen.version>0.0.1-SNAPSHOT</japigen.version>
-		<japigen.template.groupid>org.symphonyoss.s2.japigen</japigen.template.groupid>
-		<japigen.template.java>S2-japigen-template-java</japigen.template.java>
-		<japigen.template.version>${japigen.version}</japigen.template.version>
-		
-		
-    <gcp.project>sym-dev-arch</gcp.project>
 	</properties>
 
 	<repositories>
@@ -113,7 +104,7 @@
 				<artifactId>S2-common-http</artifactId>
 				<version>${s2.common.version}</version>
 			</dependency>
-			<dependency>
+			<!-- dddddxx<dependency>
 				<groupId>org.symphonyoss.s2.common</groupId>
 				<artifactId>S2-common-dom</artifactId>
 				<version>${s2.common.version}</version>
@@ -127,19 +118,8 @@
 				<groupId>org.symphonyoss.s2.common</groupId>
 				<artifactId>S2-common-crypto</artifactId>
 				<version>${s2.common.version}</version>
-			</dependency>
+			</dependency> -->
 
-			<dependency>
-				<groupId>org.symphonyoss.s2.japigen</groupId>
-				<artifactId>S2-japigen-template-java</artifactId>
-				<version>${japigen.template.version}</version>
-			</dependency>
-
-			<dependency>
-				<groupId>org.symphonyoss.s2.japigen</groupId>
-				<artifactId>S2-japigen-runtime-java</artifactId>
-				<version>${japigen.template.version}</version>
-			</dependency>
 
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>
@@ -147,22 +127,12 @@
 				<version>3.0.2</version>
 			</dependency>
 
-			<!-- <dependency> <groupId>com.networknt</groupId> <artifactId>json-schema-validator</artifactId> 
-				<version>0.1.11</version> </dependency> -->
-
-			<!-- <dependency> <groupId>com.github.java-json-tools</groupId> <artifactId>json-schema-validator</artifactId> 
-				<version>2.2.8</version> </dependency> <dependency> <groupId>org.freemarker</groupId> 
-				<artifactId>freemarker</artifactId> <version>2.3.25-incubating</version> 
-				</dependency> -->
-
 			<dependency>
 				<groupId>ch.qos.logback</groupId>
 				<artifactId>logback-classic</artifactId>
 				<version>1.0.13</version>
 			</dependency>
-
-
-		</dependencies>
+    </dependencies>
 	</dependencyManagement>
 
 	<dependencies>
@@ -170,25 +140,25 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 		</dependency>
-		<dependency> 
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-        <scope>test</scope>
-    </dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<pluginManagement>
 			<plugins>
-			  <plugin>
+				<plugin>
 					<groupId>io.fabric8</groupId>
 					<artifactId>docker-maven-plugin</artifactId>
 					<version>0.23.0</version>
-        </plugin>
-        <plugin>
-	        <groupId>io.fabric8</groupId>
-	        <artifactId>fabric8-maven-plugin</artifactId>
-	        <version>3.5.33</version>
-	      </plugin>
+				</plugin>
+				<plugin>
+					<groupId>io.fabric8</groupId>
+					<artifactId>fabric8-maven-plugin</artifactId>
+					<version>3.5.33</version>
+				</plugin>
 				<!--This plugin's configuration is used to store Eclipse m2e settings 
 					only. It has no influence on the Maven build itself. -->
 				<plugin>
