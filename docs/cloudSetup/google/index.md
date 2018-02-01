@@ -20,8 +20,40 @@ Next install **kubectl** (it is safe to execute this command if it is already in
 ```
 $ gcloud components install kubectl
 
-All components are up to date.
-$ gcloud config set project $PROJECT
+
+Your current Cloud SDK version is: 187.0.0
+Installing components from version: 187.0.0
+
+┌──────────────────────────────────────────────────────────────────┐
+│               These components will be installed.                │
+├─────────────────────┬─────────────────────┬──────────────────────┤
+│         Name        │       Version       │         Size         │
+├─────────────────────┼─────────────────────┼──────────────────────┤
+│ kubectl             │                     │                      │
+│ kubectl             │               1.8.6 │             12.2 MiB │
+└─────────────────────┴─────────────────────┴──────────────────────┘
+
+For the latest full release notes, please visit:
+  https://cloud.google.com/sdk/release_notes
+
+Do you want to continue (Y/n)?  y
+
+╔════════════════════════════════════════════════════════════╗
+╠═ Creating update staging area                             ═╣
+╠════════════════════════════════════════════════════════════╣
+╠═ Installing: kubectl                                      ═╣
+╠════════════════════════════════════════════════════════════╣
+╠═ Installing: kubectl                                      ═╣
+╠════════════════════════════════════════════════════════════╣
+╠═ Creating backup and activating new installation          ═╣
+╚════════════════════════════════════════════════════════════╝
+
+Performing post processing steps...done.                                                                                        
+
+Update done!
+
+$ 
+$ gcloud config set project sym-dev-arch
 Updated property [core/project].
 $ gcloud config set compute/region us-central1
 Updated property [compute/region].
@@ -39,6 +71,30 @@ project = sym-dev-arch
 Your active configuration is: [default]
 $ 
 
+```
+
+Now log in to your account
+```
+
+$ gcloud auth login
+Your browser has been opened to visit:
+
+    https://accounts.google.com/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost%3A8085%2F&prompt=select_account&response_type=code&client_id=32555940559.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fappengine.admin+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcompute+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Faccounts.reauth&access_type=offline
+
+```
+
+You will then be prompted to log in via your web browser, after which you should see something like this in the terminal window:
+
+```
+
+WARNING: `gcloud auth login` no longer writes application default credentials.
+If you need to use ADC, see:
+  gcloud auth application-default --help
+
+You are now logged in as [yourname@yourdomain].
+Your current project is [sym-dev-arch].  You can change this setting by running:
+  $ gcloud config set project PROJECT_ID
+$ 
 ```
 
 ## Setup A Google Cloud Kubernetes Cluster
