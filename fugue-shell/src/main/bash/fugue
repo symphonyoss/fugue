@@ -203,6 +203,73 @@ function deploy()
   esac
 }
 
+function undeploy()
+{
+  # Remove the "undeploy" command from argv
+  shift
+  
+  requiredConfig=""
+  
+  if [[ $# -gt 3 ]]
+  then
+    echo usage: fugue undeploy CLOUD PROJECT IMAGE
+    exit 1
+  fi
+
+  if [[ $# -gt 2 ]]
+  then
+    FUGUE_CLOUD=$1
+    shift
+  else
+    requiredConfig="$requiredConfig CLOUD"
+  fi
+
+  if [[ $# -gt 1 ]]
+  then
+    FUGUE_PROJECT=$1
+    shift
+  else
+    requiredConfig="$requiredConfig PROJECT"
+  fi
+
+  if [[ $# -gt 0 ]]
+  then
+    FUGUE_IMAGE=$1
+    shift
+  else
+    requiredConfig="$requiredConfig IMAGE"
+  fi
+  
+  echo undeploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE}
+  
+  
+  . ${scriptDir}/environment.sh
+  
+  echo undeploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE}
+
+  
+  case $FUGUE_CLOUD in
+    google)
+      if kubectl delete service ${FUGUE_IMAGE}
+      then
+        echo Service deleted
+      else
+        echo No current service
+      fi
+      if kubectl delete deployment ${FUGUE_IMAGE}
+      then
+        echo Deployment deleted
+      else
+        echo No current deployment
+      fi
+      ;;
+    
+    *)
+      echo UNKNOWN CLOUD PROVIDER $FUGUE_CLOUD
+      exit 1
+  esac
+}
+
 if [[ "$1" == "" ]]
   then
     cat <<EOF
@@ -220,6 +287,10 @@ case $1 in
   
   deploy)
     deploy $@
+    ;;
+  
+  undeploy)
+    undeploy $@
     ;;
     
   *)

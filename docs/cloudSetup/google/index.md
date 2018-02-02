@@ -52,7 +52,6 @@ Performing post processing steps...done.
 
 Update done!
 
-$ 
 $ gcloud config set project sym-dev-arch
 Updated property [core/project].
 $ gcloud config set compute/region us-central1
