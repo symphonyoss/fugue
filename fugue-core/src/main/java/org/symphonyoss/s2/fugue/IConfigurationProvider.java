@@ -21,10 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core;
+package org.symphonyoss.s2.fugue;
 
-public class Fugue
+import org.symphonyoss.s2.common.exception.NotFoundException;
+
+public interface IConfigurationProvider
 {
-  // Environment variable containing the tenant ID
-  public static final String FUGUE_TENANT = "FUGUE_TENANT";
+  String  getProperty(String name) throws NotFoundException;
 }

@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core;
+package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.net.InetAddress;

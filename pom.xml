@@ -38,6 +38,13 @@
 	<url>https://github.com/SymphonyOSF/fuge</url>
 	<packaging>pom</packaging>
 
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <s2.common.version>0.1.12-SNAPSHOT</s2.common.version>
+  </properties>
+  
 	<modules>
 		<module>fugue-core</module>
 		<module>fugue-di</module>
@@ -71,13 +78,6 @@
 			</roles>
 		</developer>
 	</developers>
-
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
-		<s2.common.version>0.1.11</s2.common.version>
-	</properties>
 
 	<repositories>
 		<repository>
@@ -132,6 +132,12 @@
 				<artifactId>logback-classic</artifactId>
 				<version>1.0.13</version>
 			</dependency>
+			
+			<dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
 	</dependencyManagement>
 
