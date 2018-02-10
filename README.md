@@ -1,4 +1,4 @@
 # Fugue
 Kubenetes Based Cloud Platform Abstraction
 
-Browse Documents at https://symphonyosf.github.io/fugue/
+Browse Documentation at https://symphonyoss.github.io/fugue/
