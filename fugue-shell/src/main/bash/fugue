@@ -41,6 +41,7 @@ function config()
       cat > ${FUGUE_HOME}/config.properties<<EOF
 FUGUE_CLOUD=${FUGUE_CLOUD}
 FUGUE_PROJECT=${FUGUE_PROJECT}
+FUGUE_TENANT=${FUGUE_TENANT}
 FUGUE_IMAGE=${FUGUE_IMAGE}
 FUGUE_IMAGE_VERSION=${FUGUE_IMAGE_VERSION}
 FUGUE_ENV=${FUGUE_ENV}
@@ -51,7 +52,14 @@ EOF
     
     list)
       . ${scriptDir}/environment.sh
-      showConfig
+            cat <<EOF
+FUGUE_CLOUD=${FUGUE_CLOUD}
+FUGUE_PROJECT=${FUGUE_PROJECT}
+FUGUE_TENANT=${FUGUE_TENANT}
+FUGUE_IMAGE=${FUGUE_IMAGE}
+FUGUE_IMAGE_VERSION=${FUGUE_IMAGE_VERSION}
+FUGUE_ENV=${FUGUE_ENV}
+EOF
     ;;
     
     *)
@@ -66,13 +74,13 @@ function deploy()
   
   requiredConfig=""
   
-  if [[ $# -gt 5 ]]
+  if [[ $# -gt 6 ]]
   then
-    echo usage: fugue deploy CLOUD PROJECT IMAGE IMAGE_VERSION ENV
+    echo usage: fugue deploy CLOUD PROJECT TENANT IMAGE IMAGE_VERSION ENV
     exit 1
   fi
 
-  if [[ $# -gt 4 ]]
+  if [[ $# -gt 5 ]]
   then
     FUGUE_CLOUD=$1
     shift
@@ -80,12 +88,20 @@ function deploy()
     requiredConfig="$requiredConfig CLOUD"
   fi
 
-  if [[ $# -gt 3 ]]
+  if [[ $# -gt 4 ]]
   then
     FUGUE_PROJECT=$1
     shift
   else
     requiredConfig="$requiredConfig PROJECT"
+  fi
+
+  if [[ $# -gt 3 ]]
+  then
+    FUGUE_TENANT=$1
+    shift
+  else
+    requiredConfig="$requiredConfig TENANT"
   fi
 
   if [[ $# -gt 2 ]]
@@ -140,13 +156,13 @@ function deploy()
 # 
 #   FUGUE_DESCRIPTOR=deploy-dev.yaml
   
-  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_ENV}
+  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_TENANT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_ENV}
   
   
   . ${scriptDir}/environment.sh
   
   FUGUE_DESCRIPTOR=deploy-${FUGUE_ENV}.yaml
-  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_DESCRIPTOR}
+  echo deploy ${FUGUE_CLOUD} ${FUGUE_PROJECT} ${FUGUE_TENANT} ${FUGUE_IMAGE} ${FUGUE_IMAGE_VERSION} ${FUGUE_DESCRIPTOR}
 
   WORK_DIR=`mktemp -d`
 
@@ -179,7 +195,8 @@ function deploy()
   
   case $FUGUE_CLOUD in
     google)
-      sed -e "s!\\\${FUGUE_IMAGE_URI}!gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}!" < ${WORK_DIR}/maven/kubernetes/${FUGUE_DESCRIPTOR} > ${WORK_DIR}/descriptor.yaml
+      sed -e "s!\\\${FUGUE_IMAGE_URI}!gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}!" < ${WORK_DIR}/maven/kubernetes/${FUGUE_DESCRIPTOR} |\
+      sed -e "s!\\\${FUGUE_TENANT}!${FUGUE_TENANT}!"> ${WORK_DIR}/descriptor.yaml
       
       docker tag ${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION} gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}
       gcloud docker -- push gcr.io/${FUGUE_PROJECT}/${FUGUE_IMAGE}:${FUGUE_IMAGE_VERSION}
@@ -275,8 +292,9 @@ if [[ "$1" == "" ]]
     cat <<EOF
 Usage:
   fugue config set
-  fugue config
   fugue config list
+  fugue deploy
+  fugue undeploy
 EOF
   fi
 

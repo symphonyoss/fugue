@@ -100,15 +100,6 @@ function loadProperties()
   fi
 }
 
-function showConfig()
-{
-  for n in CLOUD PROJECT
-  do
-    name=FUGUE_${n}
-    echo ${name} = ${!name}
-  done
-}
-
 if [[ "${FUGUE_HOME}" == "" ]]
 then
     if [[ ! -e ${FUGUE_DEFAULT} ]]
@@ -160,7 +151,7 @@ loadProperties ${FUGUE_HOME}/config.properties
 
 if [[ "$requiredConfig" == "all" ]]
 then
-  requiredConfig="CLOUD PROJECT IMAGE IMAGE_VERSION ENV"
+  requiredConfig="CLOUD PROJECT TENANT IMAGE IMAGE_VERSION ENV"
 fi
 
 for m in $requiredConfig
