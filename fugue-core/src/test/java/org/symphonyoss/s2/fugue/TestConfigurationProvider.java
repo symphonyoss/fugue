@@ -36,6 +36,7 @@ public class TestConfigurationProvider
   private static final String ABSENT_PROPERTY_NAME = "ABSENT_PROPERTY_NAME";
   private static final String TEST_PROPERTY_NAME = "TEST_PROPERTY_NAME";
   private static final String TEST_PROPERTY_VALUE = "TEST_PROPERTY_VALUE";
+  private static final String DIRECT_CONFIG_URL = "https://api.github.com/repos/symphonyoss/fugue/contents/fugue-core/src/test/resources/config.json";
 
   @Test
   public void testInline() throws URISyntaxException, NotFoundException
@@ -51,6 +52,42 @@ public class TestConfigurationProvider
   public void testMissingInline() throws URISyntaxException, NotFoundException
   {
     File file = Paths.get(getClass().getResource("/inlineConfig.json").toURI()).toFile();
+    
+    ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
+    
+    provider.getProperty(ABSENT_PROPERTY_NAME);
+  }
+  
+  @Test
+  public void testDirect() throws URISyntaxException, NotFoundException
+  {
+    ConfigurationProvider provider = new ConfigurationProvider(DIRECT_CONFIG_URL);
+    
+    assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getProperty(TEST_PROPERTY_NAME));
+  }
+  
+  @Test(expected=NotFoundException.class)
+  public void testMissingDirect() throws URISyntaxException, NotFoundException
+  {
+    ConfigurationProvider provider = new ConfigurationProvider(DIRECT_CONFIG_URL);
+    
+    provider.getProperty(ABSENT_PROPERTY_NAME);
+  }
+  
+  @Test
+  public void testDirectSpec() throws URISyntaxException, NotFoundException
+  {
+File file = Paths.get(getClass().getResource("/directConfigSpec.json").toURI()).toFile();
+    
+    ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
+    
+    assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getProperty(TEST_PROPERTY_NAME));
+  }
+  
+  @Test(expected=NotFoundException.class)
+  public void testMissingDirectSpec() throws URISyntaxException, NotFoundException
+  {
+File file = Paths.get(getClass().getResource("/directConfigSpec.json").toURI()).toFile();
     
     ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
     
