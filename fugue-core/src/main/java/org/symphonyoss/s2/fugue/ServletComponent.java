@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2017-2018 Symphony Communication Services, LLC.
+ * Copyright 2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,25 +21,22 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di;
+package org.symphonyoss.s2.fugue;
 
-/**
- * All Fugue components must implement this interface. 
- * 
- * @author bruce.skingle
- *
- */
-public interface IComponent
+import javax.servlet.http.HttpServlet;
+
+import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
+import org.symphonyoss.s2.fugue.di.IComponent;
+
+public abstract class ServletComponent extends HttpServlet implements IComponent, IUrlPathServlet
 {
-  /**
-   * Create a component descriptor which describes the dependencies and
-   * provided interfaces of this component.
-   * 
-   * This method may create the descriptor and will only be called once.
-   * A component sub-class should call super.getComponentDescriptor().
-   * ComponentDescriptor has a fluent interface.
-   * 
-   * @return A ComponentDescriptor for the component.
-   */
-  ComponentDescriptor getComponentDescriptor();
+  private static final long serialVersionUID = 1L;
+
+  @Override
+  public ComponentDescriptor getComponentDescriptor()
+  {
+    return new ComponentDescriptor()
+        .addProvidedInterface(IUrlPathServlet.class);
+  }
 }

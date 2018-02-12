@@ -29,8 +29,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.symphonyoss.s2.fugue.di.Cardinality;
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.IComponent;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 public class IntegerConsumer implements IComponent
 {

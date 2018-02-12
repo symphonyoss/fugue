@@ -21,11 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.impl;
-
-import org.symphonyoss.s2.fugue.di.Cardinality;
-import org.symphonyoss.s2.fugue.di.IBinder;
-import org.symphonyoss.s2.fugue.di.IComponent;
+package org.symphonyoss.s2.fugue.di;
 
 public class Dependency<T>
 {

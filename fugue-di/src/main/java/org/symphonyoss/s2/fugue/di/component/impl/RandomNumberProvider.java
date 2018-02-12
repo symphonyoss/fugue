@@ -25,8 +25,8 @@ package org.symphonyoss.s2.fugue.di.component.impl;
 
 import java.security.SecureRandom;
 
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.IRandomNumberProvider;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 /**
  * A Diafanis component which provides an instance of a SecureRandom.

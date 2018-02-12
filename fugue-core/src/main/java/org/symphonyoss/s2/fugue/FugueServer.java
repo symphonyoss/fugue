@@ -41,15 +41,16 @@ import org.symphonyoss.s2.common.http.HttpServerBuilder;
 import org.symphonyoss.s2.common.http.IServletProvider;
 import org.symphonyoss.s2.common.http.IUrlPathServlet;
 import org.symphonyoss.s2.fugue.di.Cardinality;
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
+import org.symphonyoss.s2.fugue.di.DIContext;
 import org.symphonyoss.s2.fugue.di.IComponent;
 import org.symphonyoss.s2.fugue.di.IDIContext;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
-public class FugueServer implements IComponent
+public abstract class FugueServer implements IComponent
 {
   private static Logger                          log_ = LoggerFactory.getLogger(FugueServer.class);
 
-  private final IDIContext                       diContext_;
+  private final IDIContext                       diContext_ = new DIContext();
   private final String                           name_;
   private final int                              httpPort_;
   private final ScheduledExecutorService         exec_;
@@ -69,18 +70,42 @@ public class FugueServer implements IComponent
   private String                                 serverUrl_;
 
   
-  public FugueServer(IDIContext diContext, String name, int httpPort)
+  public FugueServer(String name, int httpPort)
   {
-    diContext_ = diContext;
     name_ = name;
     httpPort_ = httpPort;
     exec_ = Executors.newScheduledThreadPool(0, new LocalThreadFactory());
   }
   
-  public void shutdown()
+  /**
+   * Start the server and return.
+   * 
+   * Unless some component starts a non-daemon thread the process will terminate. If no thread
+   * exists to keep the application alive then call join() after this method returns since
+   * this method is fluent you can call <code>start().join()</code>.
+   */
+  public FugueServer start()
+  {
+    diContext_.register(this);
+    registerComponents(diContext_);
+    diContext_.resolveAndStart();
+    
+    return this;
+  }
+  
+  protected abstract void registerComponents(IDIContext diContext);
+
+  public FugueServer join() throws InterruptedException
+  {
+    server_.join();
+    return this;
+  }
+  
+  public FugueServer stop()
   {
     log_.info("Shutting down...");
     diContext_.stop();
+    return this;
   }
 
   @Override
@@ -158,7 +183,7 @@ public class FugueServer implements IComponent
 //    return statusServlet_.setDefaultPanel(panel);
 //  }
 
-  public void startFugueServer()
+  private final void startFugueServer()
   {
     if(started_)
       return;
@@ -272,7 +297,7 @@ public class FugueServer implements IComponent
     }
   }
 
-  public final void stopFugueServer()
+  private final void stopFugueServer()
   {
     exec_.shutdown();
     server_.stop();

@@ -26,7 +26,7 @@ package org.symphonyoss.s2.fugue.di.test;
 import org.junit.Test;
 import org.symphonyoss.s2.fugue.di.Cardinality;
 import org.symphonyoss.s2.fugue.di.ConfigurationError;
-import org.symphonyoss.s2.fugue.di.impl.DIContext;
+import org.symphonyoss.s2.fugue.di.DIContext;
 
 public class TestDIContext
 {

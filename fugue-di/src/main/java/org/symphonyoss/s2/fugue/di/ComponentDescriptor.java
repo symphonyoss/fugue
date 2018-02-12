@@ -21,15 +21,12 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.impl;
+package org.symphonyoss.s2.fugue.di;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import org.symphonyoss.s2.fugue.di.Cardinality;
-import org.symphonyoss.s2.fugue.di.IBinder;
 
 public class ComponentDescriptor
 {

@@ -29,21 +29,23 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Nonnull;
 
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.exception.NotFoundException;
 import org.symphonyoss.s2.common.fault.ProgramFault;
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.IComponent;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 public class ConfigurationProvider implements IComponent, IConfigurationProvider
 {
@@ -205,45 +207,12 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
         throw new RuntimeException("FUGUE_CONFIG is " + configUrl + " but there is no content node in the JSON there");
       
       byte[] bytes = Base64.decodeBase64(content.asText());
-      String contentString = new String(bytes, StandardCharsets.UTF_8);
-      
-      System.err.println("Config is " + contentString);
       
       tree_ = mapper.readTree(bytes);
     }
     catch (IOException e)
     {
       throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
-    }
-  }
-
-  private void loadConfigFromFile(String fileName)
-  {
-    try
-    {
-      File file = Paths.get(getClass().getResource("/" + fileName).toURI()).toFile();
-      
-      if(!file.canRead() || !file.isFile())
-        throw new RuntimeException("FUGUE_CONFIG must point to a readable file.");
-      
-      try(InputStream in = new FileInputStream(file))
-      {
-        ObjectMapper mapper = new ObjectMapper();
-        
-        tree_ = mapper.readTree(in);
-      }
-      catch (FileNotFoundException e)
-      {
-        throw new ProgramFault("FUGUE_CONFIG is " + fileName + " which is not a URL or a file name.", e);
-      }
-      catch (IOException e)
-      {
-        throw new ProgramFault("FUGUE_CONFIG is " + fileName + " which is a file name, but we can't read it.", e);
-      }
-    }
-    catch (URISyntaxException e)
-    {
-      throw new ProgramFault("FUGUE_CONFIG must point to a readable file.", e);
     }
   }
 
@@ -255,7 +224,7 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
   }
 
   @Override
-  public String getProperty(String name) throws NotFoundException
+  public @Nonnull String getProperty(@Nonnull String name) throws NotFoundException
   {
     if(tree_ == null)
       throw new NotFoundException("No configuration loaded");
@@ -271,4 +240,53 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
     return node.asText();
   }
 
+  @Override
+  public @Nonnull String getRequiredProperty(@Nonnull String name)
+  {
+    try
+    {
+      return getProperty(name);
+    }
+    catch (NotFoundException e)
+    {
+      throw new ProgramFault("Required property  \"" + name + "\" not found", e);
+    }
+  }
+  
+  @Override
+  public @Nonnull List<String> getArray(@Nonnull String name) throws NotFoundException
+  {
+    if(tree_ == null)
+      throw new NotFoundException("No configuration loaded");
+    
+    JsonNode node = tree_.get(name);
+    
+    if(node == null)
+      throw new NotFoundException("No such property");
+    
+    if(!node.isArray())
+      throw new NotFoundException("Not a text value");
+    
+    List<String> result = new ArrayList<>();
+    
+    for(JsonNode child : node)
+    {
+      result.add(child.asText());
+    }
+      
+    return result;
+  }
+
+  @Override
+  public @Nonnull List<String> getRequiredArray(@Nonnull String name)
+  {
+    try
+    {
+      return getArray(name);
+    }
+    catch (NotFoundException e)
+    {
+      throw new ProgramFault("Required array property  \"" + name + "\" not found", e);
+    }
+  }
 }

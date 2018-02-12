@@ -23,9 +23,35 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.util.List;
+
 import org.symphonyoss.s2.common.exception.NotFoundException;
 
 public interface IConfigurationProvider
 {
+  /**
+   * Return the value of the given configuration property.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws NotFoundException  If the property is not defined in the current configuration.
+   */
   String  getProperty(String name) throws NotFoundException;
+  
+  /**
+   * Return the value of the given configuration property.
+   * 
+   * This method throws a ProgramFault if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws ProgramFault  If the property is not defined in the current configuration.
+   */
+  String  getRequiredProperty(String name);
+
+  List<String> getArray(String name) throws NotFoundException;
+
+  List<String> getRequiredArray(String name);
 }

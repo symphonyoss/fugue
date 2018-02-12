@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.impl;
+package org.symphonyoss.s2.fugue.di;
 
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
@@ -30,11 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-import org.symphonyoss.s2.fugue.di.ConfigurationError;
-import org.symphonyoss.s2.fugue.di.DIContextState;
-import org.symphonyoss.s2.fugue.di.IComponent;
-import org.symphonyoss.s2.fugue.di.IComponentProvider;
-import org.symphonyoss.s2.fugue.di.IDIContext;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
 import org.symphonyoss.s2.fugue.di.component.impl.DefaultLogComponent;
 

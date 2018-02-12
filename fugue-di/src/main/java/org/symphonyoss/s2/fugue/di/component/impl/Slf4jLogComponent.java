@@ -25,9 +25,8 @@ package org.symphonyoss.s2.fugue.di.component.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 public class Slf4jLogComponent implements ILogComponent
 {

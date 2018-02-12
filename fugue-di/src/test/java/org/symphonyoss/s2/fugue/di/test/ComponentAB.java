@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.di.test;
 
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 
 /**
  * @author bruce.skingle

@@ -23,8 +23,8 @@
 
 package org.symphonyoss.s2.fugue.di.component.impl;
 
+import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
-import org.symphonyoss.s2.fugue.di.impl.ComponentDescriptor;
 
 public class DefaultLogComponent implements ILogComponent
 {

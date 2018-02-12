@@ -21,12 +21,10 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.impl;
+package org.symphonyoss.s2.fugue.di;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.symphonyoss.s2.fugue.di.IComponent;
 
 public class ComponentHolder
 {

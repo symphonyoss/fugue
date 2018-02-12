@@ -180,7 +180,7 @@
 											org.symphonyoss.s2.japigen
 										</groupId>
 										<artifactId>
-											S2-japigen-maven-plugin
+											canon-maven-plugin
 										</artifactId>
 										<versionRange>
 											[0.0.1-SNAPSHOT,)
