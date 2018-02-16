@@ -83,6 +83,8 @@ public abstract class FugueServer implements IComponent
    * Unless some component starts a non-daemon thread the process will terminate. If no thread
    * exists to keep the application alive then call join() after this method returns since
    * this method is fluent you can call <code>start().join()</code>.
+   * 
+   * @return this (fluent method) 
    */
   public FugueServer start()
   {
@@ -101,6 +103,11 @@ public abstract class FugueServer implements IComponent
     return this;
   }
   
+  /**
+   * Stop the server.
+   * 
+   * @return this (fluent method) 
+   */
   public FugueServer stop()
   {
     log_.info("Shutting down...");

@@ -26,6 +26,7 @@ package org.symphonyoss.s2.fugue;
 import java.util.List;
 
 import org.symphonyoss.s2.common.exception.NotFoundException;
+import org.symphonyoss.s2.common.fault.ProgramFault;
 
 public interface IConfigurationProvider
 {
