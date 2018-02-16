@@ -25,9 +25,9 @@
   <modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>org.symphonyoss.s2</groupId>
-		<artifactId>S2-super-pom</artifactId>
-		<version>0.1.4</version>
+    <groupId>org.symphonyoss.s2</groupId>
+    <artifactId>S2-super-pom</artifactId>
+    <version>0.1.5</version>
 	</parent>
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
@@ -42,7 +42,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <s2.common.version>0.1.12-SNAPSHOT</s2.common.version>
+    <s2.common.version>0.1.12</s2.common.version>
   </properties>
   
 	<modules>
@@ -59,9 +59,9 @@
 	</licenses>
 
 	<scm>
-		<connection>scm:git:git://github.com/SymphonyOSF/fugue.git</connection>
-		<developerConnection>scm:git:git@github.com:SymphonyOSF/fugue.git</developerConnection>
-		<url>https://github.com/SymphonyOSF/fugue</url>
+		<connection>scm:git:git://github.com/symphonyoss/fugue.git</connection>
+		<developerConnection>scm:git:git@github.com:symphonyoss/fugue.git</developerConnection>
+		<url>https://github.com/symphonyoss/fugue</url>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -104,22 +104,6 @@
 				<artifactId>S2-common-http</artifactId>
 				<version>${s2.common.version}</version>
 			</dependency>
-			<!-- dddddxx<dependency>
-				<groupId>org.symphonyoss.s2.common</groupId>
-				<artifactId>S2-common-dom</artifactId>
-				<version>${s2.common.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.symphonyoss.s2.common</groupId>
-				<artifactId>S2-common-dom-jackson</artifactId>
-				<version>${s2.common.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.symphonyoss.s2.common</groupId>
-				<artifactId>S2-common-crypto</artifactId>
-				<version>${s2.common.version}</version>
-			</dependency> -->
-
 
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>
@@ -132,12 +116,6 @@
 				<artifactId>logback-classic</artifactId>
 				<version>1.0.13</version>
 			</dependency>
-			
-			<dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <scope>test</scope>
-      </dependency>
     </dependencies>
 	</dependencyManagement>
 
