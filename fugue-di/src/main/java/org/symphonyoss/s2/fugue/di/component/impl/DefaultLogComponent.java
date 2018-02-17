@@ -26,6 +26,12 @@ package org.symphonyoss.s2.fugue.di.component.impl;
 import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
 
+/**
+ * The default implementation of ILogComponent.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class DefaultLogComponent implements ILogComponent
 {
   @Override

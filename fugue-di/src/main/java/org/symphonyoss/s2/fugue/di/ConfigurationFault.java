@@ -23,31 +23,34 @@
 
 package org.symphonyoss.s2.fugue.di;
 
-public class ConfigurationError extends RuntimeException
+/**
+ * Indicates a configuration error which is assumed to be terminal for the application.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class ConfigurationFault extends RuntimeException
 {
   private static final long serialVersionUID = 1L;
 
-  public ConfigurationError()
-  {
-  }
-
-  public ConfigurationError(String message)
+  /**
+   * Construct a ConfigurationFault with the given message.
+   * 
+   * @param message An explanatory message.
+   */
+  public ConfigurationFault(String message)
   {
     super(message);
   }
 
-  public ConfigurationError(Throwable cause)
-  {
-    super(cause);
-  }
-
-  public ConfigurationError(String message, Throwable cause)
+  /**
+   * Construct a ConfigurationFault with the given message.
+   * 
+   * @param message An explanatory message.
+   * @param cause   The underlying cause of the fault.
+   */
+  public ConfigurationFault(String message, Throwable cause)
   {
     super(message, cause);
-  }
-
-  public ConfigurationError(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace)
-  {
-    super(message, cause, enableSuppression, writableStackTrace);
   }
 }

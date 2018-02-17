@@ -33,6 +33,12 @@ import java.util.Stack;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
 import org.symphonyoss.s2.fugue.di.component.impl.DefaultLogComponent;
 
+/**
+ * A dependency injection context.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class DIContext implements IDIContext
 {
   private static final String UNREACHABLE_CODE = "UNREACHABLE CODE - or did you change Cardinality?";
@@ -129,7 +135,7 @@ public class DIContext implements IDIContext
         log_.error(component.getClass());
       }
       
-      throw new ConfigurationError("Unresolvable components");
+      throw new ConfigurationFault("Unresolvable components");
     }
   }
   

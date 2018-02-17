@@ -29,7 +29,7 @@ import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.IRandomNumberProvider;
 
 /**
- * A Diafanis component which provides an instance of a SecureRandom.
+ * A component which provides an instance of a SecureRandom.
  * 
  * @author bruce.skingle
  *
@@ -92,6 +92,4 @@ public class RandomNumberProvider implements IRandomNumberProvider
   {
     return random_.nextGaussian();
   }
-  
-  
 }

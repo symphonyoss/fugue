@@ -28,6 +28,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Fugue components are required to provide a ComponentDescriptor which specifies what
+ * dependencies it has and what interfaces it provides.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class ComponentDescriptor
 {
   private List<Dependency<?>> dependencyList_     = new ArrayList<>();
@@ -41,6 +48,7 @@ public class ComponentDescriptor
    * Convenience method.
    * 
    * @param requiredInterface The interface of which an implementation is required.
+   * @param binder            The binder to be called with the injected value.
    * @return this - fluent interface.
    */
   public <T> ComponentDescriptor addDependency(Class<T> requiredInterface,
@@ -54,7 +62,7 @@ public class ComponentDescriptor
    * 
    * @param requiredInterface The interface of which an implementation is required.
    * @param cardinality       The number of instances which is required.
-   * @param binder 
+   * @param binder            The binder to be called with the injected value.
    * @return this - fluent interface.
    */
   public <T> ComponentDescriptor addDependency(Class<T> requiredInterface,
@@ -84,6 +92,13 @@ public class ComponentDescriptor
     return this;
   }
   
+  /**
+   * Add a Runnable which will be called during process initialisation.
+   * 
+   * @param handler A Runnable to be called at start time.
+   * 
+   * @return This (fluent method)
+   */
   public ComponentDescriptor  addStart(Runnable handler)
   {
     startHandlers_.add(handler);
@@ -91,6 +106,13 @@ public class ComponentDescriptor
     return this;
   }
   
+  /**
+   * Add a Runnable which will be called during process termination.
+   * 
+   * @param handler A Runnable to be called at shutdown time.
+   * 
+   * @return This (fluent method)
+   */
   public ComponentDescriptor  addStop(Runnable handler)
   {
     stopHandlers_.add(handler);
@@ -98,31 +120,25 @@ public class ComponentDescriptor
     return this;
   }
 
-  public List<Dependency<?>> getDependencies()
+  /* package */ List<Dependency<?>> getDependencies()
   {
     return dependencyList_;
   }
 
-  public Set<Class<?>> getProvidedInterfaces()
+  /* package */ Set<Class<?>> getProvidedInterfaces()
   {
     return providedInterfaces_;
   }
 
-  public List<Runnable> getStartHandlers()
+  
+  /* package */ List<Runnable> getStartHandlers()
   {
     return startHandlers_;
   }
 
-  public List<Runnable> getStopHandlers()
+  /* package */ List<Runnable> getStopHandlers()
   {
     return stopHandlers_;
-  }
-
-  public ComponentDescriptor removeProvidedInterface(Class<?> providedInterface)
-  {    
-    providedInterfaces_.remove(providedInterface);
-    
-    return this;
   }
 }
 

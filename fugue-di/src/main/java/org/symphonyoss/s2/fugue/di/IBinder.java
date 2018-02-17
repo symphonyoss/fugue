@@ -23,8 +23,20 @@
 
 package org.symphonyoss.s2.fugue.di;
 
+/**
+ * An interface to accept a declared dependency.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <T> The type of the required dependency.
+ */
 @FunctionalInterface
 public interface IBinder<T>
 {
+  /**
+   * Bind the given value as a dependency.
+   * 
+   * @param value The concrete implementation of a required dependency (interface).
+   */
   void bind(T value);
 }

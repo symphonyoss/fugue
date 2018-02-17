@@ -26,7 +26,7 @@ package org.symphonyoss.s2.fugue.di;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ComponentHolder
+/* package */ class ComponentHolder
 {
   private IComponent             component_;
   private List<ComponentHolder>  dependentComponents_ = new ArrayList<>();

@@ -23,6 +23,13 @@
 
 package org.symphonyoss.s2.fugue.di;
 
+/**
+ * The cardinality of a required interface.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+@SuppressWarnings("javadoc")
 public enum Cardinality
 {
   one, zeroOrOne, zeroOrMore, oneOrMore; 
