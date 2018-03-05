@@ -55,4 +55,10 @@ public interface IConfigurationProvider
   List<String> getArray(String name) throws NotFoundException;
 
   List<String> getRequiredArray(String name);
+  
+  IConfigurationProvider  getConfiguration(String name) throws NotFoundException;
+  
+  IConfigurationProvider  getRequiredConfiguration(String name);
+
+  boolean getBooleanProperty(String name);
 }

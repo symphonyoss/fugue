@@ -23,7 +23,20 @@
 
 package org.symphonyoss.s2.fugue.di;
 
+/**
+ * A provider of additional components.
+ * 
+ * If this interface is provided by any Component then when the context is resolved the registerComponents
+ * method will be called so that additional components can be registered into the DI context. 
+ * @author Bruce Skingle
+ *
+ */
 public interface IComponentProvider
 {
+  /**
+   * Called at start time, during the resolution process, before any component is started.
+   * 
+   * @param diContext The DI Context.
+   */
   void registerComponents(IDIContext diContext);
 }

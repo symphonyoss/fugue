@@ -23,6 +23,12 @@
 
 package org.symphonyoss.s2.fugue.di;
 
+/**
+ * A Dependency Injection Context.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IDIContext
 {
   /**
@@ -45,7 +51,18 @@ public interface IDIContext
    */
   void resolveAndStart();
   
+  /**
+   * Resolve all components.
+   * 
+   * May only be called once.
+   */
   void resolve();
+  
+  /**
+   * Start all components.
+   * 
+   * May only be called once, after the context is resolved.
+   */
   
   void start();
 

@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.di;
 
-public class Dependency<T>
+/* package */ class Dependency<T>
 {
   private final Class<T>    requiredInterface_;
   private IBinder<T>        binder_;

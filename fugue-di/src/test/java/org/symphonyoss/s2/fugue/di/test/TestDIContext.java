@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue.di.test;
 
 import org.junit.Test;
 import org.symphonyoss.s2.fugue.di.Cardinality;
-import org.symphonyoss.s2.fugue.di.ConfigurationError;
+import org.symphonyoss.s2.fugue.di.ConfigurationFault;
 import org.symphonyoss.s2.fugue.di.DIContext;
 
 public class TestDIContext
@@ -45,7 +45,7 @@ public class TestDIContext
     consumer.check(1);
   }
   
-  @Test(expected=ConfigurationError.class)
+  @Test(expected=ConfigurationFault.class)
   public void testMissing()
   {
     IntegerConsumer consumer = new IntegerConsumer(Cardinality.one);
@@ -78,7 +78,7 @@ public class TestDIContext
     context.resolveAndStart();
   }
   
-  @Test(expected=ConfigurationError.class)
+  @Test(expected=ConfigurationFault.class)
   public void testInvalidMultiple()
   {
     IntegerConsumer consumer = new IntegerConsumer(Cardinality.one);
@@ -91,7 +91,7 @@ public class TestDIContext
     context.resolveAndStart();
   }
   
-  @Test(expected=ConfigurationError.class)
+  @Test(expected=ConfigurationFault.class)
   public void testInvalidMultipleZeroOrOne()
   {
     IntegerConsumer consumer = new IntegerConsumer(Cardinality.zeroOrOne);
@@ -104,7 +104,7 @@ public class TestDIContext
     context.resolveAndStart();
   }
   
-  @Test(expected=ConfigurationError.class)
+  @Test(expected=ConfigurationFault.class)
   public void testInvalidNone()
   {
     IntegerConsumer consumer = new IntegerConsumer(Cardinality.one);
@@ -115,7 +115,7 @@ public class TestDIContext
     context.resolveAndStart();
   }
   
-  @Test(expected=ConfigurationError.class)
+  @Test(expected=ConfigurationFault.class)
   public void testInvalidNoneOneOrMore()
   {
     IntegerConsumer consumer = new IntegerConsumer(Cardinality.oneOrMore);

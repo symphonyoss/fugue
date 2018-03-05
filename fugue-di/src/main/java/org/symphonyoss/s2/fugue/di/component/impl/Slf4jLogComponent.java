@@ -28,6 +28,12 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.component.ILogComponent;
 
+/**
+ * An SLF4J implementation of ILogComponent.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class Slf4jLogComponent implements ILogComponent
 {
   private static Logger log_ = LoggerFactory.getLogger(Slf4jLogComponent.class);

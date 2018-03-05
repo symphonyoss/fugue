@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.di;
 
-public enum DIContextState
+/* package */ enum DIContextState
 {
   Initializing, Resolving, Resolved, Running, Stopping, Stopped, Starting, Failed;
 }

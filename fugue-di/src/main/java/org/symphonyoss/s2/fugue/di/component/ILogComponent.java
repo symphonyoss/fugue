@@ -43,21 +43,64 @@ import org.symphonyoss.s2.fugue.di.IComponent;
  */
 public interface ILogComponent extends IComponent
 {
-
+  /**
+   * Log a message with a stack trace at DEBUG level.
+   * 
+   * @param message A message to be logged.
+   * @param cause   A Throwable whose stack trace should be logged.
+   */
   void debug(Object message, Throwable cause);
 
+  /**
+   * Log a message at DEBUG level.
+   * 
+   * @param message A message to be logged.
+   */
   void debug(Object message);
 
+  /**
+   * Log a message with a stack trace at INFO level.
+   * 
+   * @param message A message to be logged.
+   * @param cause   A Throwable whose stack trace should be logged.
+   */
   void info(Object message, Throwable cause);
 
+  /**
+   * Log a message at INFO level.
+   * 
+   * @param message A message to be logged.
+   */
   void info(Object message);
 
+  /**
+   * Log a message with a stack trace at WARN level.
+   * 
+   * @param message A message to be logged.
+   * @param cause   A Throwable whose stack trace should be logged.
+   */
   void warn(Object message, Throwable cause);
 
+  /**
+   * Log a message at WARN level.
+   * 
+   * @param message A message to be logged.
+   */
   void warn(Object message);
 
+  /**
+   * Log a message with a stack trace at ERROR level.
+   * 
+   * @param message A message to be logged.
+   * @param cause   A Throwable whose stack trace should be logged.
+   */
   void error(Object message, Throwable cause);
 
+  /**
+   * Log a message at ERROR level.
+   * 
+   * @param message A message to be logged.
+   */
   void error(Object message);
 
 }
