@@ -30,29 +30,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.annotation.Nonnull;
 
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.exception.NotFoundException;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.IComponent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 
-public class ConfigurationProvider implements IComponent, IConfigurationProvider
+public class ConfigurationProvider extends BaseConfigurationProvider implements IComponent
 {
   private static final Logger log_ = LoggerFactory.getLogger(ConfigurationProvider.class);
   
-  private JsonNode tree_;
-
   public ConfigurationProvider()
   {
     loadConfigSpec(System.getenv("FUGUE_CONFIG"));
@@ -123,7 +115,7 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
         }
         else if((n = configSpec.get("config")) != null)
         {
-          tree_ = n;
+          setTree(n);
         }
         else
         {
@@ -185,7 +177,7 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
     {
       ObjectMapper mapper = new ObjectMapper();
       
-      tree_ = mapper.readTree(in);
+      setTree(mapper.readTree(in));
     }
     catch (IOException e)
     {
@@ -208,7 +200,7 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
       
       byte[] bytes = Base64.decodeBase64(content.asText());
       
-      tree_ = mapper.readTree(bytes);
+      setTree(mapper.readTree(bytes));
     }
     catch (IOException e)
     {
@@ -221,72 +213,5 @@ public class ConfigurationProvider implements IComponent, IConfigurationProvider
   {
     return new ComponentDescriptor()
         .addProvidedInterface(IConfigurationProvider.class);
-  }
-
-  @Override
-  public @Nonnull String getProperty(@Nonnull String name) throws NotFoundException
-  {
-    if(tree_ == null)
-      throw new NotFoundException("No configuration loaded");
-    
-    JsonNode node = tree_.get(name);
-    
-    if(node == null)
-      throw new NotFoundException("No such property");
-    
-//    if(!node.isTextual())
-//      throw new NotFoundException("Not a text value");
-    
-    return node.asText();
-  }
-
-  @Override
-  public @Nonnull String getRequiredProperty(@Nonnull String name)
-  {
-    try
-    {
-      return getProperty(name);
-    }
-    catch (NotFoundException e)
-    {
-      throw new ProgramFault("Required property  \"" + name + "\" not found", e);
-    }
-  }
-  
-  @Override
-  public @Nonnull List<String> getArray(@Nonnull String name) throws NotFoundException
-  {
-    if(tree_ == null)
-      throw new NotFoundException("No configuration loaded");
-    
-    JsonNode node = tree_.get(name);
-    
-    if(node == null)
-      throw new NotFoundException("No such property");
-    
-    if(!node.isArray())
-      throw new NotFoundException("Not a text value");
-    
-    List<String> result = new ArrayList<>();
-    
-    for(JsonNode child : node)
-    {
-      result.add(child.asText());
-    }
-      
-    return result;
-  }
-
-  @Override
-  public @Nonnull List<String> getRequiredArray(@Nonnull String name)
-  {
-    try
-    {
-      return getArray(name);
-    }
-    catch (NotFoundException e)
-    {
-      throw new ProgramFault("Required array property  \"" + name + "\" not found", e);
-    }
   }
 }
