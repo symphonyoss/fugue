@@ -39,3 +39,4 @@ target/**
 
 workspace/**
 /.recommenders/
+**/.gitignore

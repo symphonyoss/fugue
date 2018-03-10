@@ -23,41 +23,20 @@
 
 package org.symphonyoss.s2.fugue.di;
 
-/* package */ class Dependency<T>
+/**
+ * An interface to provide a declared interface.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <T> The type of the provided dependency.
+ */
+@FunctionalInterface
+public interface IProvider<T>
 {
-  private final Class<T>    requiredInterface_;
-  private IBinder<T>        binder_;
-  private final Cardinality cardinality_;
-  
-  public Dependency(Class<T> requiredInterface, IBinder<T> binder, Cardinality cardinality)
-  {
-    requiredInterface_ = requiredInterface;
-    binder_ = binder;
-    cardinality_ = cardinality;
-  }
-
-  public Class<?> getRequiredInterface()
-  {
-    return requiredInterface_;
-  }
-
-  public Cardinality getCardinality()
-  {
-    return cardinality_;
-  }
-  
-  /*
-   * We are relying on the check performed in the context which is part of our package.
+  /**
+   * Provide an interface as a dependency to other components.
+   * 
+   * @return value The concrete implementation of a provided dependency (interface).
    */
-  @SuppressWarnings("unchecked")
-  /* package */ void bind(Object value)
-  {
-    binder_.bind((T)value);
-  }
-  
-  @Override
-  public String toString()
-  {
-    return "Dependency on " + requiredInterface_.getSimpleName() + ":" + cardinality_;
-  }
+  T provide();
 }

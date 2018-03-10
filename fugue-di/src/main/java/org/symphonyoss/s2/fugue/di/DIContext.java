@@ -23,7 +23,6 @@
 
 package org.symphonyoss.s2.fugue.di;
 
-import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +43,7 @@ public class DIContext implements IDIContext
   private static final String UNREACHABLE_CODE = "UNREACHABLE CODE - or did you change Cardinality?";
   
   private ILogComponent                        log_ = new DefaultLogComponent();
-  private Map<Class<?>, List<ComponentHolder>> providedInterfaceMap_      = new HashMap<>();
+  private Map<Class<?>, List<ProvidedInterface<?>>> providedInterfaceMap_      = new HashMap<>();
   private List<ComponentHolder>                componentList_             = new ArrayList<>();
   private Object                               lifeCycleLock_             = new Object();
   private DIContextState                          lifeCycle_                 = DIContextState.Initializing;
@@ -61,14 +60,11 @@ public class DIContext implements IDIContext
     ComponentHolder holder = new ComponentHolder(component);
     ComponentDescriptor desc = holder.getComponentDescriptor();
         
-    for(Class<?> providedInterface : desc.getProvidedInterfaces())
+    for(ProvidedInterface<?> provider : desc.getProvidedInterfaces())
     { 
-      if(!providedInterface.isInstance(component))
-        throw new InvalidParameterException("Component " + component.getClass() +
-            " does not implement the interface " + providedInterface +
-            " which it declares to provide.");
-      
-      List<ComponentHolder> list = providedInterfaceMap_.get(providedInterface);
+      provider.bind(holder); // throws exception if there is a configuration problem
+      Class<?> providedInterface = provider.getProvidedInterface();
+      List<ProvidedInterface<?>> list = providedInterfaceMap_.get(providedInterface);
       
       if(list == null)
       {
@@ -76,10 +72,10 @@ public class DIContext implements IDIContext
         providedInterfaceMap_.put(providedInterface, list);
       }
       
-      list.add(holder);
+      list.add(provider);
       if(providedInterface == ILogComponent.class)
       {
-        log_ = (ILogComponent) component;
+        log_ = (ILogComponent) provider.getImplementation();
         logProvided_ = true;
       }
     }
@@ -161,7 +157,7 @@ public class DIContext implements IDIContext
     
     for(Dependency<?> dependency : holder.getComponentDescriptor().getDependencies())
     {
-      List<ComponentHolder> providers = providedInterfaceMap_.get(dependency.getRequiredInterface());
+      List<ProvidedInterface<?>> providers = providedInterfaceMap_.get(dependency.getRequiredInterface());
       
       if(providers == null || providers.size() == 0) // zero size "can't happen" but....
       {
@@ -203,9 +199,9 @@ public class DIContext implements IDIContext
                     dependency.getRequiredInterface() +
                     " for " + component.getClass());
                 
-                for(ComponentHolder provider : providers)
+                for(ProvidedInterface<?> provider : providers)
                 {
-                  log_.error("Provided by " + provider.getComponent());
+                  log_.error("Provided by " + provider.getProvidingComponent());
                 }
                 
                 result = false;
@@ -215,7 +211,7 @@ public class DIContext implements IDIContext
               
             case oneOrMore:
             case zeroOrMore:
-              for(ComponentHolder provider : providers)
+              for(ProvidedInterface<?> provider : providers)
               {
                 doBind(provider, dependency, holder);
               }
@@ -320,17 +316,17 @@ public class DIContext implements IDIContext
     stopStack_.push(holder);
   }
 
-  private void doBind(ComponentHolder providerHolder, 
+  private void doBind(ProvidedInterface<?> providerHolder, 
       Dependency<?> dependency, ComponentHolder componentHolder)
   {
     log_.debug("Binding dependency " + 
         dependency.getRequiredInterface().getSimpleName() +
-        " from " + providerHolder.getName() + 
+        " from " + providerHolder.getProvidingComponent() + 
         " for " + componentHolder.getName());
     
-    dependency.bind(providerHolder.getComponent());
+    dependency.bind(providerHolder.getImplementation());
     
-    componentHolder.addDependency(providerHolder, dependency);
+    componentHolder.addDependency(providerHolder.getProvidingComponent(), dependency);
   }
   
   @Override

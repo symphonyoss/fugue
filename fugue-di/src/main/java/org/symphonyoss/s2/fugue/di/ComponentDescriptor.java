@@ -24,9 +24,10 @@
 package org.symphonyoss.s2.fugue.di;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Fugue components are required to provide a ComponentDescriptor which specifies what
@@ -37,10 +38,10 @@ import java.util.Set;
  */
 public class ComponentDescriptor
 {
-  private List<Dependency<?>> dependencyList_     = new ArrayList<>();
-  private Set<Class<?>>       providedInterfaces_ = new HashSet<>();
-  private List<Runnable>      startHandlers_      = new ArrayList<>();
-  private List<Runnable>      stopHandlers_       = new ArrayList<>();
+  private List<Dependency<?>>                 dependencyList_     = new ArrayList<>();
+  private Map<Class<?>, ProvidedInterface<?>> providedInterfaces_ = new HashMap<>();
+  private List<Runnable>                      startHandlers_      = new ArrayList<>();
+  private List<Runnable>                      stopHandlers_       = new ArrayList<>();
  
   /**
    * Add a simple (Cardinality.One) dependency.
@@ -87,7 +88,22 @@ public class ComponentDescriptor
    */
   public ComponentDescriptor addProvidedInterface(Class<?> providedInterface)
   {
-    providedInterfaces_.add(providedInterface);
+    providedInterfaces_.put(providedInterface, new ProvidedInterface<>(providedInterface, null));
+    
+    return this;
+  }
+  
+  /**
+   * Add an interface which this component provided indirectly and which can
+   * be provided to other components.
+   * 
+   * @param providedInterface An interface which is provided.
+   * @param provider          A provider of the interface, usually a lambda
+   * @return this - fluent interface.
+   */
+  public <T> ComponentDescriptor addProvidedInterface(Class<T> providedInterface, IProvider<T> provider)
+  {
+    providedInterfaces_.put(providedInterface, new ProvidedInterface<>(providedInterface, provider));
     
     return this;
   }
@@ -125,9 +141,9 @@ public class ComponentDescriptor
     return dependencyList_;
   }
 
-  /* package */ Set<Class<?>> getProvidedInterfaces()
+  /* package */ Collection<ProvidedInterface<?>> getProvidedInterfaces()
   {
-    return providedInterfaces_;
+    return providedInterfaces_.values();
   }
 
   
