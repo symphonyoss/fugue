@@ -62,7 +62,8 @@ public class DIContext implements IDIContext
         
     for(ProvidedInterface<?> provider : desc.getProvidedInterfaces())
     { 
-      provider.bind(holder); // throws exception if there is a configuration problem
+//      provider.bind(holder); // throws exception if there is a configuration problem
+      provider.preBind(holder);
       Class<?> providedInterface = provider.getProvidedInterface();
       List<ProvidedInterface<?>> list = providedInterfaceMap_.get(providedInterface);
       
@@ -311,6 +312,12 @@ public class DIContext implements IDIContext
   private void start(ComponentHolder holder)
   {
     log_.debug("Start " + holder.getName());
+    
+    for(ProvidedInterface<?> provider : holder.getComponentDescriptor().getProvidedInterfaces())
+    { 
+      provider.bind(holder); // throws exception if there is a configuration problem
+    }
+    
     for(Runnable handler : holder.getComponentDescriptor().getStartHandlers())
       handler.run();
     stopStack_.push(holder);

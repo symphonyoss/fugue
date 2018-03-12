@@ -65,7 +65,10 @@ import java.security.InvalidParameterException;
         throw new InvalidParameterException("Component " + componentHolder.getComponent().getClass() +
             " provides a null implementation of the interface " + providedInterface_);
     }
-    
+  }
+  
+  /* package */ void preBind(ComponentHolder componentHolder)
+  {  
     providingComponent_ = componentHolder;
   }
   
