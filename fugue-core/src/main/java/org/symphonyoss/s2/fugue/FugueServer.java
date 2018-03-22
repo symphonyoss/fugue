@@ -46,7 +46,13 @@ import org.symphonyoss.s2.fugue.di.DIContext;
 import org.symphonyoss.s2.fugue.di.IComponent;
 import org.symphonyoss.s2.fugue.di.IDIContext;
 
-public abstract class FugueServer implements IComponent
+/**
+ * The main component for a Fugue process.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public abstract class FugueServer implements IComponent, IFugueServer
 {
   private static Logger                          log_ = LoggerFactory.getLogger(FugueServer.class);
 
@@ -69,7 +75,12 @@ public abstract class FugueServer implements IComponent
   private boolean                                started_;
   private String                                 serverUrl_;
 
-  
+  /**
+   * Constructor.
+   * 
+   * @param name      The program name.
+   * @param httpPort  The local port on which to run an http server.
+   */
   public FugueServer(String name, int httpPort)
   {
     name_ = name;
@@ -77,15 +88,7 @@ public abstract class FugueServer implements IComponent
     exec_ = Executors.newScheduledThreadPool(0, new LocalThreadFactory());
   }
   
-  /**
-   * Start the server and return.
-   * 
-   * Unless some component starts a non-daemon thread the process will terminate. If no thread
-   * exists to keep the application alive then call join() after this method returns since
-   * this method is fluent you can call <code>start().join()</code>.
-   * 
-   * @return this (fluent method) 
-   */
+  @Override
   public FugueServer start()
   {
     diContext_.register(this);
@@ -97,17 +100,14 @@ public abstract class FugueServer implements IComponent
   
   protected abstract void registerComponents(IDIContext diContext);
 
+  @Override
   public FugueServer join() throws InterruptedException
   {
     server_.join();
     return this;
   }
   
-  /**
-   * Stop the server.
-   * 
-   * @return this (fluent method) 
-   */
+  @Override
   public FugueServer stop()
   {
     log_.info("Shutting down...");
@@ -124,13 +124,14 @@ public abstract class FugueServer implements IComponent
 //        .addDependency(IFundamentalService.class,       (v) -> fundamentalService_ = v)
 //        .addDependency(ISystemService.class,            (v) -> systemModelService_ = v)
 //        .addDependency(ISessionService.class,           (v) -> sessionService_ = v)
+        .addProvidedInterface(IFugueServer.class)
         .addDependency(IUrlPathServlet.class,           (v) -> bind(v), Cardinality.zeroOrMore)
         .addDependency(IServletProvider.class,          (v) -> bind(v), Cardinality.zeroOrMore)
         .addStart(() -> startFugueServer())
         .addStop(() -> stopFugueServer());
   }
 
-  public synchronized void bind(IServletProvider servletProvider)
+  private synchronized void bind(IServletProvider servletProvider)
   {
     servletProviders_.addIfAbsent(servletProvider);
 //    if(servletProviders_.addIfAbsent(servletProvider))
@@ -140,7 +141,7 @@ public abstract class FugueServer implements IComponent
 //    }
   }
   
-  public synchronized void bind(IUrlPathServlet servlet)
+  private synchronized void bind(IUrlPathServlet servlet)
   {
     servlets_.addIfAbsent(servlet);
 //    if(servlets_.addIfAbsent(servlet))
