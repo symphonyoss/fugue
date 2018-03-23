@@ -23,6 +23,9 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
 /**
  * The main component for a Fugue process.
  * 
@@ -61,4 +64,62 @@ public interface IFugueServer
    */
   FugueServer stop();
 
+  /**
+   * Put the server into a failed state.
+   * 
+   * @return this (fluent method) 
+   */
+  FugueServer fail();
+
+  /**
+   * Create a new ExecutorService with a thread pool using the given name.
+   * 
+   * If tasks submitted to this service throw exceptions then they are handled the Fugue way.
+   * 
+   * The ExecutorService will be shut down when the server terminates.
+   * 
+   * @param name The name for threads in the executor.
+   * 
+   * @return A new ExecutorService.
+   */
+  ExecutorService newExecutor(String name);
+
+  /**
+   * Create a new ExecutorService using the given underlying service.
+   * 
+   * If tasks submitted to this service throw exceptions then they are handled the Fugue way.
+   * 
+   * The ExecutorService will be shut down when the server terminates.
+   * 
+   * @param exec  An executor to so the actual work.
+   * 
+   * @return A new ExecutorService.
+   */
+  ExecutorService newExecutor(ExecutorService exec);
+
+  /**
+   * Create a new ScheduledExecutorService with a thread pool using the given name.
+   * 
+   * If tasks submitted to this service throw exceptions then they are handled the Fugue way.
+   * 
+   * The ExecutorService will be shut down when the server terminates.
+   * 
+   * @param name The name for threads in the executor.
+   * 
+   * @return A new ScheduledExecutorService.
+   */
+  ScheduledExecutorService newScheduledExecutor(String name);
+
+  /**
+   * Create a new ScheduledExecutorService using the given underlying service.
+   * 
+   * If tasks submitted to this service throw exceptions then they are handled the Fugue way.
+   * 
+   * The ExecutorService will be shut down when the server terminates.
+   * 
+   * @param exec  An executor to so the actual work.
+   * 
+   * @return A new ScheduledExecutorService.
+   */
+  ScheduledExecutorService newScheduledExecutor(ScheduledExecutorService exec);
 }
