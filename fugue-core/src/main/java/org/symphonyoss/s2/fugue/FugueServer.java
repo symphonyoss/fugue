@@ -25,13 +25,9 @@ package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -40,52 +36,56 @@ import org.symphonyoss.s2.common.http.HttpServer;
 import org.symphonyoss.s2.common.http.HttpServerBuilder;
 import org.symphonyoss.s2.common.http.IServletProvider;
 import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
+import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
 import org.symphonyoss.s2.fugue.di.Cardinality;
 import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 import org.symphonyoss.s2.fugue.di.DIContext;
 import org.symphonyoss.s2.fugue.di.IComponent;
 import org.symphonyoss.s2.fugue.di.IDIContext;
 
-public abstract class FugueServer implements IComponent
+/**
+ * The main component for a Fugue process.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public abstract class FugueServer implements IComponent, IFugueServer
 {
-  private static Logger                          log_ = LoggerFactory.getLogger(FugueServer.class);
+  private static Logger                              log_              = LoggerFactory.getLogger(FugueServer.class);
 
-  private final IDIContext                       diContext_ = new DIContext();
-  private final String                           name_;
-  private final int                              httpPort_;
-  private final ScheduledExecutorService         exec_;
-  
-//  private IResourcesService                      resourcesService_;
-//  private IFundamentalService                    fundamentalService_;
-//  private ISystemService                         systemModelService_;
-//  private ISessionService                        sessionService_;
+  private final IDIContext                           diContext_        = new DIContext();
+  private final int                                  httpPort_;
 
-  private HttpServer                             server_;
-//  private StatusServlet                          statusServlet_;
-  private CopyOnWriteArrayList<IServletProvider> servletProviders_ = new CopyOnWriteArrayList<>();
-  private CopyOnWriteArrayList<IUrlPathServlet>  servlets_         = new CopyOnWriteArrayList<>();
+  // private IResourcesService resourcesService_;
+  // private IFundamentalService fundamentalService_;
+  // private ISystemService systemModelService_;
+  // private ISessionService sessionService_;
 
-//  private IApplication                           application_;
-  private boolean                                started_;
-  private String                                 serverUrl_;
+  private HttpServer                                 server_;
+  // private StatusServlet statusServlet_;
+  private CopyOnWriteArrayList<IServletProvider>     servletProviders_ = new CopyOnWriteArrayList<>();
+  private CopyOnWriteArrayList<IUrlPathServlet>      servlets_         = new CopyOnWriteArrayList<>();
+  private CopyOnWriteArrayList<FugueExecutorService> executors_        = new CopyOnWriteArrayList<>();
+  private CopyOnWriteArrayList<Thread>               threads_          = new CopyOnWriteArrayList<>();
 
-  
+  // private IApplication application_;
+  private boolean                                    started_;
+  private boolean                                    running_;
+  private String                                     serverUrl_;
+
+  /**
+   * Constructor.
+   * 
+   * @param name      The program name.
+   * @param httpPort  The local port on which to run an http server.
+   */
   public FugueServer(String name, int httpPort)
   {
-    name_ = name;
     httpPort_ = httpPort;
-    exec_ = Executors.newScheduledThreadPool(0, new LocalThreadFactory());
   }
   
-  /**
-   * Start the server and return.
-   * 
-   * Unless some component starts a non-daemon thread the process will terminate. If no thread
-   * exists to keep the application alive then call join() after this method returns since
-   * this method is fluent you can call <code>start().join()</code>.
-   * 
-   * @return this (fluent method) 
-   */
+  @Override
   public FugueServer start()
   {
     diContext_.register(this);
@@ -97,22 +97,26 @@ public abstract class FugueServer implements IComponent
   
   protected abstract void registerComponents(IDIContext diContext);
 
+  @Override
   public FugueServer join() throws InterruptedException
   {
     server_.join();
     return this;
   }
   
-  /**
-   * Stop the server.
-   * 
-   * @return this (fluent method) 
-   */
+  @Override
   public FugueServer stop()
   {
     log_.info("Shutting down...");
     diContext_.stop();
     return this;
+  }
+
+  @Override
+  public FugueServer fail()
+  {
+    log_.error("Server FAILED");
+    return stop();
   }
 
   @Override
@@ -124,13 +128,14 @@ public abstract class FugueServer implements IComponent
 //        .addDependency(IFundamentalService.class,       (v) -> fundamentalService_ = v)
 //        .addDependency(ISystemService.class,            (v) -> systemModelService_ = v)
 //        .addDependency(ISessionService.class,           (v) -> sessionService_ = v)
+        .addProvidedInterface(IFugueServer.class)
         .addDependency(IUrlPathServlet.class,           (v) -> bind(v), Cardinality.zeroOrMore)
         .addDependency(IServletProvider.class,          (v) -> bind(v), Cardinality.zeroOrMore)
         .addStart(() -> startFugueServer())
         .addStop(() -> stopFugueServer());
   }
 
-  public synchronized void bind(IServletProvider servletProvider)
+  private synchronized void bind(IServletProvider servletProvider)
   {
     servletProviders_.addIfAbsent(servletProvider);
 //    if(servletProviders_.addIfAbsent(servletProvider))
@@ -140,7 +145,7 @@ public abstract class FugueServer implements IComponent
 //    }
   }
   
-  public synchronized void bind(IUrlPathServlet servlet)
+  private synchronized void bind(IUrlPathServlet servlet)
   {
     servlets_.addIfAbsent(servlet);
 //    if(servlets_.addIfAbsent(servlet))
@@ -150,6 +155,16 @@ public abstract class FugueServer implements IComponent
 //    }
   }
   
+  public void registerThread()
+  {
+    registerThread(Thread.currentThread());
+  }
+  
+  public void registerThread(Thread thread)
+  {
+    threads_.add(thread);
+  }
+
 //  public IResourcesService getResourcesService()
 //  {
 //    return resourcesService_;
@@ -190,12 +205,25 @@ public abstract class FugueServer implements IComponent
 //    return statusServlet_.setDefaultPanel(panel);
 //  }
 
+  public synchronized boolean isRunning()
+  {
+    return running_;
+  }
+
+  private synchronized boolean setRunning(boolean running)
+  {
+    boolean v = running_;
+    running_ = running;
+    return v;
+  }
+
   private final void startFugueServer()
   {
     if(started_)
       return;
     
     started_ = true;
+    setRunning(true);
 //    application_.setLifeCycleState(ComponentLifeCycleState.Starting);
 //    application_.setState(ComponentState.OK);
     
@@ -306,22 +334,76 @@ public abstract class FugueServer implements IComponent
 
   private final void stopFugueServer()
   {
-    exec_.shutdown();
+    if(!setRunning(false))
+    {
+      log_.info("Not running, no need to stop");
+      return;
+    }
+    
+    for(FugueExecutorService exec : executors_)
+      exec.shutdown();
+    
+    for(Thread thread : threads_)
+      thread.interrupt();
+    
     server_.stop();
     log_.info("FugueServer Stopped");
     
-    try
+    waitForAllExecutors(5000);
+    
+    for(FugueExecutorService exec : executors_)
     {
-      exec_.awaitTermination(3, TimeUnit.SECONDS);
+      if(!exec.isTerminated())
+      {
+        log_.warn("Executor " + exec + " did not terminate cleanly, calling shutdownNow...");
+        exec.shutdownNow();
+      }
     }
-    catch(InterruptedException e)
+    
+    for(Thread thread : threads_)
     {
-      // Ignored, we are shutting down
+      if(thread.isAlive())
+        log_.error("Thread " + thread + " did not terminate cleanly");
     }
-    exec_.shutdownNow();
+    
+    waitForAllExecutors(5000);
+    
+    for(FugueExecutorService exec : executors_)
+    {
+      if(!exec.isTerminated())
+      {
+        log_.error("Executor " + exec + " did not terminate cleanly");
+      }
+    }
+    
     started_ = false;
   }
   
+  private void waitForAllExecutors(int delayMillis)
+  {
+    long timeout = System.currentTimeMillis() + delayMillis;
+    
+    for(FugueExecutorService exec : executors_)
+    {
+      long wait = timeout - System.currentTimeMillis();
+      
+      if(wait > 0)
+      {
+        try
+        {
+          exec.awaitTermination(wait, TimeUnit.MILLISECONDS);
+        }
+        catch (InterruptedException e)
+        {
+          log_.info("Interrupted waiting for executor termination");
+        }
+      }
+    }
+  }
+  
+  /**
+   * Open the browser on the URL for this server.
+   */
   public void openBrowser()
   {
     try
@@ -362,35 +444,44 @@ public abstract class FugueServer implements IComponent
 //    statusServlet_.addCommand(command);
 //  }
 
-  public Future<?> submit(Runnable task)
+  
+  @Override
+  public ExecutorService newExecutor(String name)
   {
-    return exec_.submit(task);
-  }
-
-  public <T> Future<T> submit(Runnable task, T result)
-  {
-    return exec_.submit(task, result);
-  }
-
-  public <T> Future<T> submit(Callable<T> task)
-  {
-    return exec_.submit(task);
+    FugueExecutorService fugueExec = new FugueExecutorService(this, name);
+    
+    executors_.add(fugueExec);
+    
+    return fugueExec;
   }
   
-  public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit)
+  @Override
+  public ExecutorService newExecutor(ExecutorService exec)
   {
-    return exec_.schedule(command, delay, unit);
+    FugueExecutorService fugueExec = new FugueExecutorService(this, exec);
+    
+    executors_.add(fugueExec);
+    
+    return fugueExec;
   }
-
-  class LocalThreadFactory implements ThreadFactory
+  
+  @Override
+  public ScheduledExecutorService newScheduledExecutor(String name)
   {
-    private int   id=1;
+    FugueScheduledExecutorService exec = new FugueScheduledExecutorService(this, name);
     
-    @Override
-    public Thread newThread(Runnable r)
-    {
-      return new Thread(r, name_ + "-Thread-" + id++);
-    }
+    executors_.add(exec);
     
+    return exec;
+  }
+  
+  @Override
+  public ScheduledExecutorService newScheduledExecutor(ScheduledExecutorService exec)
+  {
+    FugueScheduledExecutorService fugueExec = new FugueScheduledExecutorService(this, exec);
+    
+    executors_.add(fugueExec);
+    
+    return fugueExec;
   }
 }
