@@ -122,4 +122,11 @@ public interface IFugueServer
    * @return A new ScheduledExecutorService.
    */
   ScheduledExecutorService newScheduledExecutor(ScheduledExecutorService exec);
+
+  /**
+   * Return the instanceId for this process.
+   * 
+   * @return the instanceId.
+   */
+  String getInstanceId();
 }

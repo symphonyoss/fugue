@@ -23,11 +23,20 @@
 
 package org.symphonyoss.s2.fugue;
 
+/**
+ * Fugue constants.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class Fugue
 {
-  //Environment variable containing a URL to the configuration
+  /** Environment variable containing a URL to the configuration */
    public static final String FUGUE_CONFIG = "FUGUE_CONFIG";
  
-  // Config property name containing the tenant ID
+  /** Config property name containing the tenant ID */
   public static final String FUGUE_TENANT = "FUGUE_TENANT";
+  
+  /** Environment variable containing the process instance ID */
+  public static final String FUGUE_INSTANCE = "FUGUE_INSTANCE";
 }

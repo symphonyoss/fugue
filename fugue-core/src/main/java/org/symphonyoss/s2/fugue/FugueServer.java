@@ -74,6 +74,8 @@ public abstract class FugueServer implements IComponent, IFugueServer
   private boolean                                    running_;
   private String                                     serverUrl_;
 
+  private String instanceId_;
+
   /**
    * Constructor.
    * 
@@ -83,6 +85,21 @@ public abstract class FugueServer implements IComponent, IFugueServer
   public FugueServer(String name, int httpPort)
   {
     httpPort_ = httpPort;
+    
+    instanceId_ = System.getProperty(Fugue.FUGUE_INSTANCE);
+    
+    if(instanceId_ == null)
+      instanceId_ = System.getenv(Fugue.FUGUE_INSTANCE);
+    
+    if(instanceId_ == null)
+      instanceId_ = "UNKNOWN";
+    
+  }
+  
+  @Override
+  public String getInstanceId()
+  {
+    return instanceId_;
   }
   
   @Override
