@@ -23,19 +23,48 @@
 
 package org.symphonyoss.s2.fugue;
 
-import javax.servlet.http.HttpServlet;
-
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
-
 /**
- * A Component which is an instance of IUrlPathServlet.
- * 
- * This is a pretty trivial convenience class.
+ * The life cycle state of a Fugue server.
  * 
  * @author Bruce Skingle
  *
  */
-public abstract class ServletComponent extends HttpServlet implements IUrlPathServlet
+public enum FugueLifecycleState
 {
-  private static final long serialVersionUID = 1L;
+  /** Initializing, not yet started. */
+  Initializing(true),
+  
+  /** Transitioning into Running */
+  Starting(false),
+  
+  /** Starting */
+  Running(false),
+  
+  /** Transitioning into Stopped */
+  Stopping(false),
+  
+  /** Stopped. */
+  Stopped(false),
+  
+  /** Failed. */
+  Failed(false);
+  
+  private final boolean configurable_;
+
+  private FugueLifecycleState(boolean configurable)
+  {
+    configurable_ = configurable;
+  }
+
+  /**
+   * Return true if configuration changes may be made (i.e. we have not started yet)
+   * 
+   * @return true if configuration changes may be made (i.e. we have not started yet)
+   */
+  protected boolean isConfigurable()
+  {
+    return configurable_;
+  }
+  
+  
 }

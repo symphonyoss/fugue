@@ -25,6 +25,9 @@ package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -38,11 +41,6 @@ import org.symphonyoss.s2.common.http.IServletProvider;
 import org.symphonyoss.s2.common.http.IUrlPathServlet;
 import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
 import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
-import org.symphonyoss.s2.fugue.di.Cardinality;
-import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
-import org.symphonyoss.s2.fugue.di.DIContext;
-import org.symphonyoss.s2.fugue.di.IComponent;
-import org.symphonyoss.s2.fugue.di.IDIContext;
 
 /**
  * The main component for a Fugue process.
@@ -50,18 +48,15 @@ import org.symphonyoss.s2.fugue.di.IDIContext;
  * @author Bruce Skingle
  *
  */
-public abstract class FugueServer implements IComponent, IFugueServer
+public class FugueServer implements IFugueServer
 {
-  private static Logger                              log_              = LoggerFactory.getLogger(FugueServer.class);
-
-  private final IDIContext                           diContext_        = new DIContext();
+  private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
+  
   private final int                                  httpPort_;
+  private final List<IFugueComponent>                components_       = new ArrayList<>();
 
-  // private IResourcesService resourcesService_;
-  // private IFundamentalService fundamentalService_;
-  // private ISystemService systemModelService_;
-  // private ISessionService sessionService_;
-
+  private FugueLifecycleState                        state_            = FugueLifecycleState.Initializing;
+  private Stack<IFugueComponent>                     stopStack_        = new Stack<>();
   private HttpServer                                 server_;
   // private StatusServlet statusServlet_;
   private CopyOnWriteArrayList<IServletProvider>     servletProviders_ = new CopyOnWriteArrayList<>();
@@ -74,45 +69,161 @@ public abstract class FugueServer implements IComponent, IFugueServer
   private boolean                                    running_;
   private String                                     serverUrl_;
 
-  private String instanceId_;
-
   /**
    * Constructor.
    * 
-   * @param name      The program name.
-   * @param httpPort  The local port on which to run an http server.
+   * @param name        The program name.
+   * @param httpPort    The local port on which to run an http server.
+   * @param components  Zero or  more components which will be managed by this server
    */
-  public FugueServer(String name, int httpPort)
+  public FugueServer(String name, int httpPort, Object ...components)
   {
-    httpPort_ = httpPort;
+    httpPort_   = httpPort;
     
-    instanceId_ = System.getProperty(Fugue.FUGUE_INSTANCE);
+    components_.add(new IFugueComponent()
+    {
+      
+      @Override
+      public void start()
+      {
+        startFugueServer();
+      }
+      
+      @Override
+      public void stop()
+      {
+        stopFugueServer();
+      }
+    });
     
-    if(instanceId_ == null)
-      instanceId_ = System.getenv(Fugue.FUGUE_INSTANCE);
+    withComponents(components);
     
-    if(instanceId_ == null)
-      instanceId_ = "UNKNOWN";
     
   }
   
-  @Override
-  public String getInstanceId()
+  private void assertConfigurable()
   {
-    return instanceId_;
+    if(!state_.isConfigurable())
+      throw new IllegalStateException("Server has started, it is too late to make configuration changes.");
+  }
+  
+  /**
+   * Add the given components.
+   * 
+   * @param components one or more components.
+   * 
+   * @return this (Fluent method).
+   * 
+   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
+   */
+  public FugueServer withComponents(Object ...components)
+  {
+    assertConfigurable();
+    
+    for(Object o : components)
+    {
+      if(o instanceof IFugueComponent)
+      {
+        IFugueComponent component = (IFugueComponent)o;
+        
+        components_.add(component);
+      }
+    }
+    
+    return this;
+  }
+  
+  /**
+   * Add the given ServletProviders.
+   * 
+   * @param servletProvider a provider of IURLPathServlets.
+   * 
+   * @return this (Fluent method).
+   * 
+   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
+   */
+  public synchronized FugueServer withServletProvider(IServletProvider servletProvider)
+  {
+    assertConfigurable();
+    
+    servletProviders_.addIfAbsent(servletProvider);
+//    if(servletProviders_.addIfAbsent(servletProvider))
+//    {
+//      if(server_ != null)
+//        servletProvider.registerServlets(server_);
+//    }
+    
+    return this;
+  }
+
+  /**
+   * Add the given ServletProviders.
+   * 
+   * @param servlet an IURLPathServlet.
+   * 
+   * @return this (Fluent method).
+   * 
+   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
+   */
+  public synchronized FugueServer registerServlet(IUrlPathServlet servlet)
+  {
+    assertConfigurable();
+    
+    servlets_.addIfAbsent(servlet);
+//    if(servlets_.addIfAbsent(servlet))
+//    {
+//      if(server_ != null)
+//        server_.addServlet(servlet);
+//    }
+    
+    return this;
+  }
+
+  private void setLifeCycle(FugueLifecycleState state)
+  {
+    state_ = state;
   }
   
   @Override
   public FugueServer start()
   {
-    diContext_.register(this);
-    registerComponents(diContext_);
-    diContext_.resolveAndStart();
+    switch(state_)
+    {
+      case Initializing:
+      case Stopped:
+        break;
+        
+      default:
+        throw new IllegalStateException("Server cannot be started from state " + state_);
+    }
+    
+    setLifeCycle(FugueLifecycleState.Starting);
+    
+    for(IFugueComponent component : components_)
+    {
+      try
+      {
+        
+        log_.debug("Start " + component);
+        component.start(); 
+        stopStack_.push(component);
+      }
+      catch(RuntimeException ex)
+      {
+        log_.error("Unable to start component " + 
+            component, ex);
+        
+        setLifeCycle(FugueLifecycleState.Failed);
+        
+        doStop();
+        
+        log_.error("Faild to start cleanly : CALLING System.exit()");
+        System.exit(1);
+      }
+    }
     
     return this;
   }
-  
-  protected abstract void registerComponents(IDIContext diContext);
 
   @Override
   public FugueServer join() throws InterruptedException
@@ -124,9 +235,44 @@ public abstract class FugueServer implements IComponent, IFugueServer
   @Override
   public FugueServer stop()
   {
-    log_.info("Shutting down...");
-    diContext_.stop();
+    setLifeCycle(FugueLifecycleState.Stopping);
+    
+    if(doStop())
+    {
+      log_.error("Faild to stop cleanly : CALLING System.exit()");
+      System.exit(1);
+    }
+    setLifeCycle(FugueLifecycleState.Stopped);
+    
     return this;
+  }
+  
+  private boolean doStop()
+  {
+    boolean terminate = false;
+    
+    log_.info("Stopping...");
+    
+    while(!stopStack_.isEmpty())
+    {
+      IFugueComponent component = stopStack_.pop();
+      try
+      {
+        log_.debug("Stop " + component);
+        component.stop();
+      }
+      catch(RuntimeException ex)
+      {
+        log_.error("Unable to stop component " + 
+            component, ex);
+        // Don't re-throw because we want other components to have a chance to stop
+        
+        terminate = true;
+        setLifeCycle(FugueLifecycleState.Failed);
+      }
+    }
+    
+    return terminate;
   }
 
   @Override
@@ -136,72 +282,34 @@ public abstract class FugueServer implements IComponent, IFugueServer
     return stop();
   }
 
-  @Override
-  public ComponentDescriptor getComponentDescriptor()
+  
+  /**
+   * Add the current thread to the list of managed threads.
+   * 
+   * Managed threads are interrupted when the server shuts down.
+   * 
+   * @return this (Fluent method).
+   */
+  public IFugueServer withCurrentThread()
   {
-    return new ComponentDescriptor()
-//        .addProvidedInterface(IUIPanelContainer.class)
-//        .addDependency(IResourcesService.class,         (v) -> resourcesService_ = v)
-//        .addDependency(IFundamentalService.class,       (v) -> fundamentalService_ = v)
-//        .addDependency(ISystemService.class,            (v) -> systemModelService_ = v)
-//        .addDependency(ISessionService.class,           (v) -> sessionService_ = v)
-        .addProvidedInterface(IFugueServer.class)
-        .addDependency(IUrlPathServlet.class,           (v) -> bind(v), Cardinality.zeroOrMore)
-        .addDependency(IServletProvider.class,          (v) -> bind(v), Cardinality.zeroOrMore)
-        .addStart(() -> startFugueServer())
-        .addStop(() -> stopFugueServer());
-  }
-
-  private synchronized void bind(IServletProvider servletProvider)
-  {
-    servletProviders_.addIfAbsent(servletProvider);
-//    if(servletProviders_.addIfAbsent(servletProvider))
-//    {
-//      if(server_ != null)
-//        servletProvider.registerServlets(server_);
-//    }
+    return withThread(Thread.currentThread());
   }
   
-  private synchronized void bind(IUrlPathServlet servlet)
-  {
-    servlets_.addIfAbsent(servlet);
-//    if(servlets_.addIfAbsent(servlet))
-//    {
-//      if(server_ != null)
-//        server_.addServlet(servlet);
-//    }
-  }
-  
-  public void registerThread()
-  {
-    registerThread(Thread.currentThread());
-  }
-  
-  public void registerThread(Thread thread)
+  /**
+   * Add the given thread to the list of managed threads.
+   * 
+   * Managed threads are interrupted when the server shuts down.
+   * 
+   * @param thread The thread to be managed.
+   * 
+   * @return this (Fluent method).
+   */
+  public IFugueServer withThread(Thread thread)
   {
     threads_.add(thread);
+    
+    return this;
   }
-
-//  public IResourcesService getResourcesService()
-//  {
-//    return resourcesService_;
-//  }
-//
-//  public IFundamentalService getFundamentalModelService()
-//  {
-//    return fundamentalService_;
-//  }
-//  
-//  public ISystemService getSystemModelService()
-//  {
-//    return systemModelService_;
-//  }
-//
-//  public ISessionService getSessionService()
-//  {
-//    return sessionService_;
-//  }
-//
 //  
 //
 //  @Override
@@ -222,6 +330,13 @@ public abstract class FugueServer implements IComponent, IFugueServer
 //    return statusServlet_.setDefaultPanel(panel);
 //  }
 
+  /**
+   * Return true iff the server is running.
+   * 
+   * Threads may call this method in their main loop to determine if they should terminate.
+   * 
+   * @return true iff the server is running.
+   */
   public synchronized boolean isRunning()
   {
     return running_;

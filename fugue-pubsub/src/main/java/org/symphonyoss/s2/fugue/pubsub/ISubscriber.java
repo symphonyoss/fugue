@@ -21,21 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.pubsub;
 
-import javax.servlet.http.HttpServlet;
+import org.symphonyoss.s2.fugue.ITraceContext;
 
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
-
-/**
- * A Component which is an instance of IUrlPathServlet.
- * 
- * This is a pretty trivial convenience class.
- * 
- * @author Bruce Skingle
- *
- */
-public abstract class ServletComponent extends HttpServlet implements IUrlPathServlet
+public interface ISubscriber
 {
-  private static final long serialVersionUID = 1L;
+
 }

@@ -23,19 +23,25 @@
 
 package org.symphonyoss.s2.fugue;
 
-import javax.servlet.http.HttpServlet;
-
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
-
 /**
- * A Component which is an instance of IUrlPathServlet.
- * 
- * This is a pretty trivial convenience class.
+ * A managable component of a FugeServer.
  * 
  * @author Bruce Skingle
  *
  */
-public abstract class ServletComponent extends HttpServlet implements IUrlPathServlet
+public interface IFugueComponent
 {
-  private static final long serialVersionUID = 1L;
+  /**
+   * Start method called after all configuration is complete and the server is starting normal operation.
+   * 
+   * Components will be started in the order in which they are registered with the server.
+   */
+  void start();
+  
+  /**
+   * Stop method called prior to server shutdown.
+   * 
+   * Components will be stopped in the reverse order to that in which they were started.
+   */
+  void stop();
 }

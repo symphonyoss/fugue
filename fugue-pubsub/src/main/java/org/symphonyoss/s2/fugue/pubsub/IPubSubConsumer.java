@@ -21,21 +21,19 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.pubsub;
 
-import javax.servlet.http.HttpServlet;
-
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.ITraceContext;
 
 /**
- * A Component which is an instance of IUrlPathServlet.
- * 
- * This is a pretty trivial convenience class.
+ * A consumer of Pub/Sub messages.
  * 
  * @author Bruce Skingle
  *
  */
-public abstract class ServletComponent extends HttpServlet implements IUrlPathServlet
+public interface IPubSubConsumer
 {
-  private static final long serialVersionUID = 1L;
+  void unprocessableMessage(ITraceContext trace, byte[] payload, String message);
+
+  void consume(ITraceContext trace, byte[] payload);
 }

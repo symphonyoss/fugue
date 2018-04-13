@@ -41,6 +41,8 @@ public interface IFugueServer
    * exists to keep the application alive then call join() after this method returns since
    * this method is fluent you can call <code>start().join()</code>.
    * 
+   * @throws IllegalStateException  If the current state is not compatible with starting.
+   * 
    * @return this (fluent method) 
    */
   FugueServer start();
@@ -128,5 +130,16 @@ public interface IFugueServer
    * 
    * @return the instanceId.
    */
-  String getInstanceId();
+  static String getInstanceId()
+  {
+    String instanceId = System.getProperty(Fugue.FUGUE_INSTANCE);
+    
+    if(instanceId == null)
+      instanceId = System.getenv(Fugue.FUGUE_INSTANCE);
+    
+    if(instanceId == null)
+      return "UNKNOWN";
+    else
+      return instanceId;
+  }
 }

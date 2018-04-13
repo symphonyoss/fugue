@@ -23,19 +23,24 @@
 
 package org.symphonyoss.s2.fugue;
 
-import javax.servlet.http.HttpServlet;
-
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import javax.annotation.Nullable;
 
 /**
- * A Component which is an instance of IUrlPathServlet.
- * 
- * This is a pretty trivial convenience class.
+ * A factory for ITraceTransaction instances.
  * 
  * @author Bruce Skingle
  *
  */
-public abstract class ServletComponent extends HttpServlet implements IUrlPathServlet
+public interface ITraceContextFactory
 {
-  private static final long serialVersionUID = 1L;
+  /**
+   * Create a TraceTransaction with the given subject.
+   * 
+   * @param subjectType The type of the subject of the transaction
+   * @param subjectId   The ID of the subject of the transaction.
+   * 
+   * @return  An ITraceTransaction.
+   */
+  ITraceContext createTransaction(@Nullable String subjectType, @Nullable String subjectId);
+
 }
