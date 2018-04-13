@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<!-- ~ ~ Copyright 2018 Symphony Communication Services, LLC. ~ ~ Licensed 
 		to The Symphony Software Foundation (SSF) under one ~ or more contributor 
 		license agreements. See the NOTICE file ~ distributed with this work for 
@@ -21,7 +20,7 @@
 	<parent>
 		<groupId>org.symphonyoss.s2.fugue</groupId>
 		<artifactId>fugue</artifactId>
-		<version>0.0.7-SNAPSHOT</version>
+		<version>0.0.7</version>
 	</parent>
 	<artifactId>fugue-launch</artifactId>
 
