@@ -28,21 +28,13 @@
     <artifactId>fugue</artifactId>
     <version>0.0.7-SNAPSHOT</version>
   </parent>
-  <artifactId>fugue-core</artifactId>
+  <artifactId>google-fugue</artifactId>
   
   <dependencies>
-
     <dependency>
-      <groupId>org.symphonyoss.s2.common</groupId>
-      <artifactId>S2-common-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.symphonyoss.s2.common</groupId>
-      <artifactId>S2-common-http</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>fugue-core</artifactId>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 </project>

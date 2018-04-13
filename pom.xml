@@ -47,9 +47,11 @@
   
 	<modules>
 		<module>fugue-core</module>
-		<module>fugue-di</module>
+		<!-- <module>fugue-di</module> -->
 		<module>fugue-shell</module>
 		<module>fugue-launch</module>
+		<module>fugue-pubsub</module>
+		<module>google-fugue</module>
 	</modules>
 
 	<licenses>
