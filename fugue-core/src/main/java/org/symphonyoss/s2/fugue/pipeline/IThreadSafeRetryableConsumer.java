@@ -21,26 +21,28 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.pipeline;
+
+import javax.annotation.concurrent.ThreadSafe;
 
 /**
- * A manageable component of a FugeServer.
+ * A thread safe retryable consumer of some payload.
+ * 
+ * Implementations of this interface <b>MUST</b> be thread
+ * safe. Implementations which <i>are not</i> thread safe <b>MUST</b>
+ * implement {@link IRetryableConsumer} instead.
+ * 
+ * Callers can safely call the consume method multiple times concurrently from
+ * different threads.
+ * 
+ * Note that it is only the consume method of this interface which is thread safe
+ * and this interface is not {@link ThreadSafe} because it is an error to
+ * call consume after close.
+ * 
+ * @author bruce.skingle
  *
- * @author Bruce Skingle
+ * @param <T> The type of payload consumed.
  */
-public interface IFugueComponent
+public interface IThreadSafeRetryableConsumer<T> extends IRetryableConsumer<T>
 {
-  /**
-   * Start method called after all configuration is complete and the server is starting normal operation.
-   * 
-   * Components will be started in the order in which they are registered with the server.
-   */
-  void start();
-  
-  /**
-   * Stop method called prior to server shutdown.
-   * 
-   * Components will be stopped in the reverse order to that in which they were started.
-   */
-  void stop();
 }

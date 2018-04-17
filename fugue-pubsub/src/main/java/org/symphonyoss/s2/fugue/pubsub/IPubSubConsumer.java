@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.fugue.ITraceContext;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
  * A consumer of Pub/Sub messages.
@@ -31,9 +31,10 @@ import org.symphonyoss.s2.fugue.ITraceContext;
  * @author Bruce Skingle
  *
  */
-public interface IPubSubConsumer
+// TODO: DELETE ME
+public abstract class IPubSubConsumer
 {
-  void unprocessableMessage(ITraceContext trace, byte[] payload, String message);
+  public abstract void unprocessableMessage(ITraceContext trace, byte[] payload, String message);
 
-  void consume(ITraceContext trace, byte[] payload);
+  public abstract void consume(ITraceContext trace, byte[] payload);
 }

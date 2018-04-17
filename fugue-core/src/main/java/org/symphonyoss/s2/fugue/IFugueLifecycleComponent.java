@@ -23,24 +23,9 @@
 
 package org.symphonyoss.s2.fugue;
 
-/**
- * A manageable component of a FugeServer.
- *
- * @author Bruce Skingle
- */
-public interface IFugueComponent
+public interface IFugueLifecycleComponent extends IFugueComponent
 {
-  /**
-   * Start method called after all configuration is complete and the server is starting normal operation.
-   * 
-   * Components will be started in the order in which they are registered with the server.
-   */
-  void start();
-  
-  /**
-   * Stop method called prior to server shutdown.
-   * 
-   * Components will be stopped in the reverse order to that in which they were started.
-   */
-  void stop();
+
+  FugueLifecycleState getLifecycleState();
+
 }

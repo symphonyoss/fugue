@@ -21,26 +21,40 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
-
-import javax.annotation.Nullable;
+package org.symphonyoss.s2.fugue.pipeline;
 
 /**
- * A factory for ITraceTransaction instances.
+ * An exception indicating that a consumer failed to process a payload and that the thrower believes that
+ * a retry would be pointless.
  * 
  * @author Bruce Skingle
  *
  */
-public interface ITraceContextFactory
+public class FatalConsumerException extends Exception
 {
-  /**
-   * Create a TraceTransaction with the given subject.
-   * 
-   * @param subjectType The type of the subject of the transaction
-   * @param subjectId   The ID of the subject of the transaction.
-   * 
-   * @return  An ITraceTransaction.
-   */
-  ITraceContext createTransaction(@Nullable String subjectType, @Nullable String subjectId);
+
+  public FatalConsumerException()
+  {
+  }
+
+  public FatalConsumerException(String message)
+  {
+    super(message);
+  }
+
+  public FatalConsumerException(Throwable cause)
+  {
+    super(cause);
+  }
+
+  public FatalConsumerException(String message, Throwable cause)
+  {
+    super(message, cause);
+  }
+
+  public FatalConsumerException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace)
+  {
+    super(message, cause, enableSuppression, writableStackTrace);
+  }
 
 }

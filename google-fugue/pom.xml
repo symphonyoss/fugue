@@ -36,5 +36,17 @@
       <artifactId>fugue-core</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>fugue-pubsub</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    
+    <dependency>
+	    <groupId>com.google.cloud</groupId>
+	    <artifactId>google-cloud-pubsub</artifactId>
+	    <version>0.43.0-beta</version>
+	  </dependency>
+    
   </dependencies>
 </project>

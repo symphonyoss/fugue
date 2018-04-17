@@ -21,26 +21,26 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.core.trace;
+
+import javax.annotation.Nullable;
 
 /**
- * A manageable component of a FugeServer.
- *
+ * A factory for ITraceTransaction instances.
+ * 
  * @author Bruce Skingle
+ *
  */
-public interface IFugueComponent
+public interface ITraceContextFactory
 {
   /**
-   * Start method called after all configuration is complete and the server is starting normal operation.
+   * Create a TraceTransaction with the given subject.
    * 
-   * Components will be started in the order in which they are registered with the server.
-   */
-  void start();
-  
-  /**
-   * Stop method called prior to server shutdown.
+   * @param subjectType The type of the subject of the transaction
+   * @param subjectId   The ID of the subject of the transaction.
    * 
-   * Components will be stopped in the reverse order to that in which they were started.
+   * @return  An ITraceTransaction.
    */
-  void stop();
+  ITraceContext createTransaction(@Nullable String subjectType, @Nullable String subjectId);
+
 }
