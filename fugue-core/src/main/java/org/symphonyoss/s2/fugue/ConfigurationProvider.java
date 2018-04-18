@@ -45,7 +45,7 @@ public class ConfigurationProvider extends BaseConfigurationProvider
   
   public ConfigurationProvider()
   {
-    loadConfigSpec(System.getenv("FUGUE_CONFIG"));
+    loadConfigSpec(Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG));
   }
   
   /* package */ ConfigurationProvider(String fileName)
@@ -56,7 +56,7 @@ public class ConfigurationProvider extends BaseConfigurationProvider
   private void loadConfigSpec(String fileName)
   {
     if(fileName==null || fileName.trim().length()==0)
-      throw new ProgramFault("FUGUE_CONFIG must be set as an environment variable.");
+      throw new ProgramFault("fileName may not be null.");
     
     InputStream in = null;
     
