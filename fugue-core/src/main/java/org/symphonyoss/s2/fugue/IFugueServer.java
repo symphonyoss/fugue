@@ -45,7 +45,14 @@ public interface IFugueServer
    * 
    * @return this (fluent method) 
    */
-  FugueServer start();
+  IFugueServer start();
+
+  /**
+   * Stop the server, causes all managed components to be stopped.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer stop();
 
   /**
    * Join the calling thread to the server process.
@@ -57,21 +64,14 @@ public interface IFugueServer
    * 
    * @throws InterruptedException If the thread is interrupted.
    */
-  FugueServer join() throws InterruptedException;
-
-  /**
-   * Stop the server.
-   * 
-   * @return this (fluent method) 
-   */
-  FugueServer stop();
+  IFugueServer join() throws InterruptedException;
 
   /**
    * Put the server into a failed state.
    * 
    * @return this (fluent method) 
    */
-  FugueServer fail();
+  IFugueServer fail();
 
   /**
    * Create a new ExecutorService with a thread pool using the given name.
@@ -142,4 +142,25 @@ public interface IFugueServer
     else
       return instanceId;
   }
+
+  /**
+   * Add the current thread to the list of managed threads.
+   * 
+   * Managed threads are interrupted when the server shuts down.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withCurrentThread();
+
+  /**
+   * Add the given thread to the list of managed threads.
+   * 
+   * Managed threads are interrupted when the server shuts down.
+   * 
+   * @param thread The thread to be managed.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withThread(Thread thread);
+
 }

@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.core.trace;
 
 import org.symphonyoss.s2.common.hash.Hash;
 
@@ -70,12 +70,18 @@ public interface ITraceContext
   /**
    * Convenience method to record the normal completion of a trace context.
    */
-  void finished();
+  default void finished()
+  {
+    trace(FINISHED);
+  }
   
   /**
    * Convenience method to record the abnormal completion of a trace context.
    */
-  void aborted();
+  default void aborted()
+  {
+    trace(ABORTED);
+  }
 
   /**
    * Create a sub-context relating to the processing of the given external subject.

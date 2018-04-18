@@ -21,26 +21,30 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.core.strategy.naming;
 
 /**
- * A manageable component of a FugeServer.
- *
+ * A naming strategy which leaves all names unchanged.
+ * 
+ * This is used for the symlib implementations since that library manages namespacing.
+ * 
  * @author Bruce Skingle
+ *
  */
-public interface IFugueComponent
+public class NoOpNamingStrategy extends AbstractNamingStrategy
 {
   /**
-   * Start method called after all configuration is complete and the server is starting normal operation.
-   * 
-   * Components will be started in the order in which they are registered with the server.
+   * Constructor.
    */
-  void start();
-  
-  /**
-   * Stop method called prior to server shutdown.
-   * 
-   * Components will be stopped in the reverse order to that in which they were started.
-   */
-  void stop();
+  public NoOpNamingStrategy()
+  {
+    super(null);
+  }
+
+  @Override
+  public String getSubscriptionName(String topic, String subscription)
+  {
+    return subscription;
+  }
+
 }

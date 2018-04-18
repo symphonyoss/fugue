@@ -48,14 +48,13 @@ import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
  * @author Bruce Skingle
  *
  */
-public class FugueServer implements IFugueServer
+public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFugueServer
 {
   private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
   
   private final int                                  httpPort_;
   private final List<IFugueComponent>                components_       = new ArrayList<>();
 
-  private FugueLifecycleState                        state_            = FugueLifecycleState.Initializing;
   private Stack<IFugueComponent>                     stopStack_        = new Stack<>();
   private HttpServer                                 server_;
   // private StatusServlet statusServlet_;
@@ -78,6 +77,8 @@ public class FugueServer implements IFugueServer
    */
   public FugueServer(String name, int httpPort, Object ...components)
   {
+    super(FugueServer.class);
+    
     httpPort_   = httpPort;
     
     components_.add(new IFugueComponent()
@@ -101,11 +102,7 @@ public class FugueServer implements IFugueServer
     
   }
   
-  private void assertConfigurable()
-  {
-    if(!state_.isConfigurable())
-      throw new IllegalStateException("Server has started, it is too late to make configuration changes.");
-  }
+  
   
   /**
    * Add the given components.
@@ -127,6 +124,11 @@ public class FugueServer implements IFugueServer
         IFugueComponent component = (IFugueComponent)o;
         
         components_.add(component);
+      }
+      
+      if(o instanceof IUrlPathServlet)
+      {
+        servlets_.addIfAbsent((IUrlPathServlet)o);
       }
     }
     
@@ -178,26 +180,11 @@ public class FugueServer implements IFugueServer
     
     return this;
   }
-
-  private void setLifeCycle(FugueLifecycleState state)
-  {
-    state_ = state;
-  }
   
   @Override
-  public FugueServer start()
+  public IFugueServer start()
   {
-    switch(state_)
-    {
-      case Initializing:
-      case Stopped:
-        break;
-        
-      default:
-        throw new IllegalStateException("Server cannot be started from state " + state_);
-    }
-    
-    setLifeCycle(FugueLifecycleState.Starting);
+    transitionTo(FugueLifecycleState.Starting);
     
     for(IFugueComponent component : components_)
     {
@@ -213,7 +200,7 @@ public class FugueServer implements IFugueServer
         log_.error("Unable to start component " + 
             component, ex);
         
-        setLifeCycle(FugueLifecycleState.Failed);
+        setLifeCycleState(FugueLifecycleState.Failed);
         
         doStop();
         
@@ -233,16 +220,16 @@ public class FugueServer implements IFugueServer
   }
   
   @Override
-  public FugueServer stop()
+  public IFugueServer stop()
   {
-    setLifeCycle(FugueLifecycleState.Stopping);
+    transitionTo(FugueLifecycleState.Stopping);
     
     if(doStop())
     {
       log_.error("Faild to stop cleanly : CALLING System.exit()");
       System.exit(1);
     }
-    setLifeCycle(FugueLifecycleState.Stopped);
+    setLifeCycleState(FugueLifecycleState.Stopped);
     
     return this;
   }
@@ -268,7 +255,7 @@ public class FugueServer implements IFugueServer
         // Don't re-throw because we want other components to have a chance to stop
         
         terminate = true;
-        setLifeCycle(FugueLifecycleState.Failed);
+        setLifeCycleState(FugueLifecycleState.Failed);
       }
     }
     
@@ -276,34 +263,22 @@ public class FugueServer implements IFugueServer
   }
 
   @Override
-  public FugueServer fail()
+  public IFugueServer fail()
   {
     log_.error("Server FAILED");
     return stop();
   }
 
   
-  /**
-   * Add the current thread to the list of managed threads.
-   * 
-   * Managed threads are interrupted when the server shuts down.
-   * 
-   * @return this (Fluent method).
-   */
+  
+  @Override
   public IFugueServer withCurrentThread()
   {
     return withThread(Thread.currentThread());
   }
   
-  /**
-   * Add the given thread to the list of managed threads.
-   * 
-   * Managed threads are interrupted when the server shuts down.
-   * 
-   * @param thread The thread to be managed.
-   * 
-   * @return this (Fluent method).
-   */
+ 
+  @Override
   public IFugueServer withThread(Thread thread)
   {
     threads_.add(thread);
