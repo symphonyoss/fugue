@@ -52,6 +52,7 @@
 		<module>fugue-launch</module>
 		<module>fugue-pubsub</module>
 		<module>google-fugue</module>
+		<module>fugue-auth-onelogin</module>
 	</modules>
 
 	<licenses>
