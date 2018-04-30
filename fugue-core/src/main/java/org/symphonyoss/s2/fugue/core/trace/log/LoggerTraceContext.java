@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.common.hash.HashProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 class LoggerTraceContext implements ITraceContext
@@ -37,35 +38,51 @@ class LoggerTraceContext implements ITraceContext
   private static final String LONG_FORMAT = "TRACE|%s|%s|%s|%s|%s|%s|%s";
   private static final String SHORT_FORMAT = "TRACE|%s|%s|%s|%s|%s";
 
-  private final UUID          id_  = UUID.randomUUID();
-  private final UUID          parentId_;
+  private final Hash          id_  = HashProvider.getCompositeHashOf(UUID.randomUUID());
   private final String        subjectType_;
   private final String        subjectId_;
+  private final Hash          hash_;
 
   public LoggerTraceContext(String subjectType, String subjectId)
   {
-    parentId_ = null;
     subjectType_ = subjectType;
     subjectId_ = subjectId;
+    hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
+    
+    trace(ITraceContext.STARTED);
   }
   
   private LoggerTraceContext(LoggerTraceContext parent, String subjectType, String subjectId)
   {
-    parentId_ = parent.id_;
     subjectType_ = subjectType;
     subjectId_ = subjectId;
+    hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
+    
+    trace(ITraceContext.STARTED, parent.id_);
+  }
+
+  @Override
+  public Hash getHash()
+  {
+    return hash_;
   }
 
   @Override
   public void trace(String operationId)
   {
-    log_.debug(String.format(SHORT_FORMAT, id_, parentId_, subjectType_, subjectId_, operationId));
+    log_.debug(String.format(SHORT_FORMAT, id_, "", subjectType_, subjectId_, operationId));
+  }
+  
+  @Override
+  public void trace(String operationId, Hash parentHash)
+  {
+    log_.debug(String.format(SHORT_FORMAT, id_, parentHash, subjectType_, subjectId_, operationId));
   }
 
   @Override
   public void trace(String operationId, String subjectType, Hash subjectHash)
   {
-    log_.debug(String.format(LONG_FORMAT, id_, parentId_, subjectType_, subjectId_, operationId, subjectType, subjectHash));
+    log_.debug(String.format(LONG_FORMAT, id_, "", subjectType_, subjectId_, operationId, subjectType, subjectHash));
   }
 
   @Override

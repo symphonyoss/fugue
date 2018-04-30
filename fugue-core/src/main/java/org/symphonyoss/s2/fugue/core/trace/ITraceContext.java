@@ -57,6 +57,8 @@ public interface ITraceContext
    */
   void trace(String operationId);
   
+  void trace(String operationId, Hash parentHash);
+  
   /**
    * Record an operation having taken place within a trace context.
    * 
@@ -92,4 +94,6 @@ public interface ITraceContext
    * @return A new ITraceContext which is a sub-context of the current context.
    */
   ITraceContext createSubContext(String externalSubjectType, String externalSubjectId);
+
+  Hash getHash();
 }

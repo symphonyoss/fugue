@@ -39,9 +39,9 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSub
   private List<Subscriber>      subscriberList_ = new LinkedList<>();
   
   public GoogleSubscriberManager(String projectId, INamingStrategy namingStrategy, ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
-    super(GoogleSubscriberManager.class, namingStrategy, traceFactory, consumer, new UnprocessableMessageConsumer());
+    super(GoogleSubscriberManager.class, namingStrategy, traceFactory, consumer, unprocessableMessageConsumer);
     
     projectId_ = projectId;
     namingStrategy_ = namingStrategy;

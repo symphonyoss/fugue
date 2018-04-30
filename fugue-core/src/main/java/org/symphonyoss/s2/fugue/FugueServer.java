@@ -68,6 +68,11 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
   private boolean                                    running_;
   private String                                     serverUrl_;
 
+  public FugueServer(IFugueApplication application)
+  {
+    this(application.getName(), application.getHttpPort());
+  }
+  
   /**
    * Constructor.
    * 
