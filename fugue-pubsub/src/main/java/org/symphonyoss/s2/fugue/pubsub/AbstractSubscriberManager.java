@@ -59,7 +59,7 @@ public abstract class AbstractSubscriberManager<T extends AbstractSubscriberMana
   private Map<String, Set<String>>                   topicsBySubscription_            = new HashMap<>();
 
   
-  public AbstractSubscriberManager(Class<T> type, INamingStrategy namingStrategy, ITraceContextFactory traceFactory,
+  public AbstractSubscriberManager(Class<T> type, ITraceContextFactory traceFactory,
       IThreadSafeRetryableConsumer<ImmutableByteArray> consumer,
       IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
@@ -107,7 +107,7 @@ public abstract class AbstractSubscriberManager<T extends AbstractSubscriberMana
     
     set.add(topicName);
     
-    return getTypedThis();
+    return self();
   }
 
   /**

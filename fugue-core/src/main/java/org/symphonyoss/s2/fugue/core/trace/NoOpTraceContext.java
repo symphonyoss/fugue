@@ -21,10 +21,49 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.core.trace;
 
+import org.symphonyoss.s2.common.hash.Hash;
 
-public interface ISubscriber
+/**
+ * A NO OP implementation of ITraceContext
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class NoOpTraceContext implements ITraceContext
 {
+  /**
+   * The singleton instance.
+   */
+  public static final NoOpTraceContext INSTANCE = new NoOpTraceContext();
+  
+  private NoOpTraceContext()
+  {}
+  
+  @Override
+  public void trace(String operationId)
+  {
+  }
+
+  @Override
+  public void trace(String operationId, Hash parentHash)
+  {}
+
+  @Override
+  public void trace(String operationId, String subjectType, Hash subjectHash)
+  {}
+
+  @Override
+  public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId)
+  {
+    return this;
+  }
+
+  @Override
+  public Hash getHash()
+  {
+    return Hash.NIL_HASH;
+  }
 
 }

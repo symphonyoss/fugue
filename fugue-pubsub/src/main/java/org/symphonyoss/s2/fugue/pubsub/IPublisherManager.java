@@ -21,10 +21,16 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue.pubsub;
 
-public interface INamingStrategy
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+
+public interface IPublisherManager
 {
-  String getTopicName(String topic);
-  String getSubscriptionName(String topic, String subscription);
+  IThreadSafeConsumer<ImmutableByteArray> getPublisherByName(String topicName);
+  
+  IThreadSafeConsumer<ImmutableByteArray> getPublisherByConfig(String topicConfigId);
+
+  IThreadSafeConsumer<ImmutableByteArray> getTracePublisher();
 }

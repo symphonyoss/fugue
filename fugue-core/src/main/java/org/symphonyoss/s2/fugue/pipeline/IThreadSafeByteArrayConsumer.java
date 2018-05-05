@@ -21,20 +21,23 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.pipeline;
 
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
-/**
- * A consumer of Pub/Sub messages.
- * 
- * @author Bruce Skingle
- *
- */
-// TODO: DELETE ME
-public abstract class IPubSubConsumer
+public interface IThreadSafeByteArrayConsumer extends IThreadSafeConsumer<ImmutableByteArray>
 {
-  public abstract void unprocessableMessage(ITraceContext trace, byte[] payload, String message);
-
-  public abstract void consume(ITraceContext trace, byte[] payload);
+  /**
+   * Consume the given item.
+   * 
+   * A convenience method which takes a byte array.
+   * 
+   * @param item The item to be consumed.
+   * @param trace A trace context.
+   */
+  default void consume(byte[] item, ITraceContext trace)
+  {
+    consume(ImmutableByteArray.newInstance(item), trace);
+  }
 }

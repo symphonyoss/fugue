@@ -31,6 +31,15 @@ import org.symphonyoss.s2.common.fault.ProgramFault;
 public interface IConfigurationProvider
 {
   /**
+   * Return the given sub-configuration.
+   * 
+   * @param name The name of a sub-configuration.
+   * 
+   * @return An IConfigurationProvider which can be used to access the sub-configuration.
+   */
+  IConfigurationProvider getConfiguration(String name);
+
+  /**
    * Return the value of the given configuration property.
    * 
    * @param name  The name of the required property.
@@ -38,8 +47,8 @@ public interface IConfigurationProvider
    * 
    * @throws NotFoundException  If the property is not defined in the current configuration.
    */
-  String  getProperty(String name) throws NotFoundException;
-  
+  String getString(String name) throws NotFoundException;
+
   /**
    * Return the value of the given configuration property.
    * 
@@ -50,15 +59,61 @@ public interface IConfigurationProvider
    * 
    * @throws ProgramFault  If the property is not defined in the current configuration.
    */
-  String  getRequiredProperty(String name);
+  String getRequiredString(String name);
 
-  List<String> getArray(String name) throws NotFoundException;
+  /**
+   * Return the value of the given configuration property as a boolean.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws NotFoundException  If the property is not defined in the current configuration.
+   */
+  boolean getBoolean(String name) throws NotFoundException;
 
-  List<String> getRequiredArray(String name);
-  
-  IConfigurationProvider  getConfiguration(String name) throws NotFoundException;
-  
-  IConfigurationProvider  getRequiredConfiguration(String name);
+  /**
+   * Return the value of the given configuration property as a boolean.
+   * 
+   * This method throws a ProgramFault if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws ProgramFault  If the property is not defined in the current configuration.
+   */
+  boolean getRequiredBoolean(String name);
 
-  boolean getBooleanProperty(String name);
+  /**
+   * Return the value of the given configuration property as a list of Strings.
+   * 
+   * This is a poor man's implementation since the underlying IConfigurationStore does not
+   * provide access to the actual structure of the config.
+   * 
+   * I would have preferred for the list to be represented as a JSON array, but in fact
+   * it must be a string containing comma separated values.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws NotFoundException  If the property is not defined in the current configuration.
+   */
+  List<String> getStringArray(String name) throws NotFoundException;
+
+  /**
+   * Return the value of the given configuration property as a list of Strings.
+   * 
+   * This is a poor man's implementation since the underlying IConfigurationStore does not
+   * provide access to the actual structure of the config.
+   * 
+   * I would have preferred for the list to be represented as a JSON array, but in fact
+   * it must be a string containing comma separated values.
+   * 
+   * This method throws a ProgramFault if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws ProgramFault  If the property is not defined in the current configuration.
+   */
+  List<String> getRequiredStringArray(String name);
 }

@@ -27,10 +27,15 @@ import javax.annotation.Nullable;
 
 public class DefaultNamingStrategy extends AbstractNamingStrategy
 {
-
   public DefaultNamingStrategy(@Nullable String nameSpace)
   {
     super(nameSpace);
+  }
+
+  @Override
+  public String getTopicName(String topic)
+  {
+    return NameSpace.build(getNameSpace(), topic);
   }
 
   @Override

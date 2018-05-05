@@ -42,6 +42,12 @@ public class NoOpNamingStrategy extends AbstractNamingStrategy
   }
 
   @Override
+  public String getTopicName(String topic)
+  {
+    return topic;
+  }
+
+  @Override
   public String getSubscriptionName(String topic, String subscription)
   {
     return subscription;

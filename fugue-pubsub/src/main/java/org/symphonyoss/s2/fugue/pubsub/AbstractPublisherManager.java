@@ -21,10 +21,26 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue.pubsub;
 
-public interface INamingStrategy
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
+import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+
+public abstract class AbstractPublisherManager<T extends AbstractPublisherManager<T>>
+  extends FugueLifecycleComponent<T>
+  implements IPublisherManager
 {
-  String getTopicName(String topic);
-  String getSubscriptionName(String topic, String subscription);
+  private static final String TRACE_TOPIC_NAME = "trace";
+
+  protected AbstractPublisherManager(Class<T> type)
+  {
+    super(type);
+  }
+  
+  @Override
+  public IThreadSafeConsumer<ImmutableByteArray> getTracePublisher()
+  {
+    return getPublisherByName(TRACE_TOPIC_NAME);
+  }
 }
