@@ -23,13 +23,12 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
-public abstract class AbstractPublisherManager<T extends AbstractPublisherManager<T>>
+public abstract class AbstractPublisherManager<P,T extends AbstractPublisherManager<P,T>>
   extends FugueLifecycleComponent<T>
-  implements IPublisherManager
+  implements IPublisherManager<P>
 {
   private static final String TRACE_TOPIC_NAME = "trace";
 
@@ -39,7 +38,7 @@ public abstract class AbstractPublisherManager<T extends AbstractPublisherManage
   }
   
   @Override
-  public IThreadSafeConsumer<ImmutableByteArray> getTracePublisher()
+  public IThreadSafeConsumer<P> getTracePublisher()
   {
     return getPublisherByName(TRACE_TOPIC_NAME);
   }

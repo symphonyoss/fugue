@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.lambda.JsonLambdaRequest;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,21 +39,23 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   private final Map<String, String> queryParams_;
   private final Map<String, String> pathParams_;
   private final Map<String, String> requestHeaders_;
-  private final String              body_;
+  private final ImmutableByteArray  body_;
+  private Map<String, String> stageVariables_;
   
-  public AwsLambdaRequest(InputStream inputStream) throws IOException
+  public AwsLambdaRequest(InputStream inputStream)
   {
     super(inputStream);
     
     queryParams_ = mapAdaptor(getJson().get("queryStringParameters"));
     pathParams_ = mapAdaptor(getJson().get("pathParameters"));
     requestHeaders_ = mapAdaptor(getJson().get("headers"));
+    stageVariables_ = mapAdaptor(getJson().get("stageVariables"));
     
     String body = getString("body");
     
     if(body == null)
     {
-      body_ = "";
+      body_ = ImmutableByteArray.EMPTY;
     }
     else
     {
@@ -60,12 +63,11 @@ public class AwsLambdaRequest extends JsonLambdaRequest
       
       if(isEncoded != null && isEncoded.asBoolean())
       {
-        // TODO: this is probably binary so we need to do something else, an InputStream maybe?
-        body_ = new String(Base64.decodeBase64(body), StandardCharsets.UTF_8);
+        body_ = ImmutableByteArray.newInstance(Base64.decodeBase64(body));
       }
       else
       { 
-        body_ = body;
+        body_ = ImmutableByteArray.newInstance(body);
       }
     }
   }
@@ -89,7 +91,13 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   }
 
   @Override
-  public String getBody()
+  public Map<String, String> getStageVariables()
+  {
+    return stageVariables_;
+  }
+
+  @Override
+  public ImmutableByteArray getBody()
   {
     return body_;
   }

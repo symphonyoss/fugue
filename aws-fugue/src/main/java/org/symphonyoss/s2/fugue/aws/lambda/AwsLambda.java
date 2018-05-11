@@ -90,9 +90,13 @@ public abstract class AwsLambda implements RequestStreamHandler
 //      responseJson.put("headers", headerJson);
 //      responseJson.put("body", responseBody.toString());
     }
-    catch (IOException e)
+    catch (IllegalArgumentException e)
     {
       return new AwsLambdaResponse(400, e);
+    }
+    catch (RuntimeException e)
+    {
+      return new AwsLambdaResponse(500, e);
     }
   }
 

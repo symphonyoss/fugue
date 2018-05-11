@@ -30,14 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.core.strategy.naming.DefaultNamingStrategy;
 import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 
-public class FilePerTopicPublisherManager extends AbstractPublisherManager<FilePerTopicPublisherManager>
+public class FilePerTopicPublisherManager extends AbstractPublisherManager<String, FilePerTopicPublisherManager>
 {
   private final IConfigurationProvider       config_;
   private final File                         rootDir_;
@@ -95,7 +94,7 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<FileP
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<ImmutableByteArray> getPublisherByName(String topicName)
+  public synchronized IThreadSafeConsumer<String> getPublisherByName(String topicName)
   {
     assertConfigurable();
     
@@ -111,7 +110,7 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<FileP
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<ImmutableByteArray> getPublisherByConfig(String topicConfigId)
+  public synchronized IThreadSafeConsumer<String> getPublisherByConfig(String topicConfigId)
   {
     assertConfigurable();
     

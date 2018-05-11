@@ -23,14 +23,13 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
-public interface IPublisherManager
+public interface IPublisherManager<P>
 {
-  IThreadSafeConsumer<ImmutableByteArray> getPublisherByName(String topicName);
+  IThreadSafeConsumer<P> getPublisherByName(String topicName);
   
-  IThreadSafeConsumer<ImmutableByteArray> getPublisherByConfig(String topicConfigId);
+  IThreadSafeConsumer<P> getPublisherByConfig(String topicConfigId);
 
-  IThreadSafeConsumer<ImmutableByteArray> getTracePublisher();
+  IThreadSafeConsumer<P> getTracePublisher();
 }

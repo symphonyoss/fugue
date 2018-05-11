@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,7 @@ import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
-public class FilePerTopicPublisher implements IThreadSafeConsumer<ImmutableByteArray>, AutoCloseable
+public class FilePerTopicPublisher implements IThreadSafeConsumer<String>, AutoCloseable
 {
   private static final Logger  log_ = LoggerFactory.getLogger(FilePerTopicPublisher.class);
 
@@ -68,14 +69,14 @@ public class FilePerTopicPublisher implements IThreadSafeConsumer<ImmutableByteA
   }
 
   @Override
-  public synchronized void consume(ImmutableByteArray item, ITraceContext trace)
+  public synchronized void consume(String item, ITraceContext trace)
   {
     if(out_ == null)
       throw new IllegalStateException("Publisher is closed");
     
     try
     {
-      item.write(out_);
+      out_.write(item.getBytes(StandardCharsets.UTF_8));
     }
     catch (IOException e)
     {

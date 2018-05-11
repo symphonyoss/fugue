@@ -44,9 +44,18 @@ public abstract class JsonLambdaRequest extends LambdaRequest
   
   private final ObjectNode json_;
   
-  public JsonLambdaRequest(InputStream inputStream) throws IOException
+  public JsonLambdaRequest(InputStream inputStream)
   {
-    json_ = getJsonObject(MAPPER.readTree(inputStream), null);
+    try
+    {
+      json_ = getJsonObject(MAPPER.readTree(inputStream), null);
+      
+      System.out.println("JSON=" + json_);
+    }
+    catch (IOException e)
+    {
+      throw new IllegalArgumentException(e);
+    }
   }
 
   public ObjectNode getJson()
@@ -87,7 +96,7 @@ public abstract class JsonLambdaRequest extends LambdaRequest
     return EMPTY_MAP;
   }
 
-  private @Nullable ObjectNode getJsonObject(JsonNode tree, @Nullable String name) throws IOException
+  private @Nullable ObjectNode getJsonObject(JsonNode tree, @Nullable String name)
   {
     JsonNode node = name == null ? tree : tree.get(name);
     
@@ -98,8 +107,8 @@ public abstract class JsonLambdaRequest extends LambdaRequest
       return (ObjectNode) node;
     
     if(name == null)
-      throw new IOException("JSON object expected");
+      throw new IllegalArgumentException("JSON object expected");
     
-    throw new IOException("\"" + name + "\": JSON object expected");
+    throw new IllegalArgumentException("\"" + name + "\": JSON object expected");
   }
 }

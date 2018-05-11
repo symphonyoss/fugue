@@ -25,7 +25,9 @@ package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 
@@ -40,11 +42,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class BaseConfigurationProvider implements IConfigurationProvider
 {
   private JsonNode tree_;
+  private Map<String, BaseConfigurationProvider> subConfigMap_ = new HashMap<>();
 
   protected BaseConfigurationProvider()
   {}
   
-  private BaseConfigurationProvider(JsonNode tree)
+  BaseConfigurationProvider(JsonNode tree)
   {
     tree_ = tree;
   }
@@ -61,7 +64,17 @@ public class BaseConfigurationProvider implements IConfigurationProvider
     if(tree_ == null)
       throw new NotFoundException("No configuration loaded");
     
-    JsonNode node = tree_.get(name);
+    return getString(name.split("/"), 0);
+  }
+
+  private @Nonnull String getString(String[] names, int index) throws NotFoundException
+  {
+    if(index < names.length - 1)
+    {
+      return getConfiguration(names[index]).getString(names, index+1);
+    }
+    
+    JsonNode node = tree_.get(names[index]);
     
     if(node == null)
       throw new NotFoundException("No such property");
@@ -149,25 +162,34 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public @Nonnull IConfigurationProvider getConfiguration(String name)
+  public synchronized @Nonnull BaseConfigurationProvider getConfiguration(String name)
   {
     if(tree_ == null)
       throw new IllegalStateException("No configuration loaded");
     
-    JsonNode node = tree_.get(name);
+    BaseConfigurationProvider subConfig = subConfigMap_.get(name);
     
-    if(node == null || !node.isObject())
+    if(subConfig == null)
     {
-      try
+      JsonNode node = tree_.get(name);
+      
+      if(node == null || !node.isObject())
       {
-        node = new ObjectMapper().readTree("{}");
+        try
+        {
+          node = new ObjectMapper().readTree("{}");
+        }
+        catch (IOException e)
+        {
+          throw new CodingFault(e);
+        }
       }
-      catch (IOException e)
-      {
-        throw new CodingFault(e);
-      }
+      
+      subConfig = new BaseConfigurationProvider((ObjectNode)node);
+      
+      subConfigMap_.put(name, subConfig);
     }
     
-    return new BaseConfigurationProvider((ObjectNode)node);
+    return subConfig;
   }
 }

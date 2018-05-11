@@ -21,22 +21,43 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.lambda;
-
-import java.util.Map;
+package org.symphonyoss.s2.fugue.pipeline;
 
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
-public abstract class LambdaRequest
+/**
+ * Adapts a consumer of ImmutableByteArray for use by classes requiring a
+ * consumer of String.
+ * 
+ * The String payload received is encoded as UTF-8
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class StringToByteArrayConsumerAdaptor implements IThreadSafeConsumer<String>
 {
+  private final IThreadSafeConsumer<ImmutableByteArray> consumer_;
 
-  public abstract Map<String, String> getQueryParams();
+  /**
+   * Constructor.
+   * 
+   * @param consumer A consumer of ImmutableByteArray which will be called when we are called with a String.
+   */
+  public StringToByteArrayConsumerAdaptor(IThreadSafeConsumer<ImmutableByteArray> consumer)
+  {
+    consumer_ = consumer;
+  }
 
-  public abstract Map<String, String> getPathParams();
+  @Override
+  public void close()
+  {
+    consumer_.close();
+  }
 
-  public abstract Map<String, String> getRequestHeaders();
-  
-  public abstract Map<String, String> getStageVariables();
-
-  public abstract ImmutableByteArray getBody();
+  @Override
+  public void consume(String item, ITraceContext trace)
+  {
+    consumer_.consume(ImmutableByteArray.newInstance(item), trace);
+  }
 }
