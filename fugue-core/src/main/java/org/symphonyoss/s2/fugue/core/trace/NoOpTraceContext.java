@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.trace;
 
+import java.time.Instant;
+
 import org.symphonyoss.s2.common.hash.Hash;
 
 /**
@@ -51,11 +53,27 @@ public class NoOpTraceContext implements ITraceContext
   {}
 
   @Override
+  public void trace(String operationId, Instant time)
+  {
+  }
+
+  @Override
+  public void trace(String operationId, Hash parentHash, Instant time)
+  {
+  }
+
+  @Override
   public void trace(String operationId, String subjectType, Hash subjectHash)
   {}
 
   @Override
   public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId)
+  {
+    return this;
+  }
+
+  @Override
+  public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
   {
     return this;
   }

@@ -49,8 +49,6 @@ public abstract class JsonLambdaRequest extends LambdaRequest
     try
     {
       json_ = getJsonObject(MAPPER.readTree(inputStream), null);
-      
-      System.out.println("JSON=" + json_);
     }
     catch (IOException e)
     {

@@ -31,10 +31,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
-import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -42,26 +40,24 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
-public abstract class AbstractSubscriberManager<T extends AbstractSubscriberManager<T>> extends FugueLifecycleComponent<T>
+public abstract class AbstractSubscriberManager<P,T extends AbstractSubscriberManager<P,T>> extends FugueLifecycleComponent<T>
 {
-  protected static final long                        FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
-  protected static final long                        FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
+  protected static final long                   FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
+  protected static final long                   FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
 
-  private static final Logger                        log_                          = LoggerFactory
+  private static final Logger                   log_                          = LoggerFactory
       .getLogger(AbstractSubscriberManager.class);
 
-  private final ITraceContextFactory                 traceFactory_;
-  private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
-  private final IThreadSafeConsumer<ImmutableByteArray>          unprocessableMessageConsumer_;
-  
+  private final ITraceContextFactory            traceFactory_;
+  private final IThreadSafeRetryableConsumer<P> consumer_;
+  private final IThreadSafeConsumer<P>          unprocessableMessageConsumer_;
 
-  private Map<String, Set<String>>                   subscriptionsByTopic_            = new HashMap<>();
-  private Map<String, Set<String>>                   topicsBySubscription_            = new HashMap<>();
-
+  private Map<String, Set<String>>              subscriptionsByTopic_         = new HashMap<>();
+  private Map<String, Set<String>>              topicsBySubscription_         = new HashMap<>();
   
   public AbstractSubscriberManager(Class<T> type, ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer,
-      IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
+      IThreadSafeRetryableConsumer<P> consumer,
+      IThreadSafeConsumer<P> unprocessableMessageConsumer)
   {
     super(type);
     
@@ -163,7 +159,7 @@ public abstract class AbstractSubscriberManager<T extends AbstractSubscriberMana
    * @return The number of milliseconds after which a retry should be made, or -1 if the message was
    * processed and no retry is necessary.
    */
-  public long handleMessage(ImmutableByteArray immutableByteArray, ITraceContext trace)
+  public long handleMessage(P immutableByteArray, ITraceContext trace)
   {
     try
     {

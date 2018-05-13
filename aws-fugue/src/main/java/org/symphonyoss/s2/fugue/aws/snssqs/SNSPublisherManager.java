@@ -43,6 +43,10 @@ import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
+import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
+import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClient;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
@@ -77,6 +81,8 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   private String accountId_;
 
   private String region_;
+
+  private AWSSecurityTokenService stsClient_;
   
   public SNSPublisherManager(INamingStrategy namingStrategy, IConfigurationProvider config, String configRoot)
   {
@@ -97,11 +103,13 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
     
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
     
-    iamClient_ = AmazonIdentityManagementClientBuilder.standard()
+    stsClient_ = AWSSecurityTokenServiceClientBuilder.standard()
         .withRegion(region_)
         .build();
-
-    accountId_ = iamClient_.getUser().getUser().getArn().split(":")[4];
+    
+    GetCallerIdentityResult id = stsClient_.getCallerIdentity(new GetCallerIdentityRequest());
+    
+    accountId_ = id.getAccount();
     
     snsClient_ = AmazonSNSClientBuilder.standard()
       .withRegion(region_)
@@ -181,14 +189,12 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   {
     try
     {
-      System.out.println("PUBLISH " + msg);
+//      System.out.println("PUBLISH " + msg);
       
       PublishRequest publishRequest = new PublishRequest(topicArn, msg);
       PublishResult publishResult = snsClient_.publish(publishRequest);
       //print MessageId of message published to SNS topic
-      System.out.println("MessageId - " + publishResult.getMessageId());
-      
-//      producer_.send(msg);
+//      System.out.println("MessageId - " + publishResult.getMessageId());
     }
     catch (Exception e)
     {

@@ -32,6 +32,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.lambda.JsonLambdaRequest;
 
+import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.databind.JsonNode;
 
 public class AwsLambdaRequest extends JsonLambdaRequest
@@ -41,6 +42,8 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   private final Map<String, String> requestHeaders_;
   private final ImmutableByteArray  body_;
   private Map<String, String> stageVariables_;
+  private String awsRequestId_ = "UNKNOWN";
+  private long awsRequestEpoch_;
   
   public AwsLambdaRequest(InputStream inputStream)
   {
@@ -50,6 +53,21 @@ public class AwsLambdaRequest extends JsonLambdaRequest
     pathParams_ = mapAdaptor(getJson().get("pathParameters"));
     requestHeaders_ = mapAdaptor(getJson().get("headers"));
     stageVariables_ = mapAdaptor(getJson().get("stageVariables"));
+    
+    JsonNode context = getJson().get("requestContext");
+    
+    if(context != null)
+    {
+      JsonNode requestTime = context.get("requestTimeEpoch");
+      
+      if(requestTime != null && requestTime.canConvertToLong())
+        awsRequestEpoch_ = requestTime.asLong();
+      
+      JsonNode requestId = context.get("requestId");
+      
+      if(requestId != null)
+        awsRequestId_ = requestId.asText();
+    }
     
     String body = getString("body");
     
@@ -70,6 +88,16 @@ public class AwsLambdaRequest extends JsonLambdaRequest
         body_ = ImmutableByteArray.newInstance(body);
       }
     }
+  }
+
+  public String getAwsRequestId()
+  {
+    return awsRequestId_;
+  }
+
+  public long getAwsRequestEpoch()
+  {
+    return awsRequestEpoch_;
   }
 
   @Override

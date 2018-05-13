@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.core.trace.log;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -89,5 +90,26 @@ class LoggerTraceContext implements ITraceContext
   public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId)
   {
     return new LoggerTraceContext(this, externalSubjectType, externalSubjectId);
+  }
+
+  @Override
+  public void trace(String operationId, Instant time)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+  @Override
+  public void trace(String operationId, Hash parentHash, Instant time)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+
+  @Override
+  public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
+  {
+    // TODO Auto-generated method stub
+    return createSubContext(externalSubjectType, externalSubjectId);
   }
 }

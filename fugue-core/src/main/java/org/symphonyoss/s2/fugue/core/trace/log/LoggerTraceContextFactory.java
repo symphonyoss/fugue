@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.trace.log;
 
+import java.time.Instant;
+
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 
@@ -37,6 +39,13 @@ public class LoggerTraceContextFactory implements ITraceContextFactory
   @Override
   public ITraceContext createTransaction(String subjectType, String subjectId)
   {
+    return new LoggerTraceContext(subjectType, subjectId);
+  }
+
+  @Override
+  public ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime)
+  {
+    // TODO: implement properly
     return new LoggerTraceContext(subjectType, subjectId);
   }
 }

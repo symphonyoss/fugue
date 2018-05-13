@@ -27,4 +27,9 @@ public interface INamingStrategy
 {
   String getTopicName(String topic);
   String getSubscriptionName(String topic, String subscription);
+  
+  default String getTableName(String table)
+  {
+    return getTopicName(table);
+  }
 }

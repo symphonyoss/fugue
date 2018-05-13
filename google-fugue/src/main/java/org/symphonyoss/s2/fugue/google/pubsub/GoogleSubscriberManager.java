@@ -29,7 +29,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 import com.google.pubsub.v1.PubsubMessage;
 
-public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
 {
   private static final Logger   log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -129,24 +129,4 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSub
       }
     }
   }
-
-  static class UnprocessableMessageConsumer implements IThreadSafeConsumer<ImmutableByteArray>
-  {
-
-    @Override
-    public void consume(ImmutableByteArray item, ITraceContext trace)
-    {
-      // TODO Auto-generated method stub
-      
-    }
-
-    @Override
-    public void close()
-    {
-      // TODO Auto-generated method stub
-      
-    }
-    
-  }
-    
 }
