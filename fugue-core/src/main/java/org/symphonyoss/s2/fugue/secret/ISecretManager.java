@@ -21,38 +21,16 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue.secret;
 
-import javax.annotation.Nonnull;
+import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
+import org.symphonyoss.s2.fugue.naming.CredentialName;
 
-/**
- * A naming strategy which leaves all names unchanged.
- * 
- * This is used for the symlib implementations since that library manages namespacing.
- * 
- * @author Bruce Skingle
- *
- */
-public class NoOpNamingStrategy extends AbstractNamingStrategy
+public interface ISecretManager
 {
-  /**
-   * Constructor.
-   */
-  public NoOpNamingStrategy()
-  {
-    super(null);
-  }
 
-  @Override
-  public String getName(@Nonnull String name, String ...additional)
-  {
-    return NameSpace.build(null, name, additional);
-  }
+  IImmutableJsonDomNode getSecret(CredentialName secretName);
 
-  @Override
-  public String getSubscriptionName(String topic, String subscription)
-  {
-    return subscription;
-  }
+  void putSecret(CredentialName name, IImmutableJsonDomNode secret);
 
 }

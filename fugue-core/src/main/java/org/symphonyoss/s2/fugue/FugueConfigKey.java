@@ -21,38 +21,12 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue;
 
-import javax.annotation.Nonnull;
-
-/**
- * A naming strategy which leaves all names unchanged.
- * 
- * This is used for the symlib implementations since that library manages namespacing.
- * 
- * @author Bruce Skingle
- *
- */
-public class NoOpNamingStrategy extends AbstractNamingStrategy
+public class FugueConfigKey
 {
-  /**
-   * Constructor.
-   */
-  public NoOpNamingStrategy()
-  {
-    super(null);
-  }
-
-  @Override
-  public String getName(@Nonnull String name, String ...additional)
-  {
-    return NameSpace.build(null, name, additional);
-  }
-
-  @Override
-  public String getSubscriptionName(String topic, String subscription)
-  {
-    return subscription;
-  }
-
+  public static final String REGION = "region";
+  public static final String NAMESPACE = "namespace";
+  
+  private FugueConfigKey() {}
 }

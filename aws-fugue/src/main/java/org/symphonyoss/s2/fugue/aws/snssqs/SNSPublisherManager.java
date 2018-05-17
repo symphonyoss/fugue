@@ -31,75 +31,58 @@ import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
-import org.symphonyoss.s2.fugue.aws.config.S3ConfigurationProvider;
-import org.symphonyoss.s2.fugue.core.strategy.naming.DefaultNamingStrategy;
-import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
+import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 
-import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
-import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 import com.amazonaws.services.sns.AmazonSNS;
-import com.amazonaws.services.sns.AmazonSNSClient;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.auth.ClasspathPropertiesFileCredentialsProvider;
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.sns.model.CreateTopicRequest;
 import com.amazonaws.services.sns.model.CreateTopicResult;
-import com.amazonaws.services.sns.model.SubscribeRequest;
 import com.amazonaws.services.sns.model.PublishRequest;
 import com.amazonaws.services.sns.model.PublishResult;
-import com.amazonaws.services.sns.model.DeleteTopicRequest;
 
 public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPublisherManager>
 {
-  private static final Logger log_ = LoggerFactory.getLogger(SNSPublisherManager.class);
-  
-  private final INamingStrategy        namingStrategy_;
+  private static final Logger          log_                = LoggerFactory.getLogger(SNSPublisherManager.class);
+
+  private final INameFactory           nameFactory_;
   private final IConfigurationProvider config_;
-  private final String                 configRoot_;
+  private final boolean                initialize_;
 
   private Map<String, SNSPublisher>    publisherNameMap_   = new HashMap<>();
   private Map<String, SNSPublisher>    publisherConfigMap_ = new HashMap<>();
   private List<SNSPublisher>           publishers_         = new ArrayList<>();
-//  private IMessageBroker                    broker_;
-//  private IToMessageBrokerProducer          producer_;
+  private List<TopicName>              topicNames_         = new ArrayList<>();
 
   private AmazonSNS                    snsClient_;
+  private String                       accountId_;
+  private String                       region_;
+  private AWSSecurityTokenService      stsClient_;
 
-  private AmazonIdentityManagement iamClient_;
 
-  private String accountId_;
-
-  private String region_;
-
-  private AWSSecurityTokenService stsClient_;
   
-  public SNSPublisherManager(INamingStrategy namingStrategy, IConfigurationProvider config, String configRoot)
+  public SNSPublisherManager(INameFactory nameFactory, IConfigurationProvider config, boolean initialize)
   {
     super(SNSPublisherManager.class);
     
-    namingStrategy_ = namingStrategy;
+    nameFactory_ = nameFactory;
     config_ = config;
-    configRoot_ = configRoot;
+    initialize_ = initialize;
   }
 
   @Override
   public void start()
   {
-    IConfigurationProvider cf = config_.getConfiguration(configRoot_);
-    IConfigurationProvider snscf = cf.getConfiguration("snssqs");
-    
-    region_ = snscf.getRequiredString("aws.region.name");
+    region_ = config_.getRequiredString(AwsConfigKey.REGION_NAME);
     
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
     
@@ -117,15 +100,24 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
     
     for(Entry<String, SNSPublisher> entry : publisherNameMap_.entrySet())
     {
-      entry.getValue().startByName(getTopicName(entry.getKey()));
+      TopicName topicName = nameFactory_.getTopicName(entry.getKey());
+      topicNames_.add(topicName);
+      
+      entry.getValue().startByName(getTopicARN(topicName));
       publishers_.add(entry.getValue());
     }
     
     for(Entry<String, SNSPublisher> entry : publisherConfigMap_.entrySet())
     {
-      entry.getValue().startByName(getTopicName(config_.getRequiredString(entry.getKey())));
+      TopicName topicName = nameFactory_.getTopicName(config_.getRequiredString(entry.getKey())); 
+      topicNames_.add(topicName);
+      
+      entry.getValue().startByName(getTopicARN(topicName));
       publishers_.add(entry.getValue());
     }
+    
+    if(initialize_)
+      createTopics();
   }
 
   /**
@@ -137,9 +129,9 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
    * 
    * @return The topic ARN
    */
-  private String getTopicName(String rawName)
+  private String getTopicARN(TopicName topicName)
   {
-    return "arn:aws:sns:" + region_ + ":" + accountId_ + ":" + namingStrategy_.getTopicName(rawName);
+    return "arn:aws:sns:" + region_ + ":" + accountId_ + ":" + topicName;
   }
 
   @Override
@@ -202,4 +194,16 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
     }
   }
 
+  private void createTopics()
+  {
+    for(TopicName topicName : topicNames_)
+    {
+      CreateTopicRequest createTopicRequest = new CreateTopicRequest(topicName.toString());
+      CreateTopicResult createTopicResult = snsClient_.createTopic(createTopicRequest);
+      //print TopicArn
+      log_.info("Created topic " + topicName + " as " + createTopicResult.getTopicArn());
+      //get request id for CreateTopicRequest from SNS metadata   
+      System.out.println("CreateTopicRequest - " + snsClient_.getCachedResponseMetadata(createTopicRequest));
+    }
+  }
 }

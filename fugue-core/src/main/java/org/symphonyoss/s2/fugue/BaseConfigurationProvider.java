@@ -43,6 +43,7 @@ public class BaseConfigurationProvider implements IConfigurationProvider
 {
   private JsonNode tree_;
   private Map<String, BaseConfigurationProvider> subConfigMap_ = new HashMap<>();
+  private String name_ = "";
 
   protected BaseConfigurationProvider()
   {}
@@ -94,7 +95,7 @@ public class BaseConfigurationProvider implements IConfigurationProvider
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault("Required property  \"" + name + "\" not found", e);
+      throw new ProgramFault("Required property  \"" + name + "\" not found in " + name_, e);
     }
   }
   
@@ -190,6 +191,18 @@ public class BaseConfigurationProvider implements IConfigurationProvider
       subConfigMap_.put(name, subConfig);
     }
     
+    subConfig.name_ = name_ + "/" + name;
+    
     return subConfig;
+  }
+
+  public String getName()
+  {
+    return name_;
+  }
+
+  protected void setName(String name)
+  {
+    name_ = name;
   }
 }

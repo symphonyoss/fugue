@@ -77,6 +77,7 @@ public class S3ConfigurationProvider extends BaseConfigurationProvider
         String key = path.substring(i+1);
         
         loadConfig(region, bucket, key);
+        setName(configUrl + "#");
       }
       else
       {
@@ -94,6 +95,7 @@ public class S3ConfigurationProvider extends BaseConfigurationProvider
           log_.info("Loading config from file " + file.getAbsolutePath());
           
           loadConfig(in);
+          setName(file.getAbsolutePath() + " ");
         }
         catch (FileNotFoundException e1)
         {

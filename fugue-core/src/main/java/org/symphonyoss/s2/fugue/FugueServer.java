@@ -107,7 +107,12 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
     
   }
   
-  
+  public <T> T register(T component)
+  {
+    withComponents(component);
+    
+    return component;
+  }
   
   /**
    * Add the given components.
@@ -213,7 +218,7 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
         System.exit(1);
       }
     }
-    
+    setLifeCycleState(FugueLifecycleState.Running);
     return this;
   }
 

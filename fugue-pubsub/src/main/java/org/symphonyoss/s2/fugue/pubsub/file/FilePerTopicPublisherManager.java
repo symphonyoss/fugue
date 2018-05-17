@@ -48,7 +48,7 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
 
   public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir)
   {
-    this(config, rootDir, new DefaultNamingStrategy(null));
+    this(config, rootDir, new DefaultNamingStrategy());
   }
   
   public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir, INamingStrategy namingStrategy)
