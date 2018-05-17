@@ -119,11 +119,6 @@
         <artifactId>S2-common-dom-jackson</artifactId>
         <version>${s2.common.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.symphonyoss.s2.common</groupId>
-        <artifactId>S2-common-crypto</artifactId>
-        <version>${s2.common.version}</version>
-      </dependency>
 
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>
