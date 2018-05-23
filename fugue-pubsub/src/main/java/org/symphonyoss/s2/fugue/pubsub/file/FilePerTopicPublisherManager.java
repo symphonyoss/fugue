@@ -35,6 +35,7 @@ import org.symphonyoss.s2.fugue.core.strategy.naming.DefaultNamingStrategy;
 import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
+import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 public class FilePerTopicPublisherManager extends AbstractPublisherManager<String, FilePerTopicPublisherManager>
 {
@@ -94,7 +95,7 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<String> getPublisherByName(String topicName)
+  public synchronized IPublisher<String> getPublisherByName(String topicName)
   {
     assertConfigurable();
     
@@ -110,7 +111,7 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<String> getPublisherByConfig(String topicConfigId)
+  public synchronized IPublisher<String> getPublisherByConfig(String topicConfigId)
   {
     assertConfigurable();
     
@@ -123,5 +124,11 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
     }
     
     return publisher;
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return FilePerTopicPublisher.MAX_MESSAGE_SIZE;
   }
 }

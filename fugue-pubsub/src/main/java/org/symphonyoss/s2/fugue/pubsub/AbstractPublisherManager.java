@@ -24,7 +24,6 @@
 package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
 public abstract class AbstractPublisherManager<P,T extends AbstractPublisherManager<P,T>>
   extends FugueLifecycleComponent<T>
@@ -38,7 +37,7 @@ public abstract class AbstractPublisherManager<P,T extends AbstractPublisherMana
   }
   
   @Override
-  public IThreadSafeConsumer<P> getTracePublisher()
+  public IPublisher<P> getTracePublisher()
   {
     return getPublisherByName(TRACE_TOPIC_NAME);
   }

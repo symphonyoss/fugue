@@ -27,10 +27,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 
-class SNSPublisher implements IThreadSafeConsumer<String>
+class SNSPublisher implements IPublisher<String>
 {
   private static final Logger          log_ = LoggerFactory.getLogger(SNSPublisher.class);
 
@@ -69,5 +69,11 @@ class SNSPublisher implements IThreadSafeConsumer<String>
   {
     log_.info("Starting publisher for topic " + topicName + "...");
     topicName_ = topicName;
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return SNSPublisherManager.MAX_MESSAGE_SIZE;
   }
 }

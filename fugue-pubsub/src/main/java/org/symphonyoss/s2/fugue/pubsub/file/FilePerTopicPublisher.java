@@ -33,20 +33,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
-public class FilePerTopicPublisher implements IThreadSafeConsumer<String>, AutoCloseable
+public class FilePerTopicPublisher implements IPublisher<String>, AutoCloseable
 {
+  static final int MAX_MESSAGE_SIZE = 100*1000*1000; // an arbitrary large number
+
   private static final Logger  log_ = LoggerFactory.getLogger(FilePerTopicPublisher.class);
 
   private static final String NOT_OPEN = "Not open.";
-
-  private final File rootDir_;
   
+  private final File rootDir_;
   private FileOutputStream out_;
-
 
   public FilePerTopicPublisher(File rootDir)
   {
@@ -125,5 +124,11 @@ public class FilePerTopicPublisher implements IThreadSafeConsumer<String>, AutoC
     {
       throw new IllegalStateException(NOT_OPEN);
     }
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return MAX_MESSAGE_SIZE;
   }
 }

@@ -21,17 +21,17 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue;
 
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import java.util.ArrayList;
+import java.util.List;
 
-public interface IPublisherManager<P>
+public class FugueComponentContainer extends AbstractComponentContainer<FugueComponentContainer>
 {
-  IPublisher<P> getPublisherByName(String topicName);
+  private final List<IFugueComponent>                components_       = new ArrayList<>();
   
-  IPublisher<P> getPublisherByConfig(String topicConfigId);
-
-  IPublisher<P> getTracePublisher();
-  
-  int getMaximumMessageSize();
+  public FugueComponentContainer()
+  {
+    super(FugueComponentContainer.class);
+  }
 }

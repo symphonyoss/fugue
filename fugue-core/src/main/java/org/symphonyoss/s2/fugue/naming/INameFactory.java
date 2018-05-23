@@ -31,5 +31,9 @@ public interface INameFactory
   CredentialName getRealmCredentialName(String owner);
 
   TopicName getTopicName(String topic);
+  
+  SubscriptionName  getSubscriptionName(TopicName topicName, String subscription);
+
+  CredentialName getCredentialName(String tenantId, String owner);
 
 }

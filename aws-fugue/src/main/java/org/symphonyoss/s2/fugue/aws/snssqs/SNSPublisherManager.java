@@ -32,12 +32,13 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.fugue.FugueConfigKey;
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
+import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
@@ -53,6 +54,8 @@ import com.amazonaws.services.sns.model.PublishResult;
 public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPublisherManager>
 {
   private static final Logger          log_                = LoggerFactory.getLogger(SNSPublisherManager.class);
+
+  static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256K
 
   private final INameFactory           nameFactory_;
   private final IConfigurationProvider config_;
@@ -82,7 +85,10 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   @Override
   public void start()
   {
-    region_ = config_.getRequiredString(AwsConfigKey.REGION_NAME);
+    IConfigurationProvider awsConfig = config_.getConfiguration(AwsConfigKey.AMAZON);
+    IConfigurationProvider metaConfig = config_.getConfiguration(FugueConfigKey.META);
+    
+    region_ = awsConfig.getRequiredString(AwsConfigKey.REGION_NAME);
     
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
     
@@ -109,7 +115,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
     
     for(Entry<String, SNSPublisher> entry : publisherConfigMap_.entrySet())
     {
-      TopicName topicName = nameFactory_.getTopicName(config_.getRequiredString(entry.getKey())); 
+      TopicName topicName = nameFactory_.getTopicName(metaConfig.getRequiredString(entry.getKey())); 
       topicNames_.add(topicName);
       
       entry.getValue().startByName(getTopicARN(topicName));
@@ -146,7 +152,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<String> getPublisherByName(String topicName)
+  public synchronized IPublisher<String> getPublisherByName(String topicName)
   {
     assertConfigurable();
     
@@ -162,7 +168,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   }
 
   @Override
-  public synchronized IThreadSafeConsumer<String> getPublisherByConfig(String topicConfigId)
+  public synchronized IPublisher<String> getPublisherByConfig(String topicConfigId)
   {
     assertConfigurable();
     
@@ -205,5 +211,11 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
       //get request id for CreateTopicRequest from SNS metadata   
       System.out.println("CreateTopicRequest - " + snsClient_.getCachedResponseMetadata(createTopicRequest));
     }
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return MAX_MESSAGE_SIZE;
   }
 }

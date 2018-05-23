@@ -63,7 +63,7 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
 
   public AwsSecretManager(IConfigurationProvider config)
   {
-    config_ = config;
+    config_ = config.getConfiguration(AwsConfigKey.AMAZON);
   }
 
   @Override

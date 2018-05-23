@@ -25,13 +25,7 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
-public interface IPublisherManager<P>
+public interface IPublisher<P> extends IThreadSafeConsumer<P>
 {
-  IPublisher<P> getPublisherByName(String topicName);
-  
-  IPublisher<P> getPublisherByConfig(String topicConfigId);
-
-  IPublisher<P> getTracePublisher();
-  
   int getMaximumMessageSize();
 }

@@ -25,8 +25,12 @@ package org.symphonyoss.s2.fugue;
 
 public class FugueConfigKey
 {
-  public static final String REGION = "region";
-  public static final String NAMESPACE = "namespace";
+  public static final String REGION         = "region";
+  public static final String NAMESPACE      = "namespace";
+  public static final String CREDENTIAL_ID  = "credentialId";
+  public static final String REALM_ID       = "realmId";
+  public static final String ENVIRONMENT_ID = "environmentId";
+  public static final String META           = "meta";
   
   private FugueConfigKey() {}
 }
