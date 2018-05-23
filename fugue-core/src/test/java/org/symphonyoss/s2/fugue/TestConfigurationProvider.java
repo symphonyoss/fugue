@@ -46,7 +46,7 @@ public class TestConfigurationProvider
     
     ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
     
-    assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getProperty(TEST_PROPERTY_NAME));
+    assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getString(TEST_PROPERTY_NAME));
   }
   
   @Test(expected=NotFoundException.class)
@@ -56,7 +56,7 @@ public class TestConfigurationProvider
     
     ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
     
-    provider.getProperty(ABSENT_PROPERTY_NAME);
+    provider.getString(ABSENT_PROPERTY_NAME);
   }
   
 // GitHub rate limiting makes these fail, we need to set up a local jetty server to serve the config

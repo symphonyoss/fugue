@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.strategy.naming;
 
+import javax.annotation.Nonnull;
+
 /**
  * A naming strategy which leaves all names unchanged.
  * 
@@ -39,6 +41,12 @@ public class NoOpNamingStrategy extends AbstractNamingStrategy
   public NoOpNamingStrategy()
   {
     super(null);
+  }
+
+  @Override
+  public String getName(@Nonnull String name, String ...additional)
+  {
+    return NameSpace.build(null, name, additional);
   }
 
   @Override

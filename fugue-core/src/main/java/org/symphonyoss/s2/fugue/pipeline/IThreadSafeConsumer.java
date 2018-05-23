@@ -25,6 +25,8 @@ package org.symphonyoss.s2.fugue.pipeline;
 
 import javax.annotation.concurrent.ThreadSafe;
 
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+
 /**
  * A thread safe consumer of some payload.
  * 
@@ -36,13 +38,25 @@ import javax.annotation.concurrent.ThreadSafe;
  * different threads.
  * 
  * Note that it is only the consume method of this interface which is thread safe
- * and this interface is not {@link ThreadSafe} because it is an error to
- * call consume after close.
+ * and this interface is not {@link ThreadSafe} (as in javax.annotation.ThreadSafe)
+ * because it is an error to call consume after close.
  * 
  * @author bruce.skingle
  *
  * @param <T> The type of payload consumed.
  */
-public interface IThreadSafeConsumer<T> extends IConsumer<T>
+public interface IThreadSafeConsumer<T> extends IThreadSafeRetryableConsumer<T>, IConsumer<T>
 {
+  /**
+   * Consume the given item.
+   * 
+   * A normal return from this method indicates that the item has been fully processed,
+   * and the provider can discard the item. In the event that the item cannot be
+   * processed then the implementation must throw some kind of Exception.
+   * 
+   * @param item The item to be consumed.
+   * @param trace A trace context.
+   */
+  @Override
+  void consume(T item, ITraceContext trace);
 }

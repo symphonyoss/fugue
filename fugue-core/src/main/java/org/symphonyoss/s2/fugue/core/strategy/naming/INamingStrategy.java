@@ -25,5 +25,22 @@ package org.symphonyoss.s2.fugue.core.strategy.naming;
 
 public interface INamingStrategy
 {
+  String getName(String name, String ...additional);
+  
   String getSubscriptionName(String topic, String subscription);
+  
+  default String getTableName(String table)
+  {
+    return getName(table);
+  }
+  
+  default String getTopicName(String topic)
+  {
+    return getName(topic);
+  }
+  
+  default String getCredentialName(String realm, String environment, String tenant, String owner)
+  {
+    return getName(realm, environment, tenant, owner, "cred");
+  }
 }

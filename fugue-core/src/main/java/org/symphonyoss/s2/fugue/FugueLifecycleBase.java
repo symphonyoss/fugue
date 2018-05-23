@@ -28,7 +28,7 @@ import org.symphonyoss.s2.common.fault.CodingFault;
 abstract class FugueLifecycleBase<T extends FugueLifecycleBase<T>>
 {
   private FugueLifecycleState                        lifecycleState_            = FugueLifecycleState.Initializing;
-  private final T                                    typedThis_;
+  private final T                                    self_;
   
   FugueLifecycleBase(Class<T> type)
   {
@@ -38,12 +38,12 @@ abstract class FugueLifecycleBase<T extends FugueLifecycleBase<T>>
     @SuppressWarnings("unchecked")
     T typedThis = (T) this;
 
-    typedThis_ = typedThis;
+    self_ = typedThis;
   }
 
-  protected T getTypedThis()
+  protected T self()
   {
-    return typedThis_;
+    return self_;
   }
 
   protected void assertConfigurable()

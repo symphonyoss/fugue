@@ -38,6 +38,10 @@
     </dependency>
     <dependency>
       <groupId>org.symphonyoss.s2.common</groupId>
+      <artifactId>S2-common-dom-jackson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.symphonyoss.s2.common</groupId>
       <artifactId>S2-common-http</artifactId>
     </dependency>
     <dependency>

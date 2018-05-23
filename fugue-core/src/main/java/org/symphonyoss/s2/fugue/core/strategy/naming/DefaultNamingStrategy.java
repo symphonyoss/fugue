@@ -23,14 +23,48 @@
 
 package org.symphonyoss.s2.fugue.core.strategy.naming;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
+import org.symphonyoss.s2.fugue.FugueConfigKey;
+import org.symphonyoss.s2.fugue.IConfigurationProvider;
 
 public class DefaultNamingStrategy extends AbstractNamingStrategy
 {
-
+  /**
+   * @deprecated use the IConfigurationProvider constructor.
+   * 
+   * @param nameSpace The namespace to use.
+   */
+  @Deprecated
   public DefaultNamingStrategy(@Nullable String nameSpace)
   {
     super(nameSpace);
+  }
+  /**
+   * Construct an instance with no namespace.
+   */
+  public DefaultNamingStrategy()
+  {
+    super(null);
+  }
+
+  /**
+   * Constructor.
+   * 
+   * The namespcace is extracted from the given region config.
+   * 
+   * @param config  A region config.
+   */
+  public DefaultNamingStrategy(IConfigurationProvider config)
+  {
+    super(config.getRequiredString(FugueConfigKey.NAMESPACE));
+  }
+
+  @Override
+  public String getName(@Nonnull String name, String ...additional)
+  {
+    return NameSpace.build(getNameSpace(), name, additional);
   }
 
   @Override

@@ -48,14 +48,12 @@ import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
  * @author Bruce Skingle
  *
  */
-public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFugueServer
+public class FugueServer extends AbstractComponentContainer<FugueServer> implements IFugueServer
 {
   private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
   
   private final int                                  httpPort_;
-  private final List<IFugueComponent>                components_       = new ArrayList<>();
 
-  private Stack<IFugueComponent>                     stopStack_        = new Stack<>();
   private HttpServer                                 server_;
   // private StatusServlet statusServlet_;
   private CopyOnWriteArrayList<IServletProvider>     servletProviders_ = new CopyOnWriteArrayList<>();
@@ -68,6 +66,11 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
   private boolean                                    running_;
   private String                                     serverUrl_;
 
+  public FugueServer(IFugueApplication application)
+  {
+    this(application.getName(), application.getHttpPort());
+  }
+  
   /**
    * Constructor.
    * 
@@ -81,7 +84,7 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
     
     httpPort_   = httpPort;
     
-    components_.add(new IFugueComponent()
+    register(new IFugueComponent()
     {
       
       @Override
@@ -115,17 +118,10 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
    */
   public FugueServer withComponents(Object ...components)
   {
-    assertConfigurable();
+    super.withComponents(components);
     
     for(Object o : components)
     {
-      if(o instanceof IFugueComponent)
-      {
-        IFugueComponent component = (IFugueComponent)o;
-        
-        components_.add(component);
-      }
-      
       if(o instanceof IUrlPathServlet)
       {
         servlets_.addIfAbsent((IUrlPathServlet)o);
@@ -181,36 +177,36 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
     return this;
   }
   
-  @Override
-  public IFugueServer start()
-  {
-    transitionTo(FugueLifecycleState.Starting);
-    
-    for(IFugueComponent component : components_)
-    {
-      try
-      {
-        
-        log_.debug("Start " + component);
-        component.start(); 
-        stopStack_.push(component);
-      }
-      catch(RuntimeException ex)
-      {
-        log_.error("Unable to start component " + 
-            component, ex);
-        
-        setLifeCycleState(FugueLifecycleState.Failed);
-        
-        doStop();
-        
-        log_.error("Faild to start cleanly : CALLING System.exit()");
-        System.exit(1);
-      }
-    }
-    
-    return this;
-  }
+//  @Override
+//  public IFugueServer start()
+//  {
+//    transitionTo(FugueLifecycleState.Starting);
+//    
+//    for(IFugueComponent component : components_)
+//    {
+//      try
+//      {
+//        
+//        log_.debug("Start " + component);
+//        component.start(); 
+//        stopStack_.push(component);
+//      }
+//      catch(RuntimeException ex)
+//      {
+//        log_.error("Unable to start component " + 
+//            component, ex);
+//        
+//        setLifeCycleState(FugueLifecycleState.Failed);
+//        
+//        doStop();
+//        
+//        log_.error("Faild to start cleanly : CALLING System.exit()");
+//        System.exit(1);
+//      }
+//    }
+//    setLifeCycleState(FugueLifecycleState.Running);
+//    return this;
+//  }
 
   @Override
   public FugueServer join() throws InterruptedException
@@ -219,48 +215,7 @@ public class FugueServer extends FugueLifecycleBase<FugueServer> implements IFug
     return this;
   }
   
-  @Override
-  public IFugueServer stop()
-  {
-    transitionTo(FugueLifecycleState.Stopping);
-    
-    if(doStop())
-    {
-      log_.error("Faild to stop cleanly : CALLING System.exit()");
-      System.exit(1);
-    }
-    setLifeCycleState(FugueLifecycleState.Stopped);
-    
-    return this;
-  }
   
-  private boolean doStop()
-  {
-    boolean terminate = false;
-    
-    log_.info("Stopping...");
-    
-    while(!stopStack_.isEmpty())
-    {
-      IFugueComponent component = stopStack_.pop();
-      try
-      {
-        log_.debug("Stop " + component);
-        component.stop();
-      }
-      catch(RuntimeException ex)
-      {
-        log_.error("Unable to stop component " + 
-            component, ex);
-        // Don't re-throw because we want other components to have a chance to stop
-        
-        terminate = true;
-        setLifeCycleState(FugueLifecycleState.Failed);
-      }
-    }
-    
-    return terminate;
-  }
 
   @Override
   public IFugueServer fail()

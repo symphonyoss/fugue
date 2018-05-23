@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.trace;
 
+import java.time.Instant;
+
 import javax.annotation.Nullable;
 
 /**
@@ -42,5 +44,7 @@ public interface ITraceContextFactory
    * @return  An ITraceTransaction.
    */
   ITraceContext createTransaction(@Nullable String subjectType, @Nullable String subjectId);
+
+  ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime);
 
 }

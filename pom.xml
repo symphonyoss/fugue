@@ -27,7 +27,7 @@
 	<parent>
     <groupId>org.symphonyoss.s2</groupId>
     <artifactId>S2-super-pom</artifactId>
-    <version>0.1.6</version>
+    <version>0.1.7</version>
 	</parent>
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
@@ -42,7 +42,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <s2.common.version>0.1.18</s2.common.version>
+    <s2.common.version>0.1.20</s2.common.version>
   </properties>
   
 	<modules>
@@ -52,6 +52,8 @@
 		<module>fugue-launch</module>
 		<module>fugue-pubsub</module>
 		<module>google-fugue</module>
+		<module>aws-fugue</module>
+		<module>aws-fugue-lambda-auth</module>
 	</modules>
 
 	<licenses>
@@ -98,15 +100,25 @@
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
-				<groupId>org.symphonyoss.s2.common</groupId>
-				<artifactId>S2-common-core</artifactId>
-				<version>${s2.common.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.symphonyoss.s2.common</groupId>
-				<artifactId>S2-common-http</artifactId>
-				<version>${s2.common.version}</version>
-			</dependency>
+        <groupId>org.symphonyoss.s2.common</groupId>
+        <artifactId>S2-common-core</artifactId>
+        <version>${s2.common.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.symphonyoss.s2.common</groupId>
+        <artifactId>S2-common-http</artifactId>
+        <version>${s2.common.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.symphonyoss.s2.common</groupId>
+        <artifactId>S2-common-dom</artifactId>
+        <version>${s2.common.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.symphonyoss.s2.common</groupId>
+        <artifactId>S2-common-dom-jackson</artifactId>
+        <version>${s2.common.version}</version>
+      </dependency>
 
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>

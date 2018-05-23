@@ -43,7 +43,7 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  * @param <T> The type of payload consumed.
  */
 @NotThreadSafe
-public interface IConsumer<T> extends AutoCloseable
+public interface IConsumer<T> extends IRetryableConsumer<T>, AutoCloseable
 {
   /**
    * Consume the given item.
@@ -55,5 +55,6 @@ public interface IConsumer<T> extends AutoCloseable
    * @param item The item to be consumed.
    * @param trace A trace context.
    */
+  @Override
   void consume(T item, ITraceContext trace);
 }

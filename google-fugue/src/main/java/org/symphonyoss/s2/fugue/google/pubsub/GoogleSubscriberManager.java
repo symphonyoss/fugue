@@ -6,8 +6,6 @@
 
 package org.symphonyoss.s2.fugue.google.pubsub;
 
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +14,7 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.reader.ByteStringReader;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -31,7 +29,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 import com.google.pubsub.v1.PubsubMessage;
 
-public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
 {
   private static final Logger   log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -41,9 +39,9 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSub
   private List<Subscriber>      subscriberList_ = new LinkedList<>();
   
   public GoogleSubscriberManager(String projectId, INamingStrategy namingStrategy, ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<Reader> consumer)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
-    super(GoogleSubscriberManager.class, namingStrategy, traceFactory, consumer, new UnprocessableMessageConsumer());
+    super(GoogleSubscriberManager.class, traceFactory, consumer, unprocessableMessageConsumer);
     
     projectId_ = projectId;
     namingStrategy_ = namingStrategy;
@@ -63,7 +61,7 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSub
         {
           ITraceContext trace = getTraceFactory().createTransaction(PubsubMessage.class.getName(), message.getMessageId());
 
-          long retryTime = handleMessage(new ByteStringReader(message.getData(), StandardCharsets.UTF_8), trace);
+          long retryTime = handleMessage(ImmutableByteArray.newInstance(message.getData()), trace);
           
           if(retryTime < 0)
           {
@@ -131,24 +129,4 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<GoogleSub
       }
     }
   }
-
-  static class UnprocessableMessageConsumer implements IThreadSafeConsumer<Reader>
-  {
-
-    @Override
-    public void consume(Reader item, ITraceContext trace)
-    {
-      // TODO Auto-generated method stub
-      
-    }
-
-    @Override
-    public void close() throws Exception
-    {
-      // TODO Auto-generated method stub
-      
-    }
-    
-  }
-    
 }

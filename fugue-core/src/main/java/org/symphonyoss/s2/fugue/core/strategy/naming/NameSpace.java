@@ -68,8 +68,11 @@ public class NameSpace
     
     for(String s : additional)
     {
-      b.append(SEPARATOR);
-      b.append(s);
+      if(s != null)
+      {
+        b.append(SEPARATOR);
+        b.append(s);
+      }
     }
     
     return b.toString();

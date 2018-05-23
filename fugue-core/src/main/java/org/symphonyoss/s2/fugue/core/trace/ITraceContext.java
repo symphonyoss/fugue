@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.trace;
 
+import java.time.Instant;
+
 import org.symphonyoss.s2.common.hash.Hash;
 
 /**
@@ -56,6 +58,8 @@ public interface ITraceContext
    * values defined in ITraceContext
    */
   void trace(String operationId);
+  
+  void trace(String operationId, Hash parentHash);
   
   /**
    * Record an operation having taken place within a trace context.
@@ -92,4 +96,12 @@ public interface ITraceContext
    * @return A new ITraceContext which is a sub-context of the current context.
    */
   ITraceContext createSubContext(String externalSubjectType, String externalSubjectId);
+
+  Hash getHash();
+
+  void trace(String operationId, Instant time);
+
+  void trace(String operationId, Hash parentHash, Instant time);
+
+  ITraceContext createSubContext(String externalSubjectType, String externalSubjectId, Instant time);
 }

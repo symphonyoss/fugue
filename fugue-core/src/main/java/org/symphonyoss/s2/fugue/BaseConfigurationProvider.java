@@ -23,29 +23,32 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.exception.NotFoundException;
+import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class BaseConfigurationProvider implements IConfigurationProvider
 {
-  private static final Logger log_ = LoggerFactory.getLogger(BaseConfigurationProvider.class);
-  
   private JsonNode tree_;
+  private Map<String, BaseConfigurationProvider> subConfigMap_ = new HashMap<>();
+  private String name_ = "";
 
   protected BaseConfigurationProvider()
   {}
   
-  private BaseConfigurationProvider(JsonNode tree)
+  BaseConfigurationProvider(JsonNode tree)
   {
     tree_ = tree;
   }
@@ -57,12 +60,22 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public @Nonnull String getProperty(@Nonnull String name) throws NotFoundException
+  public @Nonnull String getString(@Nonnull String name) throws NotFoundException
   {
     if(tree_ == null)
       throw new NotFoundException("No configuration loaded");
     
-    JsonNode node = tree_.get(name);
+    return getString(name.split("/"), 0);
+  }
+
+  private @Nonnull String getString(String[] names, int index) throws NotFoundException
+  {
+    if(index < names.length - 1)
+    {
+      return getConfiguration(names[index]).getString(names, index+1);
+    }
+    
+    JsonNode node = tree_.get(names[index]);
     
     if(node == null)
       throw new NotFoundException("No such property");
@@ -74,24 +87,24 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public @Nonnull String getRequiredProperty(@Nonnull String name)
+  public @Nonnull String getRequiredString(@Nonnull String name)
   {
     try
     {
-      return getProperty(name);
+      return getString(name);
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault("Required property  \"" + name + "\" not found", e);
+      throw new ProgramFault("Required property  \"" + name + "\" not found in " + name_, e);
     }
   }
   
   @Override
-  public boolean getBooleanProperty(@Nonnull String name)
+  public boolean getBoolean(@Nonnull String name)
   {
     try
     {
-      return "true".equalsIgnoreCase(getProperty(name));
+      return "true".equalsIgnoreCase(getString(name));
     }
     catch (NotFoundException e)
     {
@@ -100,7 +113,20 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
   
   @Override
-  public @Nonnull List<String> getArray(@Nonnull String name) throws NotFoundException
+  public boolean getRequiredBoolean(String name)
+  {
+    try
+    {
+      return "true".equalsIgnoreCase(getString(name));
+    }
+    catch (NotFoundException e)
+    {
+      throw new ProgramFault(e);
+    }
+  }
+  
+  @Override
+  public @Nonnull List<String> getStringArray(@Nonnull String name) throws NotFoundException
   {
     if(tree_ == null)
       throw new NotFoundException("No configuration loaded");
@@ -124,11 +150,11 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public @Nonnull List<String> getRequiredArray(@Nonnull String name)
+  public @Nonnull List<String> getRequiredStringArray(@Nonnull String name)
   {
     try
     {
-      return getArray(name);
+      return getStringArray(name);
     }
     catch (NotFoundException e)
     {
@@ -137,32 +163,46 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public @Nonnull IConfigurationProvider getConfiguration(String name) throws NotFoundException
+  public synchronized @Nonnull BaseConfigurationProvider getConfiguration(String name)
   {
     if(tree_ == null)
-      throw new NotFoundException("No configuration loaded");
+      throw new IllegalStateException("No configuration loaded");
     
-    JsonNode node = tree_.get(name);
+    BaseConfigurationProvider subConfig = subConfigMap_.get(name);
     
-    if(node == null)
-      throw new NotFoundException("No such property");
+    if(subConfig == null)
+    {
+      JsonNode node = tree_.get(name);
+      
+      if(node == null || !node.isObject())
+      {
+        try
+        {
+          node = new ObjectMapper().readTree("{}");
+        }
+        catch (IOException e)
+        {
+          throw new CodingFault(e);
+        }
+      }
+      
+      subConfig = new BaseConfigurationProvider((ObjectNode)node);
+      
+      subConfigMap_.put(name, subConfig);
+    }
     
-    if(!node.isObject())
-      throw new NotFoundException("Not an object value");
+    subConfig.name_ = name_ + "/" + name;
     
-    return new BaseConfigurationProvider((ObjectNode)node);
+    return subConfig;
   }
 
-  @Override
-  public @Nonnull IConfigurationProvider getRequiredConfiguration(String name)
+  public String getName()
   {
-    try
-    {
-      return getConfiguration(name);
-    }
-    catch (NotFoundException e)
-    {
-      throw new ProgramFault("Required configuration  \"" + name + "\" not found", e);
-    }
+    return name_;
+  }
+
+  protected void setName(String name)
+  {
+    name_ = name;
   }
 }

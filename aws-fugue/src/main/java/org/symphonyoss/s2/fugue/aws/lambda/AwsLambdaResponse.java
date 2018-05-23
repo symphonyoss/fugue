@@ -21,20 +21,29 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.aws.lambda;
 
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.lambda.JsonLambdaResponse;
 
-/**
- * A consumer of Pub/Sub messages.
- * 
- * @author Bruce Skingle
- *
- */
-// TODO: DELETE ME
-public abstract class IPubSubConsumer
+public class AwsLambdaResponse extends JsonLambdaResponse
 {
-  public abstract void unprocessableMessage(ITraceContext trace, byte[] payload, String message);
+  private static final String STATUS_CODE = "statusCode";
+  private static final String BODY = "body";
 
-  public abstract void consume(ITraceContext trace, byte[] payload);
+  public AwsLambdaResponse(int statusCode, String message)
+  {
+    put(STATUS_CODE, statusCode);
+    put(BODY, message);
+}
+  
+  public AwsLambdaResponse(Throwable cause)
+  {
+    this(500, cause);
+  }
+  
+  public AwsLambdaResponse(int statusCode, Throwable cause)
+  {
+    put(STATUS_CODE, statusCode);
+    put(BODY, cause.getLocalizedMessage());
+  }
 }
