@@ -1,12 +1,12 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2017-2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The SSF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -21,22 +21,12 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.http.ui.servlet;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import org.junit.Test;
-
-public class TestLifecycle
+public interface IUIPanelContainer
 {
-  @Test
-  public void testTransitions()
-  {
-    assertTrue(FugueLifecycleState.Initializing.canTransaitionTo(FugueLifecycleState.Starting));
-    assertTrue(FugueLifecycleState.Running.canTransaitionTo(FugueLifecycleState.Stopping));
-    assertFalse(FugueLifecycleState.Running.canTransaitionTo(FugueLifecycleState.Starting));
-    assertFalse(FugueLifecycleState.Starting.canTransaitionTo(FugueLifecycleState.Starting));
-    
-  }
+
+  IUIPanelContainer addPanel(IUIPanel panel);
+
+  IUIPanelContainer setDefaultPanel(IUIPanel panel);
 }

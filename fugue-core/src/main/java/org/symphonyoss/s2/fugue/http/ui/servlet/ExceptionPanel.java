@@ -1,12 +1,12 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2017-2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The SSF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -21,38 +21,25 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue.http.ui.servlet;
 
-import javax.annotation.Nonnull;
+import javax.servlet.http.HttpServletRequest;
 
-/**
- * A naming strategy which leaves all names unchanged.
- * 
- * This is used for the symlib implementations since that library manages namespacing.
- * 
- * @author Bruce Skingle
- *
- */
-public class NoOpNamingStrategy extends AbstractNamingStrategy
+public class ExceptionPanel extends UIPanel implements IUIPanel
 {
-  /**
-   * Constructor.
-   */
-  public NoOpNamingStrategy()
+  private String error_;
+  private Throwable cause_;
+
+  public ExceptionPanel(String error, Throwable cause)
   {
-    super(null);
+    super("ERROR");
+    error_ = error;
+    cause_ = cause;
   }
 
   @Override
-  public String getName(@Nonnull String name, String ...additional)
+  public void handleContent(HttpServletRequest req, UIHtmlWriter out)
   {
-    return NameSpace.build(null, name, additional);
+    out.printError(error_, cause_);
   }
-
-  @Override
-  public String getSubscriptionName(String topic, String subscription)
-  {
-    return subscription;
-  }
-
 }

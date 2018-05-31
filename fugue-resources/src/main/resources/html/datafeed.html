@@ -1,0 +1,47 @@
+<html>
+<body>
+	<script>
+		function setupEventSource() {
+			var output = document.getElementById("output");
+			if (typeof (EventSource) !== "undefined") {
+				var sessionID = document.getElementById("sessionID").value;
+				var hostName = document.getElementById("hostID").value;
+				var portNumber = document.getElementById("portID").value;
+				
+				//var source = new EventSource("http://127.0.0.1:7011/v1/datafeed?sessionHash=10eedca65815984ba5f3b336893ea6f2561b3696ffc0a99e179671c22c1fab85a0");
+				var source = new EventSource("http://" + hostName + ":" +
+						portNumber + "/v1/datafeed?sessionHash=" + sessionID);
+		            
+				source.onmessage = function(event) {
+					/*
+					for (var x in event){
+						output.innerHTML += x + ": " + event[x] + "<br>";
+					}
+          */
+			    output.innerHTML += event.data + "<br>";
+				};
+				source.addEventListener('close', function(event) {
+					output.innerHTML += event.data + "<hr/>";
+					source.close();
+				}, false);
+			} else {
+				output.innerHTML = "Sorry, Server-Sent Events are not supported in your browser";
+			}
+			return false;
+		}
+	</script>
+	<h2>Datafeed Example</h2>
+	<div>
+	  <table>
+		<tr><th>Session ID</th><td><input type="text" id="sessionID" name="sessionID" size=80 value=""></td></tr>
+    <tr><th>Host Name</th><td><input type="text" id="hostID" name="hostName" value="127.0.0.1"></td></tr>
+    <tr><th>Port Number</th><td><input type="text" id="portID" name="portNumber" value="7003"></td></tr>
+    </table>
+    <input type="button" id="sendID" value="Send"
+			onclick="setupEventSource()" />
+		
+	</div>
+	<hr />
+	<div id="output"></div>
+</body>
+</html>

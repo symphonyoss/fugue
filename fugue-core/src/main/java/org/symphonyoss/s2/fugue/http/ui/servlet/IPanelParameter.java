@@ -1,12 +1,12 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2017-2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership.  The SSF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -21,26 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue.http.ui.servlet;
 
-public interface INamingStrategy
+public interface IPanelParameter<T> extends IPanelElement
 {
-  String getName(String name, String ...additional);
-  
-  String getSubscriptionName(String topic, String subscription);
-  
-  default String getTableName(String table)
-  {
-    return getName(table);
-  }
-  
-  default String getTopicName(String topic)
-  {
-    return getName(topic);
-  }
-  
-  default String getCredentialName(String realm, String environment, String tenant, String owner)
-  {
-    return getName(realm, environment, tenant, owner, "cred");
-  }
+  String getId();
+
+  void set(WizardRequest req, String value);
 }

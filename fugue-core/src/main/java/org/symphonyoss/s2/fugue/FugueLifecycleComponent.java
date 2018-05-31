@@ -23,8 +23,22 @@
 
 package org.symphonyoss.s2.fugue;
 
-public abstract class FugueLifecycleComponent<T extends FugueLifecycleComponent<T>> extends FugueLifecycleBase<T> implements IFugueLifecycleComponent
+import org.symphonyoss.s2.common.fluent.IFluent;
+
+/**
+ * A Fluent base class for Fugue Lifecycle Components.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <T> The concrete type to be returned by fluent methods.
+ */
+public abstract class FugueLifecycleComponent<T extends IFluent<T>> extends FugueLifecycleBase<T> implements IFugueLifecycleComponent
 {
+  /**
+   * Constructor.
+   * 
+   * @param type The concrete type returned by fluent methods.
+   */
   public FugueLifecycleComponent(Class<T> type)
   {
     super(type);

@@ -28,6 +28,12 @@ import java.util.List;
 import org.symphonyoss.s2.common.exception.NotFoundException;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 
+/**
+ * A provider of configuration values.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IConfigurationProvider
 {
   /**

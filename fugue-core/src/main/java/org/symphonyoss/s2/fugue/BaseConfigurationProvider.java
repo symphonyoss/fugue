@@ -136,14 +136,21 @@ public class BaseConfigurationProvider implements IConfigurationProvider
     if(node == null)
       throw new NotFoundException("No such property");
     
-    if(!node.isArray())
-      throw new NotFoundException("Not an array value");
-    
     List<String> result = new ArrayList<>();
     
-    for(JsonNode child : node)
+    if(node.isArray())
     {
-      result.add(child.asText());
+      for(JsonNode child : node)
+      {
+        result.add(child.asText());
+      }
+    }
+    else
+    {
+      for(String s : node.asText().split(" *, *"))
+      {
+        result.add(s);
+      }
     }
       
     return result;

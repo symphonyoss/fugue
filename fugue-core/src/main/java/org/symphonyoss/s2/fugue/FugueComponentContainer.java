@@ -23,13 +23,17 @@
 
 package org.symphonyoss.s2.fugue;
 
-import java.util.ArrayList;
-import java.util.List;
-
+/**
+ * A concrete generic container for Fugue components.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class FugueComponentContainer extends AbstractComponentContainer<FugueComponentContainer>
 {
-  private final List<IFugueComponent>                components_       = new ArrayList<>();
-  
+  /**
+   * Constructor.
+   */
   public FugueComponentContainer()
   {
     super(FugueComponentContainer.class);

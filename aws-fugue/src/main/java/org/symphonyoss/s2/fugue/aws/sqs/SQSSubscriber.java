@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
@@ -34,17 +35,20 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
 public class SQSSubscriber implements Runnable
 {
-  private final SQSSubscriberManager manager_;
-  private final AmazonSQS            sqsClient_;
-  private final String               queueUrl_;
-  private final ITraceContextFactory traceFactory_;
+  private final SQSSubscriberManager                 manager_;
+  private final AmazonSQS                            sqsClient_;
+  private final String                               queueUrl_;
+  private final ITraceContextFactory                 traceFactory_;
+  private final IThreadSafeRetryableConsumer<String> consumer_;
 
-  public SQSSubscriber(SQSSubscriberManager manager, AmazonSQS sqsClient, String queueUrl, ITraceContextFactory traceFactory)
+  public SQSSubscriber(SQSSubscriberManager manager, AmazonSQS sqsClient, String queueUrl, ITraceContextFactory traceFactory,
+      IThreadSafeRetryableConsumer<String> consumer)
   {
     manager_ = manager;
     sqsClient_ = sqsClient;
     queueUrl_ = queueUrl;
     traceFactory_ = traceFactory;
+    consumer_ = consumer;
   }
 
   public void run()
@@ -63,7 +67,7 @@ public class SQSSubscriber implements Runnable
 
         ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
 
-        long retryTime = manager_.handleMessage(m.getBody(), trace);
+        long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace);
         
         if(retryTime < 0)
         {

@@ -21,21 +21,25 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.strategy.naming;
+package org.symphonyoss.s2.fugue;
 
-import javax.annotation.Nullable;
-
-public abstract class AbstractNamingStrategy implements INamingStrategy
+/**
+ * The state of a FugueComponent.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public enum FugueComponentState
 {
-  private final @Nullable String nameSpace_;
-
-  public AbstractNamingStrategy(@Nullable String nameSpace)
-  {
-    nameSpace_ = nameSpace;
-  }
-
-  public @Nullable String getNameSpace()
-  {
-    return nameSpace_;
-  }
+  /** Everything is good. */
+  OK,
+  
+  /** Something is wrong but all services are being provided. */
+  Warn,
+  
+  /** Something is wrong and some services are being impacted but there is still some level of useful service provided. */
+  Error,
+  
+  /** Something is wrong and no useful service is being provided. */
+  Failed;
 }

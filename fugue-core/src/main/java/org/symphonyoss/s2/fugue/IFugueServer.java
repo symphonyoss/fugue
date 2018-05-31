@@ -23,8 +23,12 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.util.EnumSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+
+import org.symphonyoss.s2.fugue.http.ui.servlet.ICommandHandler;
+import org.symphonyoss.s2.fugue.http.ui.servlet.IUIPanel;
 
 /**
  * The main component for a Fugue process.
@@ -162,5 +166,35 @@ public interface IFugueServer
    * @return this (Fluent method).
    */
   IFugueServer withThread(Thread thread);
+
+  /**
+   * Add the given UIPanel to this server.
+   * 
+   * @param panel A UIPanel.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withPanel(IUIPanel panel);
+
+  /**
+   * Add the given UIPanel to this server and make it the default panel.
+   * 
+   * @param panel A UIPanel.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withDefaultPanel(IUIPanel panel);
+
+  /**
+   * Add the given command to this server.
+   * 
+   * @param path            The servlet path for the command servlet.
+   * @param name            The command name for the UI.
+   * @param validStates     Lifecycle states from which this command can be invoked.
+   * @param handler         The handler which implements the command.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withCommand(String path, String name, EnumSet<FugueLifecycleState> validStates, ICommandHandler handler);
 
 }

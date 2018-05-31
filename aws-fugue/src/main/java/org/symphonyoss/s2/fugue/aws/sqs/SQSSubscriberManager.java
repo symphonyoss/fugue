@@ -23,9 +23,6 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -40,8 +37,8 @@ import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
+import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
@@ -72,18 +69,17 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
    * @param nameFactory                     A NameFactory.
    * @param config                          The configuration to use.
    * @param traceFactory                    A trace context factory.
-   * @param consumer                        Consumer for valid messages
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    * @param initialize                      If true then create subscriptions (use PublisherManager to create topics)
    */
   public SQSSubscriberManager(INameFactory nameFactory, IConfigurationProvider config,
       ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<String> consumer, IThreadSafeConsumer<String> unprocessableMessageConsumer, boolean initialize)
+      IThreadSafeConsumer<String> unprocessableMessageConsumer, boolean initialize)
   {
-    super(SQSSubscriberManager.class, traceFactory, consumer, unprocessableMessageConsumer);
+    super(SQSSubscriberManager.class, config, traceFactory, unprocessableMessageConsumer);
     
-    if(consumer==null || unprocessableMessageConsumer==null)
-      throw new NullPointerException("consumer and unprocessableMessageConsumer are both required.");
+    if(unprocessableMessageConsumer==null)
+      throw new NullPointerException("unprocessableMessageConsumer is required.");
     
     nameFactory_ = nameFactory;
     config_ = config;
@@ -107,7 +103,7 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
       ITraceContextFactory traceFactory,
       boolean initialize)
   {
-    super(SQSSubscriberManager.class, traceFactory, null, null);
+    super(SQSSubscriberManager.class, config, traceFactory, null);
     
     nameFactory_ = nameFactory;
     config_ = config;
@@ -116,11 +112,10 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
   }
 
   @Override
-  protected void startSubscriptions(Map<String, Set<String>> subscriptionsByTopic,
-      Map<String, Set<String>> topicsBySubscription)
+  protected void startSubscription(Subscription<String> subscription)
   {
     IConfigurationProvider awsConfig = config_.getConfiguration(AwsConfigKey.AMAZON);
-    IConfigurationProvider metaConfig = config_.getConfiguration(FugueConfigKey.META);
+    
     
     region_ = awsConfig.getRequiredString(AwsConfigKey.REGION_NAME);
     
@@ -139,34 +134,29 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
           .build();
     }
     
-    for(Entry<String, Set<String>> entry : subscriptionsByTopic.entrySet())
+    for(String topic : subscription.getTopicNames())
     {
-      TopicName topicName = nameFactory_.getTopicName(metaConfig.getRequiredString(entry.getKey()));
+      TopicName topicName = nameFactory_.getTopicName(topic);
       
-      for(String subscription : entry.getValue())
+      SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+      
+      if(initialize_)
+        createSubcription(snsClient, topicName, subscriptionName);
+      
+      if(startSubscriptions_)
       {
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, metaConfig.getRequiredString(subscription));
+        log_.info("Subscribing to queue " + subscriptionName + "...");
         
-        if(initialize_)
-          createSubcription(snsClient, topicName, subscriptionName);
+        String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
+            sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
         
-        if(startSubscriptions_)
-        {
-          log_.info("Subscribing to queue " + subscriptionName + "...");
-          
-          String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
-              sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
-          
-          SQSSubscriber subscriber = new SQSSubscriber(this, sqsClient_, queueUrl, getTraceFactory());
-  
-          log_.info("Subscribing to " + subscriptionName + "...");
-        
-          submit(subscriber);
-        }
+        SQSSubscriber subscriber = new SQSSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer());
+
+        log_.info("Subscribing to " + subscriptionName + "...");
+      
+        submit(subscriber);
       }
     }
-    
-    
   }
 
   private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName)
