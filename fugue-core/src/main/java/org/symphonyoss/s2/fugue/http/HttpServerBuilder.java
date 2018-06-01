@@ -24,11 +24,14 @@
 package org.symphonyoss.s2.fugue.http;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.servlet.DispatcherType;
+import javax.servlet.Filter;
 import javax.servlet.Servlet;
 
 import org.eclipse.jetty.http.HttpVersion;
@@ -40,6 +43,7 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerList;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -47,12 +51,14 @@ import org.symphonyoss.s2.common.fault.ProgramFault;
 
 public class HttpServerBuilder implements IServletContainer
 {
-  private Map<String, Servlet> servletMap_ = new HashMap<>();
+  private Map<String, Servlet> servletMap_       = new HashMap<>();
   private List<Handler>        resourceHandlers_ = new ArrayList<>();
-  private int                  httpPort_   = -1;
-  private int                  httpsPort_  = -1;
+  private List<Filter>         filters_          = new ArrayList<>();
+  private int                  httpPort_         = -1;
+  private int                  httpsPort_        = -1;
   private String               keyStorePath_;
   private String               keyStorePassword_;
+  
   
   @Override
   public HttpServerBuilder addServlet(String path, Servlet servlet)
@@ -219,6 +225,8 @@ public class HttpServerBuilder implements IServletContainer
       servletCnt++;
     }
     
+    EnumSet<DispatcherType> filterDispatches = EnumSet.of(DispatcherType.REQUEST);
+    
     HandlerList handlers = new HandlerList();
     
         
@@ -228,10 +236,20 @@ public class HttpServerBuilder implements IServletContainer
     }
     
     if(servletCnt>0)
+    {
+      for(Filter filter : filters_)
+        sch.addFilter(new FilterHolder(filter), "/*", filterDispatches);
+      
       handlers.addHandler(sch);
+    }
 
     server.getJettyServer().setHandler(handlers);
 
     return server;
+  }
+
+  public void addFilter(Filter filter)
+  {
+    filters_.add(filter);
   }
 }

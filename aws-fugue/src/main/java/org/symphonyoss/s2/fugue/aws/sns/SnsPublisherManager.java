@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.aws.snssqs;
+package org.symphonyoss.s2.fugue.aws.sns;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,14 +46,17 @@ import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.CreateTopicRequest;
-import com.amazonaws.services.sns.model.CreateTopicResult;
 import com.amazonaws.services.sns.model.PublishRequest;
-import com.amazonaws.services.sns.model.PublishResult;
 
-public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPublisherManager>
+/**
+ * Amazon SNS implementation of PublisherManager.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPublisherManager>
 {
-  private static final Logger          log_                = LoggerFactory.getLogger(SNSPublisherManager.class);
+  private static final Logger          log_                = LoggerFactory.getLogger(SnsPublisherManager.class);
 
   static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256K
 
@@ -61,21 +64,30 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   private final IConfigurationProvider config_;
   private final boolean                initialize_;
 
-  private Map<String, SNSPublisher>    publisherNameMap_   = new HashMap<>();
-  private Map<String, SNSPublisher>    publisherConfigMap_ = new HashMap<>();
-  private List<SNSPublisher>           publishers_         = new ArrayList<>();
-  private List<TopicName>              topicNames_         = new ArrayList<>();
+  /* package */ Map<String, SnsPublisher>    publisherNameMap_   = new HashMap<>();
+  /* package */ Map<String, SnsPublisher>    publisherConfigMap_ = new HashMap<>();
+  /* package */ List<SnsPublisher>           publishers_         = new ArrayList<>();
+  /* package */ List<TopicName>              topicNames_         = new ArrayList<>();
 
-  private AmazonSNS                    snsClient_;
-  private String                       accountId_;
-  private String                       region_;
-  private AWSSecurityTokenService      stsClient_;
+  /* package */ AmazonSNS                    snsClient_;
+  /* package */ String                       accountId_;
+  /* package */ String                       region_;
+  /* package */ AWSSecurityTokenService      stsClient_;
 
-
-  
-  public SNSPublisherManager(INameFactory nameFactory, IConfigurationProvider config, boolean initialize)
+  /**
+   * Constructor.
+   * 
+   * @param nameFactory A name factory.
+   * @param config      A configuration provider.
+   */
+  public SnsPublisherManager(INameFactory nameFactory, IConfigurationProvider config)
   {
-    super(SNSPublisherManager.class);
+    this(nameFactory, config, false);
+  }
+  
+  protected SnsPublisherManager(INameFactory nameFactory, IConfigurationProvider config, boolean initialize)
+  {
+    super(SnsPublisherManager.class);
     
     nameFactory_ = nameFactory;
     config_ = config;
@@ -104,7 +116,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
       .withRegion(region_)
       .build();
     
-    for(Entry<String, SNSPublisher> entry : publisherNameMap_.entrySet())
+    for(Entry<String, SnsPublisher> entry : publisherNameMap_.entrySet())
     {
       TopicName topicName = nameFactory_.getTopicName(entry.getKey());
       topicNames_.add(topicName);
@@ -113,7 +125,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
       publishers_.add(entry.getValue());
     }
     
-    for(Entry<String, SNSPublisher> entry : publisherConfigMap_.entrySet())
+    for(Entry<String, SnsPublisher> entry : publisherConfigMap_.entrySet())
     {
       TopicName topicName = nameFactory_.getTopicName(metaConfig.getRequiredString(entry.getKey())); 
       topicNames_.add(topicName);
@@ -122,8 +134,10 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
       publishers_.add(entry.getValue());
     }
     
-    if(initialize_)
-      createTopics();
+    if(!initialize_)
+    {
+      // TODO: check that our topics are valid
+    }
   }
 
   /**
@@ -145,7 +159,7 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   {
     snsClient_.shutdown();
     
-    for(SNSPublisher publisher : publishers_)
+    for(SnsPublisher publisher : publishers_)
     {
       publisher.close();
     }
@@ -156,11 +170,11 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   {
     assertConfigurable();
     
-    SNSPublisher publisher = publisherNameMap_.get(topicName);
+    SnsPublisher publisher = publisherNameMap_.get(topicName);
     
     if(publisher == null)
     {
-      publisher = new SNSPublisher(this);
+      publisher = new SnsPublisher(this);
       publisherNameMap_.put(topicName, publisher);
     }
     
@@ -172,11 +186,11 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   {
     assertConfigurable();
     
-    SNSPublisher publisher = publisherConfigMap_.get(topicConfigId);
+    SnsPublisher publisher = publisherConfigMap_.get(topicConfigId);
     
     if(publisher == null)
     {
-      publisher = new SNSPublisher(this);
+      publisher = new SnsPublisher(this);
       publisherConfigMap_.put(topicConfigId, publisher);
     }
     
@@ -187,29 +201,12 @@ public class SNSPublisherManager extends AbstractPublisherManager<String, SNSPub
   {
     try
     {
-//      System.out.println("PUBLISH " + msg);
-      
       PublishRequest publishRequest = new PublishRequest(topicArn, msg);
-      PublishResult publishResult = snsClient_.publish(publishRequest);
-      //print MessageId of message published to SNS topic
-//      System.out.println("MessageId - " + publishResult.getMessageId());
+      snsClient_.publish(publishRequest);
     }
     catch (Exception e)
     {
       throw new TransactionFault(e);
-    }
-  }
-
-  private void createTopics()
-  {
-    for(TopicName topicName : topicNames_)
-    {
-      CreateTopicRequest createTopicRequest = new CreateTopicRequest(topicName.toString());
-      CreateTopicResult createTopicResult = snsClient_.createTopic(createTopicRequest);
-      //print TopicArn
-      log_.info("Created topic " + topicName + " as " + createTopicResult.getTopicArn());
-      //get request id for CreateTopicRequest from SNS metadata   
-      System.out.println("CreateTopicRequest - " + snsClient_.getCachedResponseMetadata(createTopicRequest));
     }
   }
 

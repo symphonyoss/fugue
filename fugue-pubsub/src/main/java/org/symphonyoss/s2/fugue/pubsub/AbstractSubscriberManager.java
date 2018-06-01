@@ -97,8 +97,13 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     return traceFactory_;
   }
 
+  protected List<Subscription<P>> getSubscribers()
+  {
+    return subscribers_;
+  }
+
   @Override
-  public synchronized final void start()
+  public synchronized void start()
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
@@ -112,7 +117,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   }
 
   @Override
-  public synchronized final void stop()
+  public synchronized void stop()
   {
     setLifeCycleState(FugueLifecycleState.Stopping);
     

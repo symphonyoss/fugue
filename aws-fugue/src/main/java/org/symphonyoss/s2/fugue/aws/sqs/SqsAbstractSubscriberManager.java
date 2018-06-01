@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.FugueConfigKey;
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -38,30 +37,24 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
+import org.symphonyoss.s2.fugue.pubsub.ISubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
-import com.amazonaws.services.sns.AmazonSNS;
-import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.CreateTopicRequest;
-import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
-import com.amazonaws.services.sns.util.Topics;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
-import com.amazonaws.services.sqs.model.CreateQueueRequest;
 
-public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSSubscriberManager>
+/* package */ class SqsAbstractSubscriberManager<T extends ISubscriberManager<String, T>> extends AbstractSubscriberManager<String, T>
 {
-  private static final Logger          log_                     = LoggerFactory.getLogger(SQSSubscriberManager.class);
+  private static final Logger          log_                     = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
-  private final INameFactory           nameFactory_;
-  private final IConfigurationProvider config_;
-  private final boolean                initialize_;
-  private final boolean                startSubscriptions_;
+  /* package */ final INameFactory           nameFactory_;
+  /* package */ final IConfigurationProvider config_;
+  /* package */ final boolean                startSubscriptions_;
 
-  private String                       region_;
-  private AmazonSQS                    sqsClient_;
+  /* package */ String                       region_;
+  /* package */ AmazonSQS                    sqsClient_;
 
-  private ExecutorService              executor_;
+  /* package */ ExecutorService              executor_;
 
   /**
    * Normal constructor.
@@ -70,107 +63,79 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
    * @param config                          The configuration to use.
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
-   * @param initialize                      If true then create subscriptions (use PublisherManager to create topics)
-   */
-  public SQSSubscriberManager(INameFactory nameFactory, IConfigurationProvider config,
+   */  
+  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, IConfigurationProvider config,
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<String> unprocessableMessageConsumer, boolean initialize)
+      IThreadSafeConsumer<String> unprocessableMessageConsumer)
   {
-    super(SQSSubscriberManager.class, config, traceFactory, unprocessableMessageConsumer);
+    super(type, config, traceFactory, unprocessableMessageConsumer);
     
     if(unprocessableMessageConsumer==null)
       throw new NullPointerException("unprocessableMessageConsumer is required.");
     
     nameFactory_ = nameFactory;
     config_ = config;
-    initialize_ = initialize;
     startSubscriptions_ = true;
     
     executor_ = Executors.newFixedThreadPool(20);
   }
   
   /**
-   * Construct a subscriber manager without and subscription processing.
-   * 
-   * This is only useful for initialization of subscriptions so initialize should be true.
+   * Construct a subscriber manager without any subscription processing.
    * 
    * @param nameFactory                     A NameFactory.
    * @param config                          The configuration to use.
    * @param traceFactory                    A trace context factory.
-   * @param initialize                      If true then create subscriptions (use PublisherManager to create topics)
    */
-  public SQSSubscriberManager(INameFactory nameFactory, IConfigurationProvider config,
-      ITraceContextFactory traceFactory,
-      boolean initialize)
+  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, IConfigurationProvider config,
+      ITraceContextFactory traceFactory)
   {
-    super(SQSSubscriberManager.class, config, traceFactory, null);
+    super(type, config, traceFactory, null);
     
     nameFactory_ = nameFactory;
     config_ = config;
-    initialize_ = initialize;
     startSubscriptions_ = false;
   }
 
   @Override
-  protected void startSubscription(Subscription<String> subscription)
+  public void start()
   {
     IConfigurationProvider awsConfig = config_.getConfiguration(AwsConfigKey.AMAZON);
     
-    
     region_ = awsConfig.getRequiredString(AwsConfigKey.REGION_NAME);
-    
-    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
     
     sqsClient_ = AmazonSQSClientBuilder.standard()
         .withRegion(region_)
         .build();
     
-    AmazonSNS snsClient = null;
+    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
     
-    if(initialize_)
+    super.start();
+  }
+
+  @Override
+  protected void startSubscription(Subscription<String> subscription)
+  {
+    if(startSubscriptions_)
     {
-      snsClient = AmazonSNSClientBuilder.standard()
-          .withRegion(region_)
-          .build();
-    }
-    
-    for(String topic : subscription.getTopicNames())
-    {
-      TopicName topicName = nameFactory_.getTopicName(topic);
-      
-      SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
-      
-      if(initialize_)
-        createSubcription(snsClient, topicName, subscriptionName);
-      
-      if(startSubscriptions_)
+      for(String topic : subscription.getTopicNames())
       {
+        TopicName topicName = nameFactory_.getTopicName(topic);
+        
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+
         log_.info("Subscribing to queue " + subscriptionName + "...");
         
         String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
             sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
         
-        SQSSubscriber subscriber = new SQSSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer());
+        SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer());
 
         log_.info("Subscribing to " + subscriptionName + "...");
       
         submit(subscriber);
       }
     }
-  }
-
-  private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName)
-  {
-    // TODO: this is creating the topic which it should not do. Implement an STS client and pass it in here and to SNSPublisherManager
-    
-    String myTopicArn = snsClient.createTopic(new CreateTopicRequest(topicName.toString())).getTopicArn();
-    String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
-    
-    String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, myTopicArn, myQueueUrl);
-    
-    snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
-    
-    log_.info("Created subscription " + subscriptionName + " as " + myQueueUrl);
   }
 
   @Override
@@ -197,7 +162,7 @@ public class SQSSubscriberManager extends AbstractSubscriberManager<String, SQSS
     }
   }
 
-  public void submit(SQSSubscriber subscriber)
+  public void submit(SqsSubscriber subscriber)
   {
     executor_.submit(subscriber);
   }

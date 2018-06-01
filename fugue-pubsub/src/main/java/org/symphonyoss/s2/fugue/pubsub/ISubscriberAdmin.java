@@ -24,43 +24,18 @@
 package org.symphonyoss.s2.fugue.pubsub;
 
 /**
- * A pub/sub publisher manager.
+ * A subscriber manager of payload type P.
  * 
  * @author Bruce Skingle
  *
- * @param <P> The type of the payload published.
+ * @param <P> The type of payload received.
+ * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public interface IPublisherManager<P>
+public interface ISubscriberAdmin<P,T extends ISubscriberManager<P,T>> extends ISubscriberManager<P,T>
 {
   /**
-   * Get the IPublisher for the given named topic.
+   * Create all configured subscriptions.
    * 
-   * @param topicName The actual name of a topic.
-   * 
-   * @return The publisher for the required topic.
    */
-  IPublisher<P> getPublisherByName(String topicName);
-  
-  /**
-   * Get the IPublisher for the topic named in the given configuration item.
-   * 
-   * @param topicConfigId A configuration key
-   * 
-   * @return The publisher for the required topic.
-   */
-  IPublisher<P> getPublisherByConfig(String topicConfigId);
-
-  /**
-   * Return the publisher for trace events.
-   * 
-   * @return the publisher for trace events.
-   */
-  IPublisher<P> getTracePublisher();
-  
-  /**
-   * Return the maximum allowed size of a message in bytes.
-   * 
-   * @return The maximum allowed size of a message in bytes.
-   */
-  int getMaximumMessageSize();
+  void createSubscriptions();
 }

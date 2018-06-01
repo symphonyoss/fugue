@@ -33,15 +33,22 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
-public class SQSSubscriber implements Runnable
+/**
+ * An SWS SNS subscriber.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+/* package */ class SqsSubscriber implements Runnable
 {
-  private final SQSSubscriberManager                 manager_;
+  private final SqsAbstractSubscriberManager<?>      manager_;
   private final AmazonSQS                            sqsClient_;
   private final String                               queueUrl_;
   private final ITraceContextFactory                 traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
 
-  public SQSSubscriber(SQSSubscriberManager manager, AmazonSQS sqsClient, String queueUrl, ITraceContextFactory traceFactory,
+  /* package */ SqsSubscriber(SqsAbstractSubscriberManager<?> manager, AmazonSQS sqsClient, String queueUrl,
+      ITraceContextFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer)
   {
     manager_ = manager;
@@ -51,6 +58,7 @@ public class SQSSubscriber implements Runnable
     consumer_ = consumer;
   }
 
+  @Override
   public void run()
   {
     // receive messages from the queue

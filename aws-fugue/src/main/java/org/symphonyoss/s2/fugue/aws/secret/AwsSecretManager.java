@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
+import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.IFugueComponent;
@@ -82,7 +83,7 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
   }
   
   @Override
-  public IImmutableJsonDomNode getSecret(CredentialName name)
+  public IImmutableJsonDomNode getSecret(CredentialName name) throws NoSuchObjectException
   {
     GetSecretValueRequest getSecretValueRequest = new GetSecretValueRequest()
         .withSecretId(name.toString());
@@ -99,7 +100,7 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
           
       return JacksonAdaptor.adapt(MAPPER.readTree(secret)).immutify();
     }
-    catch (InvalidParameterException | ResourceNotFoundException e)
+    catch (InvalidParameterException e)
     {
       throw new IllegalArgumentException(e);
     }
@@ -110,6 +111,10 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
     catch (IOException e)
     {
       throw new IllegalStateException(e);
+    }
+    catch(ResourceNotFoundException e)
+    {
+      throw new NoSuchObjectException(e);
     }
   }
   

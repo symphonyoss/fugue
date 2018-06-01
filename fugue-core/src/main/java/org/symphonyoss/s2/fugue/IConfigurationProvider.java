@@ -66,6 +66,18 @@ public interface IConfigurationProvider
    * @throws ProgramFault  If the property is not defined in the current configuration.
    */
   String getRequiredString(String name);
+  
+  /**
+   * Return the value of the given configuration property as a long integer.
+   * 
+   * This method throws a ProgramFault if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws ProgramFault  If the property is not defined in the current configuration.
+   */
+  long getRequiredLong(String name);
 
   /**
    * Return the value of the given configuration property as a boolean.
@@ -76,6 +88,17 @@ public interface IConfigurationProvider
    * @throws NotFoundException  If the property is not defined in the current configuration.
    */
   boolean getBoolean(String name) throws NotFoundException;
+  
+  /**
+   * Return the value of the given configuration property as a boolean.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   * 
+   * @return      The value of the given property name.
+   * 
+   */
+  boolean getBoolean(String name, boolean defaultValue);
 
   /**
    * Return the value of the given configuration property as a boolean.

@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.aws.snssqs;
+package org.symphonyoss.s2.fugue.aws.sns;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,14 +30,14 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 
-class SNSPublisher implements IPublisher<String>
+class SnsPublisher implements IPublisher<String>
 {
-  private static final Logger          log_ = LoggerFactory.getLogger(SNSPublisher.class);
+  private static final Logger          log_ = LoggerFactory.getLogger(SnsPublisher.class);
 
-  private final SNSPublisherManager manager_;
+  private final SnsPublisherManager manager_;
   private String                       topicName_;
 
-  SNSPublisher(SNSPublisherManager manager)
+  SnsPublisher(SnsPublisherManager manager)
   {
     manager_ = manager;
   }
@@ -74,6 +74,6 @@ class SNSPublisher implements IPublisher<String>
   @Override
   public int getMaximumMessageSize()
   {
-    return SNSPublisherManager.MAX_MESSAGE_SIZE;
+    return SnsPublisherManager.MAX_MESSAGE_SIZE;
   }
 }

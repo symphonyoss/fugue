@@ -66,7 +66,7 @@ public class StatusServlet extends UIServlet implements IUrlPathServlet, IUIPane
     statusPanel_        = new StatusPanel(app);
 
     panelMap_.put(statusPanel_.getId(), statusPanel_);
-    addCommand(new Command("Refresh", "/", null));
+    addCommand(new Command("Refresh", "#", null));
   }
 
   @Override

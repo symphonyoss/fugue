@@ -39,6 +39,7 @@ import org.symphonyoss.s2.fugue.http.HttpServerBuilder;
 import org.symphonyoss.s2.fugue.http.IResourceProvider;
 import org.symphonyoss.s2.fugue.http.IServletProvider;
 import org.symphonyoss.s2.fugue.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.http.RandomAuthFilter;
 import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
 import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
 import org.symphonyoss.s2.fugue.http.HttpServer;
@@ -77,6 +78,8 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   private String                                     serverUrl_;
 
   private StatusServlet statusServlet_;
+
+  private boolean localWebLogin_;
 
   /**
    * Constructor.
@@ -154,7 +157,13 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     return this;
   }
   
-  
+  @Override
+  public IFugueServer withLocalWebLogin()
+  {
+    localWebLogin_ = true;
+    
+    return this;
+  }
 
   @Override
   public IFugueServer fail()
@@ -246,7 +255,13 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     try
     {
       HttpServerBuilder httpServerBuilder = new HttpServerBuilder();
+      RandomAuthFilter filter = null;
       
+      if(localWebLogin_)
+      {
+        filter = new RandomAuthFilter();
+        httpServerBuilder.addFilter(filter);
+      }
       for(IResourceProvider provider : getResourceProviders())
         httpServerBuilder.withResources(provider);
       
@@ -293,6 +308,11 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
           InetAddress.getLocalHost().getHostName() + ":" + port);
       log_.info("you can also point your browser to http://" + 
           InetAddress.getLocalHost().getHostAddress() + ":" + port);
+      
+      if(filter != null)
+      {
+        openBrowser(RandomAuthFilter.LOGIN_TOKEN + "=" + filter.getAuthToken());
+      }
       
       setLifeCycleState(FugueLifecycleState.Running);
       statusMessage_ = "";
@@ -383,14 +403,19 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   
   /**
    * Open the browser on the URL for this server.
+   * 
+   * @param queryString An optional query string.
    */
-  public void openBrowser()
+  public void openBrowser(String queryString)
   {
     try
     {
       if(serverUrl_ != null)
       {
         String url = serverUrl_ + "/fugue";
+        
+        if(queryString != null)
+          url = url + "?" + queryString;
         
         log_.info("opening browser on " + url);
         

@@ -197,4 +197,11 @@ public interface IFugueServer
    */
   IFugueServer withCommand(String path, String name, EnumSet<FugueLifecycleState> validStates, ICommandHandler handler);
 
+  /**
+   * Generate a random one time authentication token and invoke the local browser to connect to the running server.
+   * 
+   * @return this (Fluent method).
+   */
+  IFugueServer withLocalWebLogin();
+
 }
