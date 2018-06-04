@@ -60,6 +60,7 @@ public interface IFugeComponentContainer<T extends IFluent<T>> extends IFluent<T
    * 
    * <code>nameFactory_ = register(new SystemNameFactory(config_));</code>
    * 
+   * @param <C>       The type of the component to be registered. 
    * @param component The component to be registered.
    * 
    * @return The component.

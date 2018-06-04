@@ -30,16 +30,16 @@ abstract class FugueLifecycleBase<T extends IFluent<T>> extends Fluent<T>
 {
   private FugueLifecycleState lifecycleState_ = FugueLifecycleState.Initializing;
   
-  FugueLifecycleBase(Class<T> type)
-  {
-    super(type);
-  }
-
   /**
    * Constructor.
    * 
    * @param type The concrete type returned by fluent methods.
    */
+  FugueLifecycleBase(Class<T> type)
+  {
+    super(type);
+  }
+
   protected void assertConfigurable()
   {
     if(!lifecycleState_.isConfigurable())
