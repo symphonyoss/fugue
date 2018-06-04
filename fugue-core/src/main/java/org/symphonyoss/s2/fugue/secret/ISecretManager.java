@@ -24,12 +24,13 @@
 package org.symphonyoss.s2.fugue.secret;
 
 import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
+import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 
 public interface ISecretManager
 {
 
-  IImmutableJsonDomNode getSecret(CredentialName secretName);
+  IImmutableJsonDomNode getSecret(CredentialName secretName) throws NoSuchObjectException;
 
   void putSecret(CredentialName name, IImmutableJsonDomNode secret);
 

@@ -31,9 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.symphonyoss.s2.fugue.IConfigurationProvider;
-import org.symphonyoss.s2.fugue.core.strategy.naming.DefaultNamingStrategy;
-import org.symphonyoss.s2.fugue.core.strategy.naming.INamingStrategy;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
@@ -41,24 +39,19 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
 {
   private final IConfigurationProvider       config_;
   private final File                         rootDir_;
-  private final INamingStrategy              namingStrategy_;
+  private final INameFactory                 nameFactory_;
 
   private Map<String, FilePerTopicPublisher> publisherNameMap_   = new HashMap<>();
   private Map<String, FilePerTopicPublisher> publisherConfigMap_ = new HashMap<>();
-  private List<FilePerTopicPublisher>        publishers_ = new ArrayList<>();
-
-  public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir)
-  {
-    this(config, rootDir, new DefaultNamingStrategy());
-  }
+  private List<FilePerTopicPublisher>        publishers_         = new ArrayList<>();
   
-  public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir, INamingStrategy namingStrategy)
+  public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir, INameFactory nameFactory)
   {
     super(FilePerTopicPublisherManager.class);
     
     config_ = config;
     rootDir_ = rootDir;
-    namingStrategy_ = namingStrategy;
+    nameFactory_ = nameFactory;
   }
 
   @Override
@@ -66,13 +59,13 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
   {
     for(Entry<String, FilePerTopicPublisher> entry : publisherNameMap_.entrySet())
     {
-      entry.getValue().startByName(namingStrategy_.getTopicName(entry.getKey()));
+      entry.getValue().startByName(nameFactory_.getTopicName(entry.getKey()).toString());
       publishers_.add(entry.getValue());
     }
     
     for(Entry<String, FilePerTopicPublisher> entry : publisherConfigMap_.entrySet())
     {
-      entry.getValue().startByName(namingStrategy_.getTopicName(config_.getRequiredString(entry.getKey())));
+      entry.getValue().startByName(nameFactory_.getTopicName(config_.getRequiredString(entry.getKey())).toString());
       publishers_.add(entry.getValue());
     }
   }

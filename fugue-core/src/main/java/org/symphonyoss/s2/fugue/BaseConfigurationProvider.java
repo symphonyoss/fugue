@@ -100,6 +100,27 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
   
   @Override
+  public long getRequiredLong(String name)
+  {
+    String s = null;
+    
+    try
+    {
+      s = getString(name);
+      
+      return Long.parseLong(s);
+    }
+    catch (NotFoundException e)
+    {
+      throw new ProgramFault("Required property  \"" + name + "\" not found in " + name_, e);
+    }
+    catch(NumberFormatException e)
+    {
+      throw new ProgramFault("Required long integer property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+    }
+  }
+
+  @Override
   public boolean getBoolean(@Nonnull String name)
   {
     try
@@ -126,6 +147,19 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
   
   @Override
+  public boolean getBoolean(String name, boolean defaultValue)
+  {
+    try
+    {
+      return "true".equalsIgnoreCase(getString(name));
+    }
+    catch (NotFoundException e)
+    {
+      return defaultValue;
+    }
+  }
+
+  @Override
   public @Nonnull List<String> getStringArray(@Nonnull String name) throws NotFoundException
   {
     if(tree_ == null)
@@ -136,14 +170,21 @@ public class BaseConfigurationProvider implements IConfigurationProvider
     if(node == null)
       throw new NotFoundException("No such property");
     
-    if(!node.isArray())
-      throw new NotFoundException("Not an array value");
-    
     List<String> result = new ArrayList<>();
     
-    for(JsonNode child : node)
+    if(node.isArray())
     {
-      result.add(child.asText());
+      for(JsonNode child : node)
+      {
+        result.add(child.asText());
+      }
+    }
+    else
+    {
+      for(String s : node.asText().split(" *, *"))
+      {
+        result.add(s);
+      }
     }
       
     return result;

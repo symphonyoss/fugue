@@ -23,41 +23,27 @@
 
 package org.symphonyoss.s2.fugue;
 
-import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.fluent.Fluent;
+import org.symphonyoss.s2.common.fluent.IFluent;
 
-abstract class FugueLifecycleBase<T extends FugueLifecycleBase<T>>
+abstract class FugueLifecycleBase<T extends IFluent<T>> extends Fluent<T>
 {
-  private FugueLifecycleState                        lifecycleState_            = FugueLifecycleState.Initializing;
-  private final T                                    self_;
+  private FugueLifecycleState lifecycleState_ = FugueLifecycleState.Initializing;
   
   FugueLifecycleBase(Class<T> type)
   {
-    if (!(type.isInstance(this)))
-      throw new CodingFault("Class is declared to be " + type + " in type parameter T but it is not.");
-
-    @SuppressWarnings("unchecked")
-    T typedThis = (T) this;
-
-    self_ = typedThis;
+    super(type);
   }
 
-  protected T self()
-  {
-    return self_;
-  }
-
+  /**
+   * Constructor.
+   * 
+   * @param type The concrete type returned by fluent methods.
+   */
   protected void assertConfigurable()
   {
     if(!lifecycleState_.isConfigurable())
       throw new IllegalStateException("Component has started, it is too late to make configuration changes.");
-  }
-
-  protected void transitionTo(FugueLifecycleState other)
-  {
-    if(!lifecycleState_.canTransaitionTo(other))
-      throw new IllegalStateException("Component is in state " + lifecycleState_ + ", cannot transition to ");
-    
-    lifecycleState_ = other;
   }
 
   protected void setLifeCycleState(FugueLifecycleState state)

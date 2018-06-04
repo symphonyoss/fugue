@@ -25,9 +25,9 @@ package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
+import java.nio.file.ClosedFileSystemException;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,12 +35,20 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.http.HttpServer;
-import org.symphonyoss.s2.common.http.HttpServerBuilder;
-import org.symphonyoss.s2.common.http.IServletProvider;
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.http.HttpServerBuilder;
+import org.symphonyoss.s2.fugue.http.IResourceProvider;
+import org.symphonyoss.s2.fugue.http.IServletProvider;
+import org.symphonyoss.s2.fugue.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.http.RandomAuthFilter;
 import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
 import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
+import org.symphonyoss.s2.fugue.http.HttpServer;
+import org.symphonyoss.s2.fugue.http.ui.servlet.Command;
+import org.symphonyoss.s2.fugue.http.ui.servlet.CommandServlet;
+import org.symphonyoss.s2.fugue.http.ui.servlet.ICommand;
+import org.symphonyoss.s2.fugue.http.ui.servlet.ICommandHandler;
+import org.symphonyoss.s2.fugue.http.ui.servlet.IUIPanel;
+import org.symphonyoss.s2.fugue.http.ui.servlet.StatusServlet;
 
 /**
  * The main component for a Fugue process.
@@ -51,21 +59,33 @@ import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
 public class FugueServer extends AbstractComponentContainer<FugueServer> implements IFugueServer
 {
   private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
+
+  private static final String APP_SERVLET_ROOT = "/app/";
   
   private final int                                  httpPort_;
 
   private HttpServer                                 server_;
   // private StatusServlet statusServlet_;
-  private CopyOnWriteArrayList<IServletProvider>     servletProviders_ = new CopyOnWriteArrayList<>();
-  private CopyOnWriteArrayList<IUrlPathServlet>      servlets_         = new CopyOnWriteArrayList<>();
+
   private CopyOnWriteArrayList<FugueExecutorService> executors_        = new CopyOnWriteArrayList<>();
   private CopyOnWriteArrayList<Thread>               threads_          = new CopyOnWriteArrayList<>();
 
   // private IApplication application_;
   private boolean                                    started_;
   private boolean                                    running_;
+  private FugueComponentState                        componentState_ = FugueComponentState.OK;
+  private String                                     statusMessage_ = "Initializing...";
   private String                                     serverUrl_;
 
+  private StatusServlet statusServlet_;
+
+  private boolean localWebLogin_;
+
+  /**
+   * Constructor.
+   * 
+   * @param application       The program name and local port on which to run an http server.
+   */
   public FugueServer(IFugueApplication application)
   {
     this(application.getName(), application.getHttpPort());
@@ -74,17 +94,16 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   /**
    * Constructor.
    * 
-   * @param name        The program name.
-   * @param httpPort    The local port on which to run an http server.
-   * @param components  Zero or  more components which will be managed by this server
+   * @param name              The program name.
+   * @param httpPort          The local port on which to run an http server.
    */
-  public FugueServer(String name, int httpPort, Object ...components)
+  public FugueServer(String name, int httpPort)
   {
     super(FugueServer.class);
     
     httpPort_   = httpPort;
     
-    register(new IFugueComponent()
+    register(new IFugueLifecycleComponent()
     {
       
       @Override
@@ -98,124 +117,53 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       {
         stopFugueServer();
       }
+
+      @Override
+      public FugueLifecycleState getLifecycleState()
+      {
+        return FugueServer.this.getLifecycleState();
+      }
+
+      @Override
+      public FugueComponentState getComponentState()
+      {
+        return componentState_;
+      }
+
+      @Override
+      public String getComponentStatusMessage()
+      {
+        return statusMessage_;
+      }
     });
     
-    withComponents(components);
-    
-    
+    withCommand(APP_SERVLET_ROOT, "shutdown", 
+        EnumSet.of(FugueLifecycleState.Running,
+            FugueLifecycleState.Initializing,
+            FugueLifecycleState.Starting),
+        () -> 
+        {
+          if(started_)
+            stopFugueServer();
+        });
   }
-  
-  
-  
-  /**
-   * Add the given components.
-   * 
-   * @param components one or more components.
-   * 
-   * @return this (Fluent method).
-   * 
-   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
-   */
-  public FugueServer withComponents(Object ...components)
-  {
-    super.withComponents(components);
-    
-    for(Object o : components)
-    {
-      if(o instanceof IUrlPathServlet)
-      {
-        servlets_.addIfAbsent((IUrlPathServlet)o);
-      }
-    }
-    
-    return this;
-  }
-  
-  /**
-   * Add the given ServletProviders.
-   * 
-   * @param servletProvider a provider of IURLPathServlets.
-   * 
-   * @return this (Fluent method).
-   * 
-   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
-   */
-  public synchronized FugueServer withServletProvider(IServletProvider servletProvider)
-  {
-    assertConfigurable();
-    
-    servletProviders_.addIfAbsent(servletProvider);
-//    if(servletProviders_.addIfAbsent(servletProvider))
-//    {
-//      if(server_ != null)
-//        servletProvider.registerServlets(server_);
-//    }
-    
-    return this;
-  }
-
-  /**
-   * Add the given ServletProviders.
-   * 
-   * @param servlet an IURLPathServlet.
-   * 
-   * @return this (Fluent method).
-   * 
-   * @throws IllegalStateException If the server is not configurable (i.e. has been started)
-   */
-  public synchronized FugueServer registerServlet(IUrlPathServlet servlet)
-  {
-    assertConfigurable();
-    
-    servlets_.addIfAbsent(servlet);
-//    if(servlets_.addIfAbsent(servlet))
-//    {
-//      if(server_ != null)
-//        server_.addServlet(servlet);
-//    }
-    
-    return this;
-  }
-  
-//  @Override
-//  public IFugueServer start()
-//  {
-//    transitionTo(FugueLifecycleState.Starting);
-//    
-//    for(IFugueComponent component : components_)
-//    {
-//      try
-//      {
-//        
-//        log_.debug("Start " + component);
-//        component.start(); 
-//        stopStack_.push(component);
-//      }
-//      catch(RuntimeException ex)
-//      {
-//        log_.error("Unable to start component " + 
-//            component, ex);
-//        
-//        setLifeCycleState(FugueLifecycleState.Failed);
-//        
-//        doStop();
-//        
-//        log_.error("Faild to start cleanly : CALLING System.exit()");
-//        System.exit(1);
-//      }
-//    }
-//    setLifeCycleState(FugueLifecycleState.Running);
-//    return this;
-//  }
 
   @Override
-  public FugueServer join() throws InterruptedException
+  public synchronized FugueServer join() throws InterruptedException
   {
-    server_.join();
+    while(running_)
+      wait();
+    
     return this;
   }
   
-  
+  @Override
+  public IFugueServer withLocalWebLogin()
+  {
+    localWebLogin_ = true;
+    
+    return this;
+  }
 
   @Override
   public IFugueServer fail()
@@ -240,25 +188,36 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     
     return this;
   }
-//  
-//
-//  @Override
-//  public IUIPanelContainer getUIPanelContainer()
-//  {
-//    return statusServlet_;
-//  }
-//
-//  @Override
-//  public IUIPanelContainer addPanel(IUIPanel panel)
-//  {
-//    return statusServlet_.addPanel(panel);
-//  }
-//
-//  @Override
-//  public IUIPanelContainer setDefaultPanel(IUIPanel panel)
-//  {
-//    return statusServlet_.setDefaultPanel(panel);
-//  }
+
+  @Override
+  public IFugueServer withPanel(IUIPanel panel)
+  {
+    statusServlet_.addPanel(panel);
+    
+    return this;
+  }
+
+  @Override
+  public IFugueServer withDefaultPanel(IUIPanel panel)
+  {
+    statusServlet_.setDefaultPanel(panel);
+    
+    return this;
+  }
+  
+  public IFugueServer withCommand(String path, String name, 
+      EnumSet<FugueLifecycleState> validStates,
+      ICommandHandler handler)
+  {
+    path = path + name;
+    name = name.substring(0,1).toUpperCase() + name.substring(1);
+    
+    ICommand command = new Command(name, path, validStates, handler);
+    
+    register(command);
+    
+    return this;
+  }
 
   /**
    * Return true iff the server is running.
@@ -276,6 +235,10 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   {
     boolean v = running_;
     running_ = running;
+    
+    if(!running)
+      notifyAll();
+    
     return v;
   }
 
@@ -286,62 +249,47 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     
     started_ = true;
     setRunning(true);
-//    application_.setLifeCycleState(ComponentLifeCycleState.Starting);
-//    application_.setState(ComponentState.OK);
     
     log_.info("FugueServer Started");
     
     try
     {
-      
-//      int   httpPort = configureHttpPort();
-//      int   grpcPort = configureGrcpPort();
-//      
-//      UIServletResources    res         = new UIServletResources(getResourcesService());
-//
-//      statusServlet_ = new StatusServlet(res, application_);
-//  
-//      configure(statusServlet_);
-      
       HttpServerBuilder httpServerBuilder = new HttpServerBuilder();
-//      (getResourcesService())
-//          .addResource("/html/examplePage.html")
-//          .addResource("/html/datafeed.html")
-//          .addResource("/css/main.css")
-//          .addResource("/images/s2avatar.png")
-//          .addServlet(statusServlet_)
-//          .addServlet(APP_SERVLET_ROOT + "status",    new AppStatusServlet(application_));
-//      
-//      
-//      String keyStore = systemModelService_.getServerKeystorePath();
-//      
-//      if(keyStore == null || keyStore.trim().length()==0)
-//          ssl=true;
+      RandomAuthFilter filter = null;
       
-      boolean ssl = false;
+      if(localWebLogin_)
+      {
+        filter = new RandomAuthFilter();
+        httpServerBuilder.addFilter(filter);
+      }
+      for(IResourceProvider provider : getResourceProviders())
+        httpServerBuilder.withResources(provider);
       
       httpServerBuilder
         .setHttpPort(httpPort_);
 
-//      if(ssl)
-//      {
-//        httpServerBuilder
-//          .setHttpsPort(httpPort)
-//          .setKeyStorePath(keyStore)
-//          .setKeyStorePassword(systemModelService_.getServerKeystorePassword());
-//      }
-//      
-//      configure(httpServerBuilder);
+      List<IResourceProvider> resourceProviders = getResourceProviders();
       
+      if(!resourceProviders.isEmpty())
+      {
+        statusServlet_ = new StatusServlet(resourceProviders.get(0), this);
+        httpServerBuilder.addServlet(statusServlet_);
+        
+        for(ICommand command : getCommands())
+        {
+          httpServerBuilder.addServlet(command.getPath(),  new CommandServlet(command.getHandler()));
+          statusServlet_.addCommand(command);
+        }
+      }
       
       synchronized(this)
       {
-        for(IServletProvider servletProvider : servletProviders_)
+        for(IServletProvider servletProvider : getServletProviders())
         {
           servletProvider.registerServlets(httpServerBuilder);
         }
         
-        for(IUrlPathServlet servlet : servlets_)
+        for(IUrlPathServlet servlet : getServlets())
         {
           httpServerBuilder.addServlet(servlet);
         }
@@ -353,14 +301,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       
       int port = server_.getLocalPort();
       
-      if(ssl)
-      {
-        serverUrl_ = "https://localhost.symphony.com:" + port;
-      }
-      else
-      {
-        serverUrl_ = "http://127.0.0.1:" + port;
-      }
+      serverUrl_ = "http://127.0.0.1:" + port;
       
       log_.info("server started on " + serverUrl_);
       log_.info("you can also point your browser to http://" + 
@@ -368,29 +309,20 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       log_.info("you can also point your browser to http://" + 
           InetAddress.getLocalHost().getHostAddress() + ":" + port);
       
-//      addCommand(APP_SERVLET_ROOT, "shutdown", 
-//          EnumSet.of(ComponentLifeCycleState.Running,
-//              ComponentLifeCycleState.Initializing,
-//              ComponentLifeCycleState.Starting),
-//          () -> 
-//          {
-//            diContext_.stop();
-//            
-//            if(started_)
-//              stopFugueServer();
-//          });
-
+      if(filter != null)
+      {
+        openBrowser(RandomAuthFilter.LOGIN_TOKEN + "=" + filter.getAuthToken());
+      }
       
-      
-//      application_.setLifeCycleState(ComponentLifeCycleState.Running);
-//      application_.setState(ComponentState.OK);
+      setLifeCycleState(FugueLifecycleState.Running);
+      statusMessage_ = "";
     }
     catch(IOException e)
     {
+      setLifeCycleState(FugueLifecycleState.Failed);
+      componentState_ = FugueComponentState.Failed;
+      statusMessage_ = e.toString();
       log_.error("Start failed", e);
-      
-//      application_.setLifeCycleState(ComponentLifeCycleState.Stopped);
-//      application_.setState(ComponentState.Failed);
     }
   }
 
@@ -401,6 +333,9 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       log_.info("Not running, no need to stop");
       return;
     }
+
+    setLifeCycleState(FugueLifecycleState.Stopping);
+    statusMessage_ = "Shutting down...";
     
     for(FugueExecutorService exec : executors_)
       exec.shutdown();
@@ -439,6 +374,9 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     }
     
     started_ = false;
+
+    setLifeCycleState(FugueLifecycleState.Stopped);
+    statusMessage_ = "Stopped cleanly.";
   }
   
   private void waitForAllExecutors(int delayMillis)
@@ -465,14 +403,19 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   
   /**
    * Open the browser on the URL for this server.
+   * 
+   * @param queryString An optional query string.
    */
-  public void openBrowser()
+  public void openBrowser(String queryString)
   {
     try
     {
       if(serverUrl_ != null)
       {
         String url = serverUrl_ + "/fugue";
+        
+        if(queryString != null)
+          url = url + "?" + queryString;
         
         log_.info("opening browser on " + url);
         
@@ -494,17 +437,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
 //  protected void configure(S2HttpServerBuilder httpServerBuilder) throws S2Exception
 //  {}
 //
-//  public void addCommand(String path, String name, 
-//      EnumSet<ComponentLifeCycleState> validStates,
-//      ICommandHandler handler)
-//  {
-//    path = path + name;
-//    name = name.substring(0,1).toUpperCase() + name.substring(1);
-//    
-//    ICommand command = new Command(name, path, validStates, handler);
-//    server_.addCommand(command);
-//    statusServlet_.addCommand(command);
-//  }
+
 
   
   @Override

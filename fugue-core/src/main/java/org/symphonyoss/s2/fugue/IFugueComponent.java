@@ -43,4 +43,19 @@ public interface IFugueComponent
    * Components will be stopped in the reverse order to that in which they were started.
    */
   void stop();
+  
+  default FugueComponentState getComponentState()
+  {
+    return FugueComponentState.Warn;
+  }
+  
+  default String getComponentStatusMessage()
+  {
+    return getClass().getSimpleName() + " does not implement IFugeComponent.getComponentStatusMessage()";
+  }
+  
+  default String getComponentId()
+  {
+    return getClass().getSimpleName();
+  }
 }

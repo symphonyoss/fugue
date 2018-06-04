@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue;
 
 import javax.servlet.http.HttpServlet;
 
-import org.symphonyoss.s2.common.http.IUrlPathServlet;
+import org.symphonyoss.s2.fugue.http.IUrlPathServlet;
 
 /**
  * A Component which is an instance of IUrlPathServlet.

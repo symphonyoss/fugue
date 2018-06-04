@@ -23,9 +23,17 @@
 
 package org.symphonyoss.s2.fugue;
 
+/**
+ * A Fugue component which supports lifecycle states.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IFugueLifecycleComponent extends IFugueComponent
 {
-
+  /**
+   * @return the current lifecycle state of this component.
+   */
   FugueLifecycleState getLifecycleState();
 
 }

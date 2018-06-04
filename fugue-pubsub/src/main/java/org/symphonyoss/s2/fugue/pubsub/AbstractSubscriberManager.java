@@ -23,16 +23,16 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.FugueConfigKey;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
+import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -40,85 +40,52 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
-public abstract class AbstractSubscriberManager<P,T extends AbstractSubscriberManager<P,T>> extends FugueLifecycleComponent<T>
+/**
+ * Base class for subscriber managers.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <P> Type of payload received.
+ * @param <T> Type of concrete manager, needed for fluent methods.
+ */
+public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<P,T>> extends FugueLifecycleComponent<T> implements ISubscriberManager<P,T>
 {
-  protected static final long                   FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
-  protected static final long                   FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
+  protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
+  protected static final long          FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
 
-  private static final Logger                   log_                          = LoggerFactory
-      .getLogger(AbstractSubscriberManager.class);
+  private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
 
-  private final ITraceContextFactory            traceFactory_;
-  private final IThreadSafeRetryableConsumer<P> consumer_;
-  private final IThreadSafeConsumer<P>          unprocessableMessageConsumer_;
+  private final IConfigurationProvider metaConfig_;
+  private final ITraceContextFactory   traceFactory_;
+  private final IThreadSafeConsumer<P> unprocessableMessageConsumer_;
+  private List<Subscription<P>>        subscribers_                  = new ArrayList<>();
 
-  private Map<String, Set<String>>              subscriptionsByTopic_         = new HashMap<>();
-  private Map<String, Set<String>>              topicsBySubscription_         = new HashMap<>();
   
-  public AbstractSubscriberManager(Class<T> type, ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<P> consumer,
+  protected AbstractSubscriberManager(Class<T> type, 
+      IConfigurationProvider config, ITraceContextFactory traceFactory,
       IThreadSafeConsumer<P> unprocessableMessageConsumer)
   {
     super(type);
     
+    metaConfig_ = config.getConfiguration(FugueConfigKey.META);
     traceFactory_ = traceFactory;
-    consumer_ = consumer;
     unprocessableMessageConsumer_ = unprocessableMessageConsumer;
   }
 
-  /**
-   * Subscribe to the given subscription on the given topic.
-   * 
-   * @param topicName           The name of the topic to subscribe to.
-   * @param subscriptionName    The name of the subscription to subscribe to.
-   * 
-   * @throws IllegalArgumentException If a duplicate request is made.
-   * 
-   * @return this (fluent method)
-   */
-  public synchronized T withSubscription(String topicName, String subscriptionName)
+  
+  @Override
+  public synchronized T withSubscriptionsByConfig(
+      String topicListConfigName, String subscriptionConfigName,
+      IThreadSafeRetryableConsumer<P> consumer)
   {
     assertConfigurable();
     
-    Set<String> set = subscriptionsByTopic_.get(topicName);
-    
-    if(set == null)
-    {
-      set = new HashSet<>();
-      subscriptionsByTopic_.put(topicName, set);
-    }
-    
-    if(!set.add(subscriptionName))
-    {
-      throw new IllegalArgumentException("Subscription " + subscriptionName + " on topic " + topicName + " already exists.");
-    }
-    
-    set = topicsBySubscription_.get(subscriptionName);
-    
-    if(set == null)
-    {
-      set = new HashSet<>();
-      topicsBySubscription_.put(subscriptionName, set);
-    }
-    
-    set.add(topicName);
+    subscribers_.add(new ConfigSubscription<P>(topicListConfigName, subscriptionConfigName, consumer));
     
     return self();
   }
 
-  /**
-   * Start with the given subscriptions.
-   * 
-   * We guarantee not to provide the same topic/subscription name more than once, it would be an error
-   * to do so and we throw IllegalArgumentException to our caller if they request a duplicate.
-   * 
-   * We provide the same set of information indexed both ways as a convenience, the implementor should
-   * process one or the other but not both.
-   * 
-   * @param subscriptionsByTopic  A map of topic names, each entry is a set of subscription names.
-   * @param topicsBySubscription  A map of subscription names, each entry is a set of topic names.
-   */
-  protected abstract void startSubscriptions(Map<String, Set<String>> subscriptionsByTopic, Map<String, Set<String>> topicsBySubscription);
+  protected abstract void startSubscription(Subscription<P> subscription);
 
   /**
    * Stop all subscribers.
@@ -130,18 +97,27 @@ public abstract class AbstractSubscriberManager<P,T extends AbstractSubscriberMa
     return traceFactory_;
   }
 
+  protected List<Subscription<P>> getSubscribers()
+  {
+    return subscribers_;
+  }
+
   @Override
-  public synchronized final void start()
+  public synchronized void start()
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
-    startSubscriptions(subscriptionsByTopic_, topicsBySubscription_);
+    for(Subscription<P> s : subscribers_)
+    {
+      s.resolve(metaConfig_);
+      startSubscription(s);
+    }
     
     setLifeCycleState(FugueLifecycleState.Running);
   }
 
   @Override
-  public synchronized final void stop()
+  public synchronized void stop()
   {
     setLifeCycleState(FugueLifecycleState.Stopping);
     
@@ -153,17 +129,18 @@ public abstract class AbstractSubscriberManager<P,T extends AbstractSubscriberMa
   /**
    * Handle the given message.
    * 
-   * @param immutableByteArray A received message.
-   * @param trace A trace context.
+   * @param consumer  The consumer for the message.
+   * @param payload   A received message.
+   * @param trace     A trace context.
    * 
    * @return The number of milliseconds after which a retry should be made, or -1 if the message was
    * processed and no retry is necessary.
    */
-  public long handleMessage(P immutableByteArray, ITraceContext trace)
+  public long handleMessage(IThreadSafeRetryableConsumer<P> consumer, P payload, ITraceContext trace)
   {
     try
     {
-      consumer_.consume(immutableByteArray, trace);
+      consumer.consume(payload, trace);
     }
     catch (RetryableConsumerException e)
     {
@@ -190,7 +167,7 @@ public abstract class AbstractSubscriberManager<P,T extends AbstractSubscriberMa
       trace.trace("MESSAGE_IS_UNPROCESSABLE");
       try
       {
-        unprocessableMessageConsumer_.consume(immutableByteArray, trace);
+        unprocessableMessageConsumer_.consume(payload, trace);
       }
       catch(RuntimeException e2)
       {

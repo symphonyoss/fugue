@@ -23,9 +23,6 @@
 
 package org.symphonyoss.s2.fugue;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * The life cycle state of a Fugue server.
  * 
@@ -41,27 +38,23 @@ public enum FugueLifecycleState
   Stopping(false),
   
   /** Starting */
-  Running(false, Stopping),
+  Running(false),
   
   /** Transitioning into Running */
   Starting(false),
   
   /** Stopped. */
-  Stopped(false, Starting),
+  Stopped(false),
   
   /** Initializing, not yet started. */
-  Initializing(true, Starting)
+  Initializing(true)
   ;
   
   private final boolean configurable_;
-  private final Set<FugueLifecycleState> allowedTransitions_ = new HashSet<>();
 
-  private FugueLifecycleState(boolean configurable, FugueLifecycleState ...allowedTransitions)
+  private FugueLifecycleState(boolean configurable)
   {
     configurable_ = configurable;
-    
-    for(FugueLifecycleState state : allowedTransitions)
-      allowedTransitions_.add(state);
   }
 
   /**
@@ -72,10 +65,5 @@ public enum FugueLifecycleState
   public boolean isConfigurable()
   {
     return configurable_;
-  }
-  
-  public boolean canTransaitionTo(FugueLifecycleState other)
-  {
-    return allowedTransitions_.contains(other);
   }
 }

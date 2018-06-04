@@ -23,8 +23,23 @@
 
 package org.symphonyoss.s2.fugue;
 
+/**
+ * An application which is served by a server.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IFugueApplication
 {
+  /**
+   * 
+   * @return the application name.
+   */
   String  getName();
+  
+  /**
+   * 
+   * @return the local HTTP port which the server should listen on.
+   */
   int getHttpPort();
 }
