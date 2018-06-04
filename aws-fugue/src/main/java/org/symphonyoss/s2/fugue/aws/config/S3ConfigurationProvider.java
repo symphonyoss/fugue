@@ -99,11 +99,11 @@ public class S3ConfigurationProvider extends BaseConfigurationProvider
         }
         catch (FileNotFoundException e1)
         {
-          throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.", e);
+          throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.", e1);
         }
         catch (IOException e1)
         {
-          log_.warn("Failed to close config input", e);
+          log_.warn("Failed to close config input", e1);
         }
       }
       else

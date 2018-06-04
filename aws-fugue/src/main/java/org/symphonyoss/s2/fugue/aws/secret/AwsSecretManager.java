@@ -51,6 +51,12 @@ import com.amazonaws.services.secretsmanager.model.ResourceExistsException;
 import com.amazonaws.services.secretsmanager.model.ResourceNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * AWS implementation of Secret Manager.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class AwsSecretManager implements ISecretManager, IFugueComponent
 {
   private static final Logger log_ = LoggerFactory.getLogger(AwsSecretManager.class);
@@ -62,6 +68,11 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
   private String                       region_;
   private AWSSecretsManager            secretClient_;
 
+  /**
+   * Constructor.
+   * 
+   * @param config  A configuration provider.
+   */
   public AwsSecretManager(IConfigurationProvider config)
   {
     config_ = config.getConfiguration(AwsConfigKey.AMAZON);
@@ -114,7 +125,7 @@ public class AwsSecretManager implements ISecretManager, IFugueComponent
     }
     catch(ResourceNotFoundException e)
     {
-      throw new NoSuchObjectException(e);
+      throw new NoSuchObjectException("Unable to find secret " + name, e);
     }
   }
   

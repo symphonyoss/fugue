@@ -30,16 +30,27 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 import com.google.cloud.pubsub.v1.AckReplyConsumer;
 import com.google.cloud.pubsub.v1.MessageReceiver;
-import com.google.protobuf.ByteString;
 import com.google.pubsub.v1.PubsubMessage;
 
+/**
+ * A subscriber to a single topic.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class GoogleSubscriber implements MessageReceiver
 {
-  private final GoogleSubscriberManager manager_;
+  private final GoogleAbstractSubscriberManager<?>               manager_;
   private final ITraceContextFactory                             traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
 
-  public GoogleSubscriber(GoogleSubscriberManager manager, ITraceContextFactory traceFactory, IThreadSafeRetryableConsumer<ImmutableByteArray> consumer)
+  /**
+   * Constructor.
+   * @param manager       The manager.
+   * @param traceFactory  A trace factory.
+   * @param consumer      Sink for received messages.
+   */
+  public GoogleSubscriber(GoogleAbstractSubscriberManager<?> manager, ITraceContextFactory traceFactory, IThreadSafeRetryableConsumer<ImmutableByteArray> consumer)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
@@ -53,9 +64,6 @@ public class GoogleSubscriber implements MessageReceiver
     {
       ITraceContext trace = traceFactory_.createTransaction(PubsubMessage.class.getName(), message.getMessageId());
 
-      ByteString bytes = message.getData();
-      String string = bytes.toStringUtf8();
-      
       ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
       
       long retryTime = manager_.handleMessage(consumer_, byteArray, trace);
