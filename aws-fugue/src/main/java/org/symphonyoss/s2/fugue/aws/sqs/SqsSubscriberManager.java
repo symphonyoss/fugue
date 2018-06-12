@@ -39,7 +39,7 @@ public class SqsSubscriberManager extends SqsAbstractSubscriberManager<SqsSubscr
    * Constructor.
    * 
    * @param nameFactory                     A NameFactory.
-   * @param config                          The configuration to use.
+   * @param region                          The AWS region in which to operate.
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */

@@ -66,9 +66,8 @@ public class AwsSecretManager implements ISecretManager
 
   /**
    * Constructor.
-   * @param region 
    * 
-   * @param config  A configuration provider.
+   * @param region The AWS region in which to operate.
    */
   public AwsSecretManager(String region)
   {

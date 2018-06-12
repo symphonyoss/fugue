@@ -41,7 +41,6 @@ import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
 import com.amazonaws.services.sns.util.Topics;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
-import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 
 /**
@@ -58,7 +57,7 @@ public class SqsSubscriberAdmin extends SqsAbstractSubscriberManager<SqsSubscrib
    * Constructor.
    * 
    * @param nameFactory   A name factory.
-   * @param config        A configuration provider.
+   * @param region The AWS region in which to operate.
    * @param traceFactory  A trace factory.
    */
   public SqsSubscriberAdmin(INameFactory nameFactory, String region, ITraceContextFactory traceFactory)

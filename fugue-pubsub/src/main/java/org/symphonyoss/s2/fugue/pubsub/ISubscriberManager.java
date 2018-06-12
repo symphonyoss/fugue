@@ -41,9 +41,8 @@ public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends
 
   /**
    * Subscribe to the given subscription on the given topic.
-   * 
-   * @param topicListConfigName     The name of a key in the given configuration which contains the name of one or more topics
-   * @param subscriptionConfigName  The name of a key in the given configuration which contains the name of the subscription
+   * @param topicNames              A list of topic names.
+   * @param subscriptionName        A subscription name.
    * @param consumer                A consumer for received messages.
    * 
    * @throws IllegalArgumentException If a duplicate request is made.
@@ -53,6 +52,14 @@ public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends
   T withSubscriptionsByConfig(List<String> topicNames, String subscriptionName, 
       IThreadSafeRetryableConsumer<P> consumer);
 
+  /**
+   * Add the given subscription.
+   * 
+   * @param topicName           A topic name
+   * @param subscriptionName    A subscription name
+   * @param consumer            The consumer for received messages.
+   * @return  this (fluent method)
+   */
   T withSubscription(String topicName, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer);
 
 }
