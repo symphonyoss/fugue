@@ -28,7 +28,7 @@ public interface INameFactory
 
   TableName getTableName(String table);
 
-  CredentialName getRealmCredentialName(String owner);
+  CredentialName getEnvironmentCredentialName(String owner);
 
   TopicName getTopicName(String topic);
   

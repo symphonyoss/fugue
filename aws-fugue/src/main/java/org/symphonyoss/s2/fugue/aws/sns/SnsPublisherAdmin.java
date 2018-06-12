@@ -25,7 +25,6 @@ package org.symphonyoss.s2.fugue.aws.sns;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.IPublisherAdmin;
@@ -47,16 +46,17 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
    * Constructor.
    * 
    * @param nameFactory A name factory.
-   * @param config      A configuration provider.
+   * @param region      The AWS region to use.
    */
-  public SnsPublisherAdmin(INameFactory nameFactory, IConfigurationProvider config)
+  public SnsPublisherAdmin(INameFactory nameFactory, String region)
   {
-    super(nameFactory, config, true);
+    super(nameFactory, region, true);
   }
 
   @Override
-  public void createTopics()
+  public void createTopics(boolean dryRun)
   {
+    // TODO: implement dryRun
     for(TopicName topicName : topicNames_)
     {
       CreateTopicRequest createTopicRequest = new CreateTopicRequest(topicName.toString());
@@ -66,5 +66,13 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
       //get request id for CreateTopicRequest from SNS metadata   
       System.out.println("CreateTopicRequest - " + snsClient_.getCachedResponseMetadata(createTopicRequest));
     }
+  }
+
+  @Override
+  public void deleteTopics(boolean dryRun)
+  {
+    // TODO Auto-generated method stub
+
+    // TODO: implement dryRun
   }
 }

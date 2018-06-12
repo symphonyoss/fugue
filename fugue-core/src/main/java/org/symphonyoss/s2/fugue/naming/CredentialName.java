@@ -27,14 +27,14 @@ public class CredentialName extends Name
 {
   private static final String SUFFIX = "cred";
   
-  private final String realmId_;
   private final String environmentId_;
+  private final String realmId_;
   private final String tenantId_;
   private final String owner_;
 
-  public CredentialName(String realmId, String owner)
+  public CredentialName(String environmentId, String owner)
   {
-    this(realmId, null, null, owner);
+    this(environmentId, null, null, owner);
   }
   
   public CredentialName(String realmId, String environmentId, String owner)
@@ -42,24 +42,24 @@ public class CredentialName extends Name
     this(realmId, environmentId, null, owner);
   }
   
-  public CredentialName(String realmId, String environmentId, String tenantId, String owner)
+  public CredentialName(String environmentId, String realmId, String tenantId, String owner)
   {
-    super(realmId, environmentId, tenantId, owner, SUFFIX);
+    super(environmentId, realmId, tenantId, owner, SUFFIX);
     
-    realmId_ = realmId;
     environmentId_ = environmentId;
+    realmId_ = realmId;
     tenantId_ = tenantId;
     owner_ = owner;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
   }
 
   public String getEnvironmentId()
   {
     return environmentId_;
+  }
+
+  public String getRealmId()
+  {
+    return realmId_;
   }
 
   public String getTenantId()

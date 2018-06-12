@@ -32,9 +32,6 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.fugue.FugueConfigKey;
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
-import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
@@ -60,47 +57,36 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
 
   static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256K
 
-  private final INameFactory           nameFactory_;
-  private final IConfigurationProvider config_;
-  private final boolean                initialize_;
+  private final INameFactory              nameFactory_;
+  private final String                    region_;
+  private final boolean                   initialize_;
 
-  /* package */ Map<String, SnsPublisher>    publisherNameMap_   = new HashMap<>();
-  /* package */ Map<String, SnsPublisher>    publisherConfigMap_ = new HashMap<>();
-  /* package */ List<SnsPublisher>           publishers_         = new ArrayList<>();
-  /* package */ List<TopicName>              topicNames_         = new ArrayList<>();
+  /* package */ Map<String, SnsPublisher> publisherNameMap_   = new HashMap<>();
+  /* package */ List<SnsPublisher>        publishers_         = new ArrayList<>();
+  /* package */ List<TopicName>           topicNames_         = new ArrayList<>();
 
-  /* package */ AmazonSNS                    snsClient_;
-  /* package */ String                       accountId_;
-  /* package */ String                       region_;
-  /* package */ AWSSecurityTokenService      stsClient_;
+  /* package */ AmazonSNS                 snsClient_;
+  /* package */ String                    accountId_;
+  /* package */ AWSSecurityTokenService   stsClient_;
 
   /**
    * Constructor.
    * 
    * @param nameFactory A name factory.
-   * @param config      A configuration provider.
+   * @param region      The AWS region to use.
    */
-  public SnsPublisherManager(INameFactory nameFactory, IConfigurationProvider config)
+  public SnsPublisherManager(INameFactory nameFactory, String region)
   {
-    this(nameFactory, config, false);
+    this(nameFactory, region, false);
   }
   
-  protected SnsPublisherManager(INameFactory nameFactory, IConfigurationProvider config, boolean initialize)
+  protected SnsPublisherManager(INameFactory nameFactory, String region, boolean initialize)
   {
     super(SnsPublisherManager.class);
     
     nameFactory_ = nameFactory;
-    config_ = config;
+    region_ = region;
     initialize_ = initialize;
-  }
-
-  @Override
-  public void start()
-  {
-    IConfigurationProvider awsConfig = config_.getConfiguration(AwsConfigKey.AMAZON);
-    IConfigurationProvider metaConfig = config_.getConfiguration(FugueConfigKey.META);
-    
-    region_ = awsConfig.getRequiredString(AwsConfigKey.REGION_NAME);
     
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
     
@@ -116,18 +102,15 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
       .withRegion(region_)
       .build();
     
+
+  }
+
+  @Override
+  public void start()
+  {
     for(Entry<String, SnsPublisher> entry : publisherNameMap_.entrySet())
     {
       TopicName topicName = nameFactory_.getTopicName(entry.getKey());
-      topicNames_.add(topicName);
-      
-      entry.getValue().startByName(getTopicARN(topicName));
-      publishers_.add(entry.getValue());
-    }
-    
-    for(Entry<String, SnsPublisher> entry : publisherConfigMap_.entrySet())
-    {
-      TopicName topicName = nameFactory_.getTopicName(metaConfig.getRequiredString(entry.getKey())); 
       topicNames_.add(topicName);
       
       entry.getValue().startByName(getTopicARN(topicName));
@@ -176,22 +159,6 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     {
       publisher = new SnsPublisher(this);
       publisherNameMap_.put(topicName, publisher);
-    }
-    
-    return publisher;
-  }
-
-  @Override
-  public synchronized IPublisher<String> getPublisherByConfig(String topicConfigId)
-  {
-    assertConfigurable();
-    
-    SnsPublisher publisher = publisherConfigMap_.get(topicConfigId);
-    
-    if(publisher == null)
-    {
-      publisher = new SnsPublisher(this);
-      publisherConfigMap_.put(topicConfigId, publisher);
     }
     
     return publisher;

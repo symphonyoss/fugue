@@ -40,15 +40,6 @@ public interface IPublisherManager<P>
    * @return The publisher for the required topic.
    */
   IPublisher<P> getPublisherByName(String topicName);
-  
-  /**
-   * Get the IPublisher for the topic named in the given configuration item.
-   * 
-   * @param topicConfigId A configuration key
-   * 
-   * @return The publisher for the required topic.
-   */
-  IPublisher<P> getPublisherByConfig(String topicConfigId);
 
   /**
    * Return the publisher for trace events.

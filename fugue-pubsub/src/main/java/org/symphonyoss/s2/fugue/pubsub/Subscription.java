@@ -23,25 +23,42 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
-public abstract class Subscription<P>
+public class Subscription<P>
 {
   private final IThreadSafeRetryableConsumer<P> consumer_;
+  private final List<String>                    topicNames_;
+  private final String                          subscriptionName_;
 
-  public Subscription(IThreadSafeRetryableConsumer<P> consumer)
+  public Subscription(List<String> topicNames, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer)
   {
     consumer_ = consumer;
+    topicNames_ = topicNames;
+    subscriptionName_ = subscriptionName;
   }
   
-  public abstract void resolve(IConfigurationProvider config);
+  public Subscription(String topicName, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer)
+  {
+    consumer_ = consumer;
+    topicNames_ = new ArrayList<>(1);
+    topicNames_.add(topicName);
+    subscriptionName_ = subscriptionName;
+  }
 
-  public abstract Collection<String> getTopicNames();
+  public Collection<String> getTopicNames()
+  {
+    return topicNames_;
+  }
 
-  public abstract String getSubscriptionName();
+  public String getSubscriptionName()
+  {
+    return subscriptionName_;
+  }
 
   public IThreadSafeRetryableConsumer<P> getConsumer()
   {

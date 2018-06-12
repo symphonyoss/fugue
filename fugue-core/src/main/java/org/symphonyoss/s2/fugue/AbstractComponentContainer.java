@@ -151,6 +151,7 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
     
     for(IFugueComponent component : components_)
     {
+      stopStack_.push(component);
       try
       {
         

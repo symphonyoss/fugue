@@ -29,8 +29,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
-import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
@@ -48,33 +46,31 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
   private static final Logger          log_                     = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
   /* package */ final INameFactory           nameFactory_;
-  /* package */ final IConfigurationProvider config_;
+  /* package */ final String                 region_;
   /* package */ final boolean                startSubscriptions_;
 
-  /* package */ String                       region_;
   /* package */ AmazonSQS                    sqsClient_;
-
   /* package */ ExecutorService              executor_;
 
   /**
    * Normal constructor.
    * 
    * @param nameFactory                     A NameFactory.
-   * @param config                          The configuration to use.
+   * @param region                          The AWS region to use.
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */  
-  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, IConfigurationProvider config,
+  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String region,
       ITraceContextFactory traceFactory,
       IThreadSafeConsumer<String> unprocessableMessageConsumer)
   {
-    super(type, config, traceFactory, unprocessableMessageConsumer);
+    super(type, traceFactory, unprocessableMessageConsumer);
     
     if(unprocessableMessageConsumer==null)
       throw new NullPointerException("unprocessableMessageConsumer is required.");
     
     nameFactory_ = nameFactory;
-    config_ = config;
+    region_ = region;
     startSubscriptions_ = true;
     
     executor_ = Executors.newFixedThreadPool(20);
@@ -84,26 +80,22 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
    * Construct a subscriber manager without any subscription processing.
    * 
    * @param nameFactory                     A NameFactory.
-   * @param config                          The configuration to use.
+   * @param region                          The AWS region to use.
    * @param traceFactory                    A trace context factory.
    */
-  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, IConfigurationProvider config,
+  SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String region,
       ITraceContextFactory traceFactory)
   {
-    super(type, config, traceFactory, null);
+    super(type, traceFactory, null);
     
     nameFactory_ = nameFactory;
-    config_ = config;
+    region_ = region;
     startSubscriptions_ = false;
   }
 
   @Override
   public void start()
   {
-    IConfigurationProvider awsConfig = config_.getConfiguration(AwsConfigKey.AMAZON);
-    
-    region_ = awsConfig.getRequiredString(AwsConfigKey.REGION_NAME);
-    
     sqsClient_ = AmazonSQSClientBuilder.standard()
         .withRegion(region_)
         .build();

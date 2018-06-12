@@ -21,35 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.config;
 
-public class TableName extends Name
+public interface ITaskConfiguration extends IConfiguration
 {
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
 
-  public TableName(String environmentId, String realmId, String table)
-  {
-    super(environmentId, realmId, table);
-    
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
-  }
+  boolean isDryRun();
 
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
-  }
 }

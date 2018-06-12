@@ -34,7 +34,15 @@ public interface IPublisherAdmin<P> extends IPublisherManager<P>
 {
   /**
    * Create topics for all registered publishers.
-   *  
+   * 
+   * @param dryRun If true then don't change anything
    */
-  void createTopics();
+  void createTopics(boolean dryRun);
+  
+  /**
+   * Delete topics for all registered publishers.
+   * 
+   * @param dryRun If true then don't change anything
+   */
+  void deleteTopics(boolean dryRun);
 }

@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import java.util.List;
 
@@ -34,7 +34,7 @@ import org.symphonyoss.s2.common.fault.ProgramFault;
  * @author Bruce Skingle
  *
  */
-public interface IConfigurationProvider
+public interface IConfiguration
 {
   /**
    * Return the given sub-configuration.
@@ -43,7 +43,7 @@ public interface IConfigurationProvider
    * 
    * @return An IConfigurationProvider which can be used to access the sub-configuration.
    */
-  IConfigurationProvider getConfiguration(String name);
+  IConfiguration getConfiguration(String name);
 
   /**
    * Return the value of the given configuration property.
@@ -145,4 +145,9 @@ public interface IConfigurationProvider
    * @throws ProgramFault  If the property is not defined in the current configuration.
    */
   List<String> getRequiredStringArray(String name);
+
+  /**
+   * @return The name of this configuration.
+   */
+  String getName();
 }

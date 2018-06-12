@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,20 +35,21 @@ import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.ProgramFault;
+import org.symphonyoss.s2.fugue.Fugue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class ConfigurationProvider extends BaseConfigurationProvider
+public class GitHubConfiguration extends Configuration
 {
-  private static final Logger log_ = LoggerFactory.getLogger(ConfigurationProvider.class);
+  private static final Logger log_ = LoggerFactory.getLogger(GitHubConfiguration.class);
   
-  public ConfigurationProvider()
+  public GitHubConfiguration()
   {
     loadConfigSpec(Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG));
   }
   
-  /* package */ ConfigurationProvider(String fileName)
+  /* package */ GitHubConfiguration(String fileName)
   {
     loadConfigSpec(fileName);
   }

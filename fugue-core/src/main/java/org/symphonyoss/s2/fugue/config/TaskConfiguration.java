@@ -21,35 +21,31 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.config;
 
-public class TableName extends Name
+public class TaskConfiguration extends ConfigurationDelegator implements ITaskConfiguration
 {
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
-
-  public TableName(String environmentId, String realmId, String table)
+  public static final String DRY_RUN = "dryRun";
+  
+  private final boolean dryRun_;
+  
+  public TaskConfiguration()
   {
-    super(environmentId, realmId, table);
+    super(new EmptyConfiguration());
     
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
+    dryRun_ = true;
+  }
+  
+  public TaskConfiguration(IConfiguration configuration)
+  {
+    super(configuration);
+    
+    dryRun_ = getBoolean(DRY_RUN, true);
   }
 
-  public String getEnvironmentId()
+  @Override
+  public boolean isDryRun()
   {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
+    return dryRun_;
   }
 }

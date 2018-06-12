@@ -21,35 +21,25 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.config;
 
-public class TableName extends Name
+import java.io.IOException;
+
+import org.symphonyoss.s2.common.fault.CodingFault;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class EmptyConfiguration extends Configuration
 {
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
-
-  public TableName(String environmentId, String realmId, String table)
+  public EmptyConfiguration()
   {
-    super(environmentId, realmId, table);
-    
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
-  }
-
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
+    try
+    {
+      setTree(new ObjectMapper().readTree("{}"));
+    }
+    catch(IOException e)
+    {
+      throw new CodingFault("Can't happen", e);
+    }
   }
 }

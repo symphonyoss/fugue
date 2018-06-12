@@ -29,10 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.FugueConfigKey;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -55,32 +53,39 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
 
   private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
 
-  private final IConfigurationProvider metaConfig_;
   private final ITraceContextFactory   traceFactory_;
   private final IThreadSafeConsumer<P> unprocessableMessageConsumer_;
   private List<Subscription<P>>        subscribers_                  = new ArrayList<>();
 
   
   protected AbstractSubscriberManager(Class<T> type, 
-      IConfigurationProvider config, ITraceContextFactory traceFactory,
+      ITraceContextFactory traceFactory,
       IThreadSafeConsumer<P> unprocessableMessageConsumer)
   {
     super(type);
     
-    metaConfig_ = config.getConfiguration(FugueConfigKey.META);
     traceFactory_ = traceFactory;
     unprocessableMessageConsumer_ = unprocessableMessageConsumer;
   }
 
-  
   @Override
-  public synchronized T withSubscriptionsByConfig(
-      String topicListConfigName, String subscriptionConfigName,
+  public synchronized T withSubscription(String topicName, String subscriptionName, 
       IThreadSafeRetryableConsumer<P> consumer)
   {
     assertConfigurable();
     
-    subscribers_.add(new ConfigSubscription<P>(topicListConfigName, subscriptionConfigName, consumer));
+    subscribers_.add(new Subscription<P>(topicName, subscriptionName, consumer));
+    
+    return self();
+  }
+  
+  @Override
+  public synchronized T withSubscriptionsByConfig(List<String> topicNames, String subscriptionName, 
+      IThreadSafeRetryableConsumer<P> consumer)
+  {
+    assertConfigurable();
+    
+    subscribers_.add(new Subscription<P>(topicNames, subscriptionName, consumer));
     
     return self();
   }
@@ -109,7 +114,6 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     
     for(Subscription<P> s : subscribers_)
     {
-      s.resolve(metaConfig_);
       startSubscription(s);
     }
     

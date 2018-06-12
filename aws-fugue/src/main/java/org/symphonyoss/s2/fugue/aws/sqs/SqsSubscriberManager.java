@@ -23,7 +23,6 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
@@ -44,10 +43,10 @@ public class SqsSubscriberManager extends SqsAbstractSubscriberManager<SqsSubscr
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */
-  public SqsSubscriberManager(INameFactory nameFactory, IConfigurationProvider config,
+  public SqsSubscriberManager(INameFactory nameFactory, String region,
       ITraceContextFactory traceFactory,
       IThreadSafeConsumer<String> unprocessableMessageConsumer)
   {
-    super(SqsSubscriberManager.class, nameFactory, config, traceFactory, unprocessableMessageConsumer);
+    super(SqsSubscriberManager.class, nameFactory, region, traceFactory, unprocessableMessageConsumer);
   }
 }
