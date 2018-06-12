@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,20 +32,34 @@ import java.io.InputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.ProgramFault;
+import org.symphonyoss.s2.fugue.Fugue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class FileConfigurationProvider extends BaseConfigurationProvider
+/**
+ * An implementation of IConfiguration which reads a JSON document from a file.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class FileConfiguration extends Configuration
 {
-  private static final Logger log_ = LoggerFactory.getLogger(FileConfigurationProvider.class);
-
-  private static final String AWS_COM = ".amazonaws.com";
-  
-  public FileConfigurationProvider()
+  public static final IConfigurationFactory FACTORY = new IConfigurationFactory()
   {
-    String fugueConfig = Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG);
-   
+    @Override
+    public IConfiguration newInstance(String variableName)
+    {
+      return new FileConfiguration(variableName);
+    }
+
+  };
+      
+  private static final Logger log_ = LoggerFactory.getLogger(FileConfiguration.class);
+  
+  private FileConfiguration(String variableName)
+  {
+    String fugueConfig = Fugue.getRequiredProperty(variableName);
 
     File file = new File(fugueConfig);
     
@@ -60,7 +74,7 @@ public class FileConfigurationProvider extends BaseConfigurationProvider
       }
       catch (FileNotFoundException e)
       {
-        throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.", e);
+        throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.", e);
       }
       catch (IOException e)
       {
@@ -69,7 +83,7 @@ public class FileConfigurationProvider extends BaseConfigurationProvider
     }
     else
     {
-      throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.");
+      throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.");
     }
   }
 

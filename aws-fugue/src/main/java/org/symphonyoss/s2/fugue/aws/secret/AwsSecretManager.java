@@ -31,9 +31,6 @@ import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.CodingFault;
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
-import org.symphonyoss.s2.fugue.IFugueComponent;
-import org.symphonyoss.s2.fugue.aws.config.AwsConfigKey;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.secret.ISecretManager;
 
@@ -57,40 +54,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Bruce Skingle
  *
  */
-public class AwsSecretManager implements ISecretManager, IFugueComponent
+public class AwsSecretManager implements ISecretManager
 {
-  private static final Logger log_ = LoggerFactory.getLogger(AwsSecretManager.class);
+  private static final Logger       log_   = LoggerFactory.getLogger(AwsSecretManager.class);
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private final String              region_;
   
-  private static final ObjectMapper    MAPPER = new ObjectMapper();
-
-  private final IConfigurationProvider config_;
-
-  private String                       region_;
-  private AWSSecretsManager            secretClient_;
+  private AWSSecretsManager         secretClient_;
 
   /**
    * Constructor.
+   * @param region 
    * 
    * @param config  A configuration provider.
    */
-  public AwsSecretManager(IConfigurationProvider config)
+  public AwsSecretManager(String region)
   {
-    config_ = config.getConfiguration(AwsConfigKey.AMAZON);
-  }
+    region_ = region;
 
-  @Override
-  public void start()
-  {
-    region_ = config_.getRequiredString(AwsConfigKey.REGION_NAME);
-    
     secretClient_ = AWSSecretsManagerClientBuilder.standard()
         .withRegion(region_)
         .build();
-  }
-
-  @Override
-  public void stop()
-  {
   }
   
   @Override

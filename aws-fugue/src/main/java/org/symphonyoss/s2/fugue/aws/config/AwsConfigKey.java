@@ -23,10 +23,10 @@
 
 package org.symphonyoss.s2.fugue.aws.config;
 
+@Deprecated
 public class AwsConfigKey
 {
-  public static final String REGION_NAME = "regionName";
-  public static final String AMAZON = "amazon";
+
   
   private AwsConfigKey() {}
   

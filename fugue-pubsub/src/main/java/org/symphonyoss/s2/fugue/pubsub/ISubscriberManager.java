@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import java.util.List;
+
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
@@ -48,7 +50,9 @@ public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends
    * 
    * @return this (fluent method)
    */
-  T withSubscriptionsByConfig(String topicListConfigName, String subscriptionConfigName,
+  T withSubscriptionsByConfig(List<String> topicNames, String subscriptionName, 
       IThreadSafeRetryableConsumer<P> consumer);
+
+  T withSubscription(String topicName, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer);
 
 }

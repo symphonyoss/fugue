@@ -36,11 +36,26 @@ import org.symphonyoss.s2.common.fault.ProgramFault;
  */
 public class Fugue
 {
-  /** Environment variable containing a URL to the configuration */
-   public static final String FUGUE_CONFIG = "FUGUE_CONFIG";
+  /** 
+   * Environment variable containing a pointer to the configuration.
+   * 
+   * This configuration is a common view of configuration seen by all processes in an environment.
+   */
+  public static final String FUGUE_CONFIG = "FUGUE_CONFIG";
  
-  /** Config property name containing the tenant ID */
-  public static final String FUGUE_TENANT = "FUGUE_TENANT";
+  /**
+   * Environment variable containing an optional pointer to the task configuration.
+   * 
+   * A task configuration is a set of instructions describing the reuired actions. These
+   * are usually needed only for administration tasks such as deploying new instances etc.
+   */
+  public static final String FUGUE_TASK = "FUGUE_TASK";
+ 
+  /**
+   * Environment variable containing a pointer to the sub-tree in the configuration which applies
+   * to the current process. 
+   */
+  public static final String FUGUE_ID = "FUGUE_ID";
   
   /** Environment variable containing the process instance ID */
   public static final String FUGUE_INSTANCE = "FUGUE_INSTANCE";

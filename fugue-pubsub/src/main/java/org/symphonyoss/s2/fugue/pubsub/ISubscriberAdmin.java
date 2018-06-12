@@ -36,6 +36,14 @@ public interface ISubscriberAdmin<P,T extends ISubscriberManager<P,T>> extends I
   /**
    * Create all configured subscriptions.
    * 
+   * @param dryRun If true then don't change anything
    */
-  void createSubscriptions();
+  void createSubscriptions(boolean dryRun);
+  
+  /**
+   * Delete all configured subscriptions.
+   * 
+   * @param dryRun If true then don't change anything
+   */
+  void deleteSubscriptions(boolean dryRun);
 }

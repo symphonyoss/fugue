@@ -20,7 +20,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import static org.junit.Assert.assertEquals;
 
@@ -61,7 +61,7 @@ public class TestBaseConfigurationProvider
   @Test
   public void testTop() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getString(TEST_PROPERTY_NAME));
   }
@@ -69,7 +69,7 @@ public class TestBaseConfigurationProvider
   @Test(expected=NotFoundException.class)
   public void testMissingTop() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     provider.getString(ABSENT_PROPERTY_NAME);
   }
@@ -77,7 +77,7 @@ public class TestBaseConfigurationProvider
   @Test
   public void testNestOne() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     assertEquals("Test propety is not valid", TEST_NEST_ONE_PROPERTY_VALUE, provider.getString(TEST_NEST_ONE_PROPERTY_NAME));
   }
@@ -85,7 +85,7 @@ public class TestBaseConfigurationProvider
   @Test(expected=NotFoundException.class)
   public void testMissingNestOne() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     provider.getString(ABSENT_NEST_ONE_PROPERTY_NAME);
   }
@@ -93,7 +93,7 @@ public class TestBaseConfigurationProvider
   @Test
   public void testNestTwo() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     assertEquals("Test propety is not valid", TEST_NEST_TWO_PROPERTY_VALUE, provider.getString(TEST_NEST_TWO_PROPERTY_NAME));
   }
@@ -101,7 +101,7 @@ public class TestBaseConfigurationProvider
   @Test(expected=NotFoundException.class)
   public void testMissingNestTwo() throws NotFoundException
   {
-    BaseConfigurationProvider provider = new BaseConfigurationProvider(json_);
+    Configuration provider = new Configuration(json_);
     
     provider.getString(ABSENT_NEST_TWO_PROPERTY_NAME);
   }

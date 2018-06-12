@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,16 +39,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class BaseConfigurationProvider implements IConfigurationProvider
+public class Configuration implements IConfiguration
 {
   private JsonNode tree_;
-  private Map<String, BaseConfigurationProvider> subConfigMap_ = new HashMap<>();
+  private Map<String, Configuration> subConfigMap_ = new HashMap<>();
   private String name_ = "";
 
-  protected BaseConfigurationProvider()
+  protected Configuration()
   {}
   
-  BaseConfigurationProvider(JsonNode tree)
+  protected Configuration(JsonNode tree)
   {
     tree_ = tree;
   }
@@ -58,6 +58,11 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   {
     tree_ = tree;
   }
+  
+//  /* package */  JsonNode getTree()
+//  {
+//    return tree_;
+//  }
 
   @Override
   public @Nonnull String getString(@Nonnull String name) throws NotFoundException
@@ -204,12 +209,12 @@ public class BaseConfigurationProvider implements IConfigurationProvider
   }
 
   @Override
-  public synchronized @Nonnull BaseConfigurationProvider getConfiguration(String name)
+  public synchronized @Nonnull Configuration getConfiguration(String name)
   {
     if(tree_ == null)
       throw new IllegalStateException("No configuration loaded");
     
-    BaseConfigurationProvider subConfig = subConfigMap_.get(name);
+    Configuration subConfig = subConfigMap_.get(name);
     
     if(subConfig == null)
     {
@@ -227,7 +232,7 @@ public class BaseConfigurationProvider implements IConfigurationProvider
         }
       }
       
-      subConfig = new BaseConfigurationProvider((ObjectNode)node);
+      subConfig = new Configuration((ObjectNode)node);
       
       subConfigMap_.put(name, subConfig);
     }

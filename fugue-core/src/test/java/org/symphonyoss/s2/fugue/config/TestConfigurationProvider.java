@@ -20,7 +20,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.symphonyoss.s2.fugue;
+package org.symphonyoss.s2.fugue.config;
 
 import static org.junit.Assert.assertEquals;
 
@@ -44,7 +44,7 @@ public class TestConfigurationProvider
   {
     File file = Paths.get(getClass().getResource("/inlineConfig.json").toURI()).toFile();
     
-    ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
+    GitHubConfiguration provider = new GitHubConfiguration(file.getAbsolutePath());
     
     assertEquals("Test propety is not valid", TEST_PROPERTY_VALUE, provider.getString(TEST_PROPERTY_NAME));
   }
@@ -54,7 +54,7 @@ public class TestConfigurationProvider
   {
     File file = Paths.get(getClass().getResource("/inlineConfig.json").toURI()).toFile();
     
-    ConfigurationProvider provider = new ConfigurationProvider(file.getAbsolutePath());
+    GitHubConfiguration provider = new GitHubConfiguration(file.getAbsolutePath());
     
     provider.getString(ABSENT_PROPERTY_NAME);
   }

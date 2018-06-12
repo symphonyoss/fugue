@@ -25,22 +25,17 @@ package org.symphonyoss.s2.fugue.naming;
 
 public class TopicName extends Name
 {
-  private final String realmId_;
   private final String environmentId_;
+  private final String realmId_;
   private final String topic_;
 
-  public TopicName(String realmId, String environmentId, String topic)
+  public TopicName(String environmentId, String realmId, String topic)
   {
-    super(realmId, environmentId, topic);
+    super(environmentId, realmId, topic);
     
-    realmId_ = realmId;
     environmentId_ = environmentId;
+    realmId_ = realmId;
     topic_ = topic;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
   }
 
   public String getEnvironmentId()
@@ -48,7 +43,10 @@ public class TopicName extends Name
     return environmentId_;
   }
 
-
+  public String getRealmId()
+  {
+    return realmId_;
+  }
 
   public String getTopic()
   {

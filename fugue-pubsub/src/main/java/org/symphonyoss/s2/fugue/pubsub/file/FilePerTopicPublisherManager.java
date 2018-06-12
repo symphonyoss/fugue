@@ -30,26 +30,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.symphonyoss.s2.fugue.IConfigurationProvider;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 public class FilePerTopicPublisherManager extends AbstractPublisherManager<String, FilePerTopicPublisherManager>
 {
-  private final IConfigurationProvider       config_;
   private final File                         rootDir_;
   private final INameFactory                 nameFactory_;
 
   private Map<String, FilePerTopicPublisher> publisherNameMap_   = new HashMap<>();
-  private Map<String, FilePerTopicPublisher> publisherConfigMap_ = new HashMap<>();
   private List<FilePerTopicPublisher>        publishers_         = new ArrayList<>();
   
-  public FilePerTopicPublisherManager(IConfigurationProvider config, File rootDir, INameFactory nameFactory)
+  public FilePerTopicPublisherManager(File rootDir, INameFactory nameFactory)
   {
     super(FilePerTopicPublisherManager.class);
     
-    config_ = config;
     rootDir_ = rootDir;
     nameFactory_ = nameFactory;
   }
@@ -60,12 +56,6 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
     for(Entry<String, FilePerTopicPublisher> entry : publisherNameMap_.entrySet())
     {
       entry.getValue().startByName(nameFactory_.getTopicName(entry.getKey()).toString());
-      publishers_.add(entry.getValue());
-    }
-    
-    for(Entry<String, FilePerTopicPublisher> entry : publisherConfigMap_.entrySet())
-    {
-      entry.getValue().startByName(nameFactory_.getTopicName(config_.getRequiredString(entry.getKey())).toString());
       publishers_.add(entry.getValue());
     }
   }
@@ -98,22 +88,6 @@ public class FilePerTopicPublisherManager extends AbstractPublisherManager<Strin
     {
       publisher = new FilePerTopicPublisher(rootDir_);
       publisherNameMap_.put(topicName, publisher);
-    }
-    
-    return publisher;
-  }
-
-  @Override
-  public synchronized IPublisher<String> getPublisherByConfig(String topicConfigId)
-  {
-    assertConfigurable();
-    
-    FilePerTopicPublisher publisher = publisherConfigMap_.get(topicConfigId);
-    
-    if(publisher == null)
-    {
-      publisher = new FilePerTopicPublisher(rootDir_);
-      publisherConfigMap_.put(topicConfigId, publisher);
     }
     
     return publisher;

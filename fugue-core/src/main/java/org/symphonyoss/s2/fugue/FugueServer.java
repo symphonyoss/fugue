@@ -109,7 +109,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       @Override
       public void start()
       {
-        startFugueServer();
+//        startFugueServer();
       }
       
       @Override
@@ -146,6 +146,16 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
           if(started_)
             stopFugueServer();
         });
+  }
+
+  @Override
+  public FugueServer start()
+  {
+    super.start();
+    
+    startFugueServer();
+    
+    return this;
   }
 
   @Override

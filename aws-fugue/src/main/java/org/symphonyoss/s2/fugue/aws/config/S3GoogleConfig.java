@@ -21,35 +21,36 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.aws.config;
 
-public class TableName extends Name
+import java.net.MalformedURLException;
+import java.net.URL;
+
+import org.symphonyoss.s2.common.fault.ProgramFault;
+
+public class S3GoogleConfig extends S3ConfigFileMapper
 {
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
 
-  public TableName(String environmentId, String realmId, String table)
+  public S3GoogleConfig()
   {
-    super(environmentId, realmId, table);
+    super("GOOGLE_APPLICATION_CREDENTIALS", getCred());
+  }
+
+  private static URL getCred()
+  {
+    String config = System.getenv("S3_GOOGLE_CREDENTIALS");
     
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
+    if(config == null || config.trim().length()==0)
+      return null;
+    
+    try
+    {
+      return new URL(config);
+    }
+    catch (MalformedURLException e)
+    {
+      throw new ProgramFault("Invalid URL for S3_GOOGLE_CREDENTIALS", e);
+    }
   }
 
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
-  }
 }
