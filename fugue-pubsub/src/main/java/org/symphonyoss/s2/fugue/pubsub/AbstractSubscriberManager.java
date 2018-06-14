@@ -35,6 +35,7 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
@@ -53,14 +54,14 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
 
   private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
 
-  private final ITraceContextFactory   traceFactory_;
-  private final IThreadSafeConsumer<P> unprocessableMessageConsumer_;
-  private List<Subscription<P>>        subscribers_                  = new ArrayList<>();
+  private final ITraceContextFactory        traceFactory_;
+  private final IThreadSafeErrorConsumer<P> unprocessableMessageConsumer_;
+  private List<Subscription<P>>             subscribers_                  = new ArrayList<>();
 
   
   protected AbstractSubscriberManager(Class<T> type, 
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<P> unprocessableMessageConsumer)
+      IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
   {
     super(type);
     
@@ -171,7 +172,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
       trace.trace("MESSAGE_IS_UNPROCESSABLE");
       try
       {
-        unprocessableMessageConsumer_.consume(payload, trace);
+        unprocessableMessageConsumer_.consume(payload, trace, e.getLocalizedMessage(), e);
       }
       catch(RuntimeException e2)
       {

@@ -9,7 +9,7 @@ package org.symphonyoss.s2.fugue.google.pubsub;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 
 public class GoogleSubscriberManager extends GoogleAbstractSubscriberManager<GoogleSubscriberManager>
 {
@@ -23,7 +23,7 @@ public class GoogleSubscriberManager extends GoogleAbstractSubscriberManager<Goo
    */
   public GoogleSubscriberManager(INameFactory nameFactory, String projectId,
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
+      IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
     super(GoogleSubscriberManager.class, nameFactory, projectId, traceFactory, unprocessableMessageConsumer);
   }

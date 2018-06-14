@@ -18,19 +18,17 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
-import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 import com.google.pubsub.v1.ProjectTopicName;
-import com.google.pubsub.v1.PushConfig;
 
 /* package */ class GoogleAbstractSubscriberManager<T extends ISubscriberManager<ImmutableByteArray,T>> extends AbstractSubscriberManager<ImmutableByteArray, T>
 {
@@ -53,7 +51,7 @@ import com.google.pubsub.v1.PushConfig;
    */
   /* package */ GoogleAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String projectId,
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<ImmutableByteArray> unprocessableMessageConsumer)
+      IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
     super(type, traceFactory, unprocessableMessageConsumer);
     

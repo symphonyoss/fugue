@@ -33,7 +33,7 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
@@ -62,7 +62,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
    */  
   SqsAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String region,
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<String> unprocessableMessageConsumer)
+      IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
     super(type, traceFactory, unprocessableMessageConsumer);
     

@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 
 /**
  * AWS SQS implementation of SubscriberManager.
@@ -45,7 +45,7 @@ public class SqsSubscriberManager extends SqsAbstractSubscriberManager<SqsSubscr
    */
   public SqsSubscriberManager(INameFactory nameFactory, String region,
       ITraceContextFactory traceFactory,
-      IThreadSafeConsumer<String> unprocessableMessageConsumer)
+      IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
     super(SqsSubscriberManager.class, nameFactory, region, traceFactory, unprocessableMessageConsumer);
   }
