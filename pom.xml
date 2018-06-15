@@ -27,7 +27,7 @@
 	<parent>
     <groupId>org.symphonyoss.s2</groupId>
     <artifactId>S2-super-pom</artifactId>
-    <version>0.1.7</version>
+    <version>0.1.8-SNAPSHOT</version>
 	</parent>
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
@@ -140,11 +140,11 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 		</dependency>
-		<dependency>
+		<!-- <dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<scope>test</scope>
-		</dependency>
+		</dependency> -->
 	</dependencies>
 	<build>
 		<pluginManagement>

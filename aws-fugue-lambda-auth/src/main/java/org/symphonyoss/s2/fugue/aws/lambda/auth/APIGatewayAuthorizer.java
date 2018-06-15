@@ -29,8 +29,6 @@ import org.symphonyoss.s2.fugue.aws.lambda.AwsLambdaRequest;
 import org.symphonyoss.s2.fugue.lambda.LambdaRequest;
 import org.symphonyoss.s2.fugue.lambda.LambdaResponse;
 
-import com.amazonaws.services.lambda.runtime.events.CloudWatchLogsEvent.AWSLogs;
-
 public abstract class APIGatewayAuthorizer extends AwsLambda
 {
   @Override
