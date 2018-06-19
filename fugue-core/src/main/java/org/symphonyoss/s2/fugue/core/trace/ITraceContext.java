@@ -42,14 +42,23 @@ import org.symphonyoss.s2.common.hash.Hash;
  */
 public interface ITraceContext
 {
-  /** Standard Start of context operation */
-  String STARTED = "TRACE_STARTED";
-
   /** Standard normal termination of context operation */
   String FINISHED = "TRACE_FINISHED";
 
   /** Standard abnormal termination of context operation */
   String ABORTED = "TRACE_ABORTED";
+
+  /**
+   * 
+   * @return The Hash (ID) of this Trace Context.
+   */
+  Hash getHash();
+  
+  /**
+   * 
+   * @return The timestamp (start time) of this trace context.
+   */
+  Instant getTimestamp();
 
   /**
    * Record an operation having taken place within a trace context.
@@ -59,7 +68,14 @@ public interface ITraceContext
    */
   void trace(String operationId);
   
-  void trace(String operationId, Hash parentHash);
+  /**
+   * Record an operation having taken place within a trace context.
+   * 
+   * @param operationId The operation ID, which can be any String the caller chooses including one of the standard
+   * values defined in ITraceContext
+   * @param time The time at which the event took place.
+   */
+  void trace(String operationId, Instant time);
   
   /**
    * Record an operation having taken place within a trace context.
@@ -67,9 +83,9 @@ public interface ITraceContext
    * @param operationId The operation ID, which can be any String the caller chooses including one of the standard
    * values defined in ITraceContext
    * @param subjectType The type of the subject of this operation
-   * @param subjectHash The identifying hash of the subject of this operation.
+   * @param subjectId The id of the subject of this operation.
    */
-  void trace(String operationId, String subjectType, Hash subjectHash);
+  void trace(String operationId, String subjectType, String subjectId);
 
   /**
    * Convenience method to record the normal completion of a trace context.
@@ -90,18 +106,21 @@ public interface ITraceContext
   /**
    * Create a sub-context relating to the processing of the given external subject.
    *  
-   * @param externalSubjectType The type of the subject of this process.
-   * @param externalSubjectId   The ID of the subject of this process.
+   * @param subjectType The type of the subject of this process.
+   * @param subjectId   The ID of the subject of this process.
    * 
    * @return A new ITraceContext which is a sub-context of the current context.
    */
-  ITraceContext createSubContext(String externalSubjectType, String externalSubjectId);
+  ITraceContext createSubContext(String subjectType, String subjectId);
 
-  Hash getHash();
-
-  void trace(String operationId, Instant time);
-
-  void trace(String operationId, Hash parentHash, Instant time);
-
-  ITraceContext createSubContext(String externalSubjectType, String externalSubjectId, Instant time);
+  /**
+   * Create a sub-context relating to the processing of the given external subject.
+   *  
+   * @param subjectType The type of the subject of this process.
+   * @param subjectId   The ID of the subject of this process.
+   * @param time        The time at which the sub-transaction started.
+   * 
+   * @return A new ITraceContext which is a sub-context of the current context.
+   */
+  ITraceContext createSubContext(String subjectType, String subjectId, Instant time);
 }

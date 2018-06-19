@@ -36,30 +36,26 @@ class LoggerTraceContext implements ITraceContext
 {
   private static final Logger log_ = LoggerFactory.getLogger(LoggerTraceContext.class);
 
-  private static final String LONG_FORMAT = "TRACE|%s|%s|%s|%s|%s|%s|%s";
-  private static final String SHORT_FORMAT = "TRACE|%s|%s|%s|%s|%s";
+  private static final String LONG_FORMAT = "TRACE|%s|%s|%s|%s|%s|%s";
+  private static final String SHORT_FORMAT = "TRACE|%s|%s|%s|%s";
 
   private final Hash          id_  = HashProvider.getCompositeHashOf(UUID.randomUUID());
   private final String        subjectType_;
   private final String        subjectId_;
   private final Hash          hash_;
-
+  
   public LoggerTraceContext(String subjectType, String subjectId)
   {
     subjectType_ = subjectType;
     subjectId_ = subjectId;
     hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
     
-    trace(ITraceContext.STARTED);
+    trace("STARTED");
   }
   
   private LoggerTraceContext(LoggerTraceContext parent, String subjectType, String subjectId)
   {
-    subjectType_ = subjectType;
-    subjectId_ = subjectId;
-    hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
-    
-    trace(ITraceContext.STARTED, parent.id_);
+    this(subjectType, subjectId);
   }
 
   @Override
@@ -71,19 +67,13 @@ class LoggerTraceContext implements ITraceContext
   @Override
   public void trace(String operationId)
   {
-    log_.debug(String.format(SHORT_FORMAT, id_, "", subjectType_, subjectId_, operationId));
-  }
-  
-  @Override
-  public void trace(String operationId, Hash parentHash)
-  {
-    log_.debug(String.format(SHORT_FORMAT, id_, parentHash, subjectType_, subjectId_, operationId));
+    log_.debug(String.format(SHORT_FORMAT, id_, subjectType_, subjectId_, operationId));
   }
 
   @Override
-  public void trace(String operationId, String subjectType, Hash subjectHash)
+  public void trace(String operationId, String subjectType, String subjectId)
   {
-    log_.debug(String.format(LONG_FORMAT, id_, "", subjectType_, subjectId_, operationId, subjectType, subjectHash));
+    log_.debug(String.format(LONG_FORMAT, id_, "", subjectType_, subjectId_, operationId, subjectType, subjectId));
   }
 
   @Override
@@ -95,21 +85,18 @@ class LoggerTraceContext implements ITraceContext
   @Override
   public void trace(String operationId, Instant time)
   {
-    // TODO Auto-generated method stub
-    
-  }
-
-  @Override
-  public void trace(String operationId, Hash parentHash, Instant time)
-  {
-    // TODO Auto-generated method stub
-    
+    trace(operationId);
   }
 
   @Override
   public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
   {
-    // TODO Auto-generated method stub
     return createSubContext(externalSubjectType, externalSubjectId);
+  }
+
+  @Override
+  public Instant getTimestamp()
+  {
+    return Instant.EPOCH;
   }
 }
