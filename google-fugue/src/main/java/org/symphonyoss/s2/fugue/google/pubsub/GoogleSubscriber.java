@@ -23,6 +23,10 @@
 
 package org.symphonyoss.s2.fugue.google.pubsub;
 
+import java.time.Instant;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -30,6 +34,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 import com.google.cloud.pubsub.v1.AckReplyConsumer;
 import com.google.cloud.pubsub.v1.MessageReceiver;
+import com.google.protobuf.Timestamp;
 import com.google.pubsub.v1.PubsubMessage;
 
 /**
@@ -40,6 +45,8 @@ import com.google.pubsub.v1.PubsubMessage;
  */
 public class GoogleSubscriber implements MessageReceiver
 {
+  private static final Logger  log_ = LoggerFactory.getLogger(GoogleSubscriber.class);
+  
   private final GoogleAbstractSubscriberManager<?>               manager_;
   private final ITraceContextFactory                             traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
@@ -62,8 +69,12 @@ public class GoogleSubscriber implements MessageReceiver
   {
     try
     {
-      ITraceContext trace = traceFactory_.createTransaction(PubsubMessage.class.getName(), message.getMessageId());
-
+      Timestamp ts = message.getPublishTime();
+      
+      ITraceContext trace = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),
+          Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos()));
+      
+      trace.trace("RECEIVED");
       ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
       
       long retryTime = manager_.handleMessage(consumer_, byteArray, trace);
@@ -84,8 +95,7 @@ public class GoogleSubscriber implements MessageReceiver
     }
     catch (RuntimeException e)
     {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      log_.error("Failed to handle message", e);
     }
   }
 }
