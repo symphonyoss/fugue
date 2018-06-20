@@ -91,8 +91,6 @@ public class AwsSecretManager implements ISecretManager
       
       if(getSecretValueResponse.getSecretString() == null) 
         throw new IllegalStateException("Returned value is not a string");
-
-      System.out.println("Retrieved secret = " + secret);
           
       return JacksonAdaptor.adapt(MAPPER.readTree(secret)).immutify();
     }

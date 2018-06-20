@@ -45,7 +45,6 @@ public class LoggerTraceContextFactory implements ITraceContextFactory
   @Override
   public ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime)
   {
-    // TODO: implement properly
     return new LoggerTraceContext(subjectType, subjectId);
   }
 }

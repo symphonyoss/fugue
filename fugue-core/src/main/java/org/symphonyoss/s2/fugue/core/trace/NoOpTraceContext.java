@@ -49,22 +49,20 @@ public class NoOpTraceContext implements ITraceContext
   }
 
   @Override
-  public void trace(String operationId, Hash parentHash)
-  {}
-
-  @Override
   public void trace(String operationId, Instant time)
   {
   }
 
   @Override
-  public void trace(String operationId, Hash parentHash, Instant time)
-  {
+  public void trace(String operationId, String subjectType, String subjectId)
+  {    
   }
 
   @Override
-  public void trace(String operationId, String subjectType, Hash subjectHash)
-  {}
+  public Instant getTimestamp()
+  {
+    return Instant.EPOCH;
+  }
 
   @Override
   public ITraceContext createSubContext(String externalSubjectType, String externalSubjectId)
