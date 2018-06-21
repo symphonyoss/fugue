@@ -75,7 +75,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
         ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
 
-        long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace);
+        long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace, m.getMessageId());
         
         if(retryTime < 0)
         {
@@ -85,7 +85,10 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         else
         {
           trace.trace("ABOUT_TO_NACK");
-          // TODO: do we need to do something here ?
+          
+          int visibilityTimout = (int) (retryTime / 1000);
+          
+          sqsClient_.changeMessageVisibility(queueUrl_, m.getReceiptHandle(), visibilityTimout);
         }
         trace.finished();
       }

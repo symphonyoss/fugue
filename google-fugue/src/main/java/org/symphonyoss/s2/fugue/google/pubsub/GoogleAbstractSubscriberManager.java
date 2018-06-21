@@ -106,7 +106,7 @@ import com.google.pubsub.v1.ProjectTopicName;
 
         validateSubcription(topicName, subscriptionName);
         
-        GoogleSubscriber        receiver                = new GoogleSubscriber(this, getTraceFactory(), subscription.getConsumer());
+        GoogleSubscriber        receiver                = new GoogleSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName);
         ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
         Subscriber              subscriber              = Subscriber.newBuilder(projectSubscriptionName, receiver).build();
         
