@@ -39,6 +39,9 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+
 /**
  * Base class for subscriber managers.
  * 
@@ -51,13 +54,18 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
   protected static final long          FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
+  protected static final long          MESSAGE_PROCESSED_OK          = -1;
 
   private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
+  private static final Integer FAILURE_CNT_LIMIT = 5;
 
   private final ITraceContextFactory        traceFactory_;
   private final IThreadSafeErrorConsumer<P> unprocessableMessageConsumer_;
   private List<Subscription<P>>             subscribers_                  = new ArrayList<>();
-
+  private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
+                                                                            .maximumSize(5000)
+                                                                            .expireAfterAccess(30, TimeUnit.MINUTES)
+                                                                            .build();
   
   protected AbstractSubscriberManager(Class<T> type, 
       ITraceContextFactory traceFactory,
@@ -137,11 +145,12 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
    * @param consumer  The consumer for the message.
    * @param payload   A received message.
    * @param trace     A trace context.
+   * @param messageId A unique ID for the message.
    * 
    * @return The number of milliseconds after which a retry should be made, or -1 if the message was
    * processed and no retry is necessary.
    */
-  public long handleMessage(IThreadSafeRetryableConsumer<P> consumer, P payload, ITraceContext trace)
+  public long handleMessage(IThreadSafeRetryableConsumer<P> consumer, P payload, ITraceContext trace, String messageId)
   {
     try
     {
@@ -149,38 +158,67 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     }
     catch (RetryableConsumerException e)
     {
+      
       log_.warn("Unprocessable message, will retry", e);
       
       // TODO: how do we break an infinite loop?
       
       if(e.getRetryTime() == null || e.getRetryTimeUnit() == null)
-        return FAILED_CONSUMER_RETRY_TIME;
+        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME);
       
-      return e.getRetryTimeUnit().toMillis(e.getRetryTime());
+      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()));
     }
     catch (RuntimeException  e)
     {
-      log_.warn("Unprocessable message, will retry", e);
-      
-      // TODO: how do we break an infinite loop?
-      
-      return FAILED_CONSUMER_RETRY_TIME;
+      return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME);
     }
     catch (FatalConsumerException e)
     {
       log_.error("Unprocessable message, aborted", e);
+
       trace.trace("MESSAGE_IS_UNPROCESSABLE");
-      try
-      {
-        unprocessableMessageConsumer_.consume(payload, trace, e.getLocalizedMessage(), e);
-      }
-      catch(RuntimeException e2)
-      {
-        log_.error("Unprocessable message consumer failed", e);
-        return FAILED_DEAD_LETTER_RETRY_TIME;
-      }
+      
+      return abortMessage(payload, trace, e);
     }
     
-    return -1;
+    return MESSAGE_PROCESSED_OK;
+  }
+
+  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId, long retryTime)
+  {
+    Integer cnt = failureCache_.getIfPresent(messageId);
+    
+    if(cnt == null)
+    {
+      cnt = 1;
+      failureCache_.put(messageId, cnt);
+    }
+    else
+    {
+      if(cnt >= FAILURE_CNT_LIMIT)
+      {
+        trace.trace("MESSAGE_RETRIES_EXCEEDED");
+        
+        return abortMessage(payload, trace, cause);
+      }
+      failureCache_.put(messageId, ++cnt);
+    }
+    log_.warn("Message processing failed " + cnt + " times, will retry", cause);
+    
+    return retryTime;
+  }
+
+  private long abortMessage(P payload, ITraceContext trace, Throwable e)
+  {
+    try
+    {
+      unprocessableMessageConsumer_.consume(payload, trace, e.getLocalizedMessage(), e);
+      return MESSAGE_PROCESSED_OK;
+    }
+    catch(RuntimeException e2)
+    {
+      log_.error("Unprocessable message consumer failed", e);
+      return FAILED_DEAD_LETTER_RETRY_TIME;
+    }
   }
 }

@@ -24,12 +24,19 @@
 package org.symphonyoss.s2.fugue.google.pubsub;
 
 import java.time.Instant;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 import com.google.cloud.pubsub.v1.AckReplyConsumer;
@@ -45,23 +52,28 @@ import com.google.pubsub.v1.PubsubMessage;
  */
 public class GoogleSubscriber implements MessageReceiver
 {
-  private static final Logger  log_ = LoggerFactory.getLogger(GoogleSubscriber.class);
+  private static final Logger           log_      = LoggerFactory.getLogger(GoogleSubscriber.class);
+  private static final ScheduledThreadPoolExecutor  executor_ = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("google-failed-msg-ack", true));
+  private static final int MAX_PENDING_RETRY_COUNT = 10000;
   
   private final GoogleAbstractSubscriberManager<?>               manager_;
   private final ITraceContextFactory                             traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
+  private final SubscriptionName                                 subscriptionName_;
 
   /**
    * Constructor.
    * @param manager       The manager.
    * @param traceFactory  A trace factory.
    * @param consumer      Sink for received messages.
+   * @param subscriptionName The name of the subscription we are processing for
    */
-  public GoogleSubscriber(GoogleAbstractSubscriberManager<?> manager, ITraceContextFactory traceFactory, IThreadSafeRetryableConsumer<ImmutableByteArray> consumer)
+  public GoogleSubscriber(GoogleAbstractSubscriberManager<?> manager, ITraceContextFactory traceFactory, IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
+    subscriptionName_ = subscriptionName;
   }
 
   @Override
@@ -77,7 +89,7 @@ public class GoogleSubscriber implements MessageReceiver
       trace.trace("RECEIVED");
       ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
       
-      long retryTime = manager_.handleMessage(consumer_, byteArray, trace);
+      long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
       
       if(retryTime < 0)
       {
@@ -86,16 +98,17 @@ public class GoogleSubscriber implements MessageReceiver
       }
       else
       {
-        // TODO: do we need to do this or is it better to do nothing so the ack timeout exceeds,
-        // given that the async library does extension of ack deadlines it's unclear
-        consumer.nack();
+        if(executor_.getQueue().size() > MAX_PENDING_RETRY_COUNT)
+          log_.error("We are holding " + executor_.getQueue().size() + " failed messages, this message will not be re-tried for up to 60 mins.");
+        else
+          executor_.schedule(() -> {consumer.nack();}, retryTime, TimeUnit.MILLISECONDS);
       }
       
       trace.finished();
     }
     catch (RuntimeException e)
     {
-      log_.error("Failed to handle message", e);
+      log_.error("Failed to handle message from " + subscriptionName_, e);
     }
   }
 }
