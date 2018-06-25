@@ -25,6 +25,8 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
@@ -41,11 +43,15 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
  */
 /* package */ class SqsSubscriber implements Runnable
 {
+  private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriber.class);
+  
   private final SqsAbstractSubscriberManager<?>      manager_;
   private final AmazonSQS                            sqsClient_;
   private final String                               queueUrl_;
   private final ITraceContextFactory                 traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
+  private final NonIdleSubscriber                    nonIdleSubscriber_;
+  private int messageBatchSize_ = 10;
 
   /* package */ SqsSubscriber(SqsAbstractSubscriberManager<?> manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextFactory traceFactory,
@@ -56,50 +62,84 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     queueUrl_ = queueUrl;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
+    nonIdleSubscriber_ = new NonIdleSubscriber();
+  }
+  
+  class NonIdleSubscriber implements Runnable
+  {
+    @Override
+    public void run()
+    {
+      SqsSubscriber.this.run(false);
+    }
   }
 
   @Override
   public void run()
   {
+    run(true);
+  }
+
+  public void run(boolean runIfIdle)
+  {
     // receive messages from the queue
     
     ReceiveMessageRequest request = new ReceiveMessageRequest(queueUrl_)
-        .withMaxNumberOfMessages(10)
+        .withMaxNumberOfMessages(messageBatchSize_ )
         .withWaitTimeSeconds(20);
     try
     {    
       List<Message> messages = sqsClient_.receiveMessage(request).getMessages();
   
-      for (Message m : messages)
+      if(messages.isEmpty())
       {
-
-        ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
-
-        long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace, m.getMessageId());
+        if(runIfIdle)
+        {
+          manager_.submit(this, runIfIdle);
+        }
+      }
+      else
+      {
+        if(messages.size() == messageBatchSize_)
+        {
+          manager_.submit(nonIdleSubscriber_, false);
+        }
         
-        if(retryTime < 0)
+        for (Message m : messages)
         {
-          trace.trace("ABOUT_TO_ACK");
-          sqsClient_.deleteMessage(queueUrl_, m.getReceiptHandle());
+  
+          ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
+  
+          long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace, m.getMessageId());
+          
+          if(retryTime < 0)
+          {
+            trace.trace("ABOUT_TO_ACK");
+            sqsClient_.deleteMessage(queueUrl_, m.getReceiptHandle());
+          }
+          else
+          {
+            trace.trace("ABOUT_TO_NACK");
+            
+            int visibilityTimout = (int) (retryTime / 1000);
+            
+            sqsClient_.changeMessageVisibility(queueUrl_, m.getReceiptHandle(), visibilityTimout);
+          }
+          trace.finished();
         }
+        
+        if(runIfIdle)
+          manager_.submit(this, runIfIdle);
         else
-        {
-          trace.trace("ABOUT_TO_NACK");
-          
-          int visibilityTimout = (int) (retryTime / 1000);
-          
-          sqsClient_.changeMessageVisibility(queueUrl_, m.getReceiptHandle(), visibilityTimout);
-        }
-        trace.finished();
+          manager_.submit(nonIdleSubscriber_, runIfIdle);
       }
     }
     catch (RuntimeException e)
     {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      log_.error("Error processing message", e);
     }
    
     
-    manager_.submit(this);
+    
   }
 }

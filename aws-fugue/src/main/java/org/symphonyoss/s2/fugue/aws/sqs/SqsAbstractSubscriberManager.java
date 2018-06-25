@@ -25,6 +25,8 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -43,14 +45,16 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 /* package */ class SqsAbstractSubscriberManager<T extends ISubscriberManager<String, T>> extends AbstractSubscriberManager<String, T>
 {
-  private static final Logger          log_                     = LoggerFactory.getLogger(SqsSubscriberManager.class);
+  private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
-  /* package */ final INameFactory           nameFactory_;
-  /* package */ final String                 region_;
-  /* package */ final boolean                startSubscriptions_;
+  /* package */ final int                           threadPoolSize_ = 20;
+  /* package */ final INameFactory                  nameFactory_;
+  /* package */ final String                        region_;
+  /* package */ final boolean                       startSubscriptions_;
+  /* package */ final LinkedBlockingQueue<Runnable> executorQueue_  = new LinkedBlockingQueue<Runnable>();
 
-  /* package */ AmazonSQS                    sqsClient_;
-  /* package */ ExecutorService              executor_;
+  /* package */ AmazonSQS                           sqsClient_;
+  /* package */ ThreadPoolExecutor                  executor_;
 
   /**
    * Normal constructor.
@@ -73,7 +77,9 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
     region_ = region;
     startSubscriptions_ = true;
     
-    executor_ = Executors.newFixedThreadPool(20);
+    executor_ = new ThreadPoolExecutor(threadPoolSize_, threadPoolSize_,
+        0L, TimeUnit.MILLISECONDS,
+        executorQueue_);
   }
   
   /**
@@ -125,7 +131,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
         log_.info("Subscribing to " + subscriptionName + "...");
       
-        submit(subscriber);
+        submit(subscriber, true);
       }
     }
   }
@@ -154,9 +160,10 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
     }
   }
 
-  public void submit(SqsSubscriber subscriber)
+  public void submit(Runnable subscriber, boolean force)
   {
-    executor_.submit(subscriber);
+    if(force || executorQueue_.size() < threadPoolSize_)
+      executor_.submit(subscriber);
   }
 
 }
