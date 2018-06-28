@@ -166,4 +166,8 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
       executor_.submit(subscriber);
   }
 
+  void printQueueSize()
+  {
+    log_.debug("Queue size " + executorQueue_.size());
+  }
 }

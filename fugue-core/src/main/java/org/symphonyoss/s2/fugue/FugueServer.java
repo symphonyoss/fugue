@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.ClosedFileSystemException;
+import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -35,14 +35,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
+import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
+import org.symphonyoss.s2.fugue.http.HttpServer;
 import org.symphonyoss.s2.fugue.http.HttpServerBuilder;
 import org.symphonyoss.s2.fugue.http.IResourceProvider;
 import org.symphonyoss.s2.fugue.http.IServletProvider;
 import org.symphonyoss.s2.fugue.http.IUrlPathServlet;
 import org.symphonyoss.s2.fugue.http.RandomAuthFilter;
-import org.symphonyoss.s2.fugue.concurrent.FugueExecutorService;
-import org.symphonyoss.s2.fugue.concurrent.FugueScheduledExecutorService;
-import org.symphonyoss.s2.fugue.http.HttpServer;
 import org.symphonyoss.s2.fugue.http.ui.servlet.Command;
 import org.symphonyoss.s2.fugue.http.ui.servlet.CommandServlet;
 import org.symphonyoss.s2.fugue.http.ui.servlet.ICommand;
@@ -100,6 +100,18 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   public FugueServer(String name, int httpPort)
   {
     super(FugueServer.class);
+
+    String configFile = System.getProperty("log4j.configurationFile");
+    
+    if(configFile == null)
+    {
+      URL url = getClass().getClassLoader().getResource("log4j2.xml");
+      System.out.println("log4j2.xml from resources = " + url);
+    }
+    else
+    {
+      System.out.println("log4j2.xml from system property = " + configFile);
+    }
     
     httpPort_   = httpPort;
     

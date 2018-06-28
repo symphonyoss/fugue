@@ -102,7 +102,7 @@ public class S3Configuration extends Configuration
       }
       else
       {
-        throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " a " + AWS_COM + " hostname is expected.");
+        throw new ProgramFault(variableName + " is " + configUrl + " a " + AWS_COM + " hostname is expected.");
       }
     }
     catch (MalformedURLException e)
@@ -120,7 +120,7 @@ public class S3Configuration extends Configuration
         }
         catch (FileNotFoundException e1)
         {
-          throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.", e1);
+          throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.", e1);
         }
         catch (IOException e1)
         {
@@ -129,7 +129,7 @@ public class S3Configuration extends Configuration
       }
       else
       {
-        throw new ProgramFault("FUGUE_CONFIG is " + fugueConfig + " but this file does not exist.");
+        throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.");
       }
     }
   }

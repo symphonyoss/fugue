@@ -96,6 +96,8 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         if(runIfIdle)
         {
           manager_.submit(this, runIfIdle);
+          log_.debug("Idle schedule " + queueUrl_);
+          manager_.printQueueSize();
         }
       }
       else
@@ -103,6 +105,8 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         if(messages.size() == messageBatchSize_)
         {
           manager_.submit(nonIdleSubscriber_, false);
+
+          log_.debug("Extra schedule " + queueUrl_);
         }
         
         for (Message m : messages)
@@ -129,9 +133,16 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         }
         
         if(runIfIdle)
+        {
           manager_.submit(this, runIfIdle);
+          log_.debug("Idle re-schedule " + queueUrl_);
+        }
         else
+        {
           manager_.submit(nonIdleSubscriber_, runIfIdle);
+          log_.debug("Extra re-schedule " + queueUrl_);
+        }
+        manager_.printQueueSize();
       }
     }
     catch (RuntimeException e)

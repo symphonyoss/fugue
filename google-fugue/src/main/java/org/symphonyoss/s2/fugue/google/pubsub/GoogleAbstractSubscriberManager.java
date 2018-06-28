@@ -28,7 +28,6 @@ import com.google.cloud.pubsub.v1.Subscriber;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
-import com.google.pubsub.v1.ProjectTopicName;
 
 /* package */ class GoogleAbstractSubscriberManager<T extends ISubscriberManager<ImmutableByteArray,T>> extends AbstractSubscriberManager<ImmutableByteArray, T>
 {
@@ -39,7 +38,7 @@ import com.google.pubsub.v1.ProjectTopicName;
   /* package */ final boolean                startSubscriptions_;
 
   /* package */ List<Subscriber>             subscriberList_ = new LinkedList<>();
-  /* package */ 
+  /* package */ int                          subscriptionErrorCnt_;
   
   /**
    * Normal constructor.
@@ -84,7 +83,7 @@ import com.google.pubsub.v1.ProjectTopicName;
   { 
     for(String topic : subscription.getTopicNames())
     {
-      log_.info("Validating to topic " + topic + "...");
+      log_.info("Validating topic " + topic + "...");
       
       TopicName               topicName = nameFactory_.getTopicName(topic);
       
@@ -96,6 +95,11 @@ import com.google.pubsub.v1.ProjectTopicName;
     
     if(startSubscriptions_)
     {
+      if(subscriptionErrorCnt_>0)
+      {
+        throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
+      }
+      
       for(String topic : subscription.getTopicNames())
       {
         log_.info("Subscribing to topic " + topic + "...");
@@ -134,18 +138,20 @@ import com.google.pubsub.v1.ProjectTopicName;
   {
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
     {
-      ProjectTopicName projectTopicName = ProjectTopicName.of(projectId_, topicName.toString());
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
       
       try
       {
         com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
         
-        log_.info("Subscription " + subscriptionName + " on topic " + topicName + " exists.");
+        log_.info("Subscription " + subscriptionName + " on topic " + topicName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
+        
+        
       }
       catch(NotFoundException e)
       {   
         log_.error("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
+        subscriptionErrorCnt_++;
       }
     }
     catch (IOException e)
