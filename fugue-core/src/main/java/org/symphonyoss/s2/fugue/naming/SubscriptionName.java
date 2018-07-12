@@ -23,24 +23,48 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+/**
+ * The name of a subscription.
+ * 
+ * This is constructed from the subscription simple name and the topic name, in that order
+ * so that AWS policies can be written with resource rules of the form ${ENVIRONMENT}-*
+ * 
+ * SBE creates subscriptions with the topic followed by the simple subscription name.
+ * @author Bruce Skingle
+ *
+ */
 public class SubscriptionName extends Name
 {
   private final TopicName topicName_;
   private final String subscription_;
 
+  /**
+   * Constructor.
+   * 
+   * @param topicName     The TopicName of the topic to be subscribed to.
+   * @param subscription  The simple subscription name.
+   */
   public SubscriptionName(TopicName topicName, String subscription)
   {
-    super(topicName.toString(), subscription);
+    super(subscription, topicName.toString());
     
     topicName_ = topicName;
     subscription_ = subscription;
   }
 
+  /**
+   * 
+   * @return The TopicName of the topic to which this subscription relates.
+   */
   public TopicName getTopicName()
   {
     return topicName_;
   }
 
+  /**
+   * 
+   * @return The simple subscription name.
+   */
   public String getSubscription()
   {
     return subscription_;

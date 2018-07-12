@@ -52,17 +52,21 @@ import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 public class SqsSubscriberAdmin extends SqsAbstractSubscriberManager<SqsSubscriberAdmin> implements ISubscriberAdmin<String, SqsSubscriberAdmin>
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
+  private final String accountId_;
 
   /**
    * Constructor.
    * 
    * @param nameFactory   A name factory.
    * @param region The AWS region in which to operate.
+   * @param accountId The AWS account ID 
    * @param traceFactory  A trace factory.
    */
-  public SqsSubscriberAdmin(INameFactory nameFactory, String region, ITraceContextFactory traceFactory)
+  public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId, ITraceContextFactory traceFactory)
   {
     super(SqsSubscriberAdmin.class, nameFactory, region, traceFactory);
+    
+    accountId_ = accountId;
   }
 
   @Override
@@ -85,12 +89,26 @@ public class SqsSubscriberAdmin extends SqsAbstractSubscriberManager<SqsSubscrib
     }
   }
   
+  /**
+   * Topic-arns can be constructed if the region, accountId, and topic name is known.
+   * 
+   * $topicArn = 'arn:aws:sns:<REGION></>:<ACCOUNT-ID>:<TOPIC-NAME>'
+   *
+   * @param topicName - name of topic
+   * 
+   * @return The topic ARN
+   */
+  private String getTopicARN(TopicName topicName)
+  {
+    return "arn:aws:sns:" + region_ + ":" + accountId_ + ":" + topicName;
+  }
+  
   private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
     // TODO: implement dryRun
-    // TODO: this is creating the topic which it should not do. Implement an STS client and pass it in here and to SNSPublisherManager
     
-    String myTopicArn = snsClient.createTopic(new CreateTopicRequest(topicName.toString())).getTopicArn();
+    log_.info("Creating subscription " + subscriptionName + "...");
+    String myTopicArn = getTopicARN(topicName);
     String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
     
     String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, myTopicArn, myQueueUrl);

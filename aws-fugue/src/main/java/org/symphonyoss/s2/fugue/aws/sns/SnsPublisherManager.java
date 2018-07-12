@@ -59,6 +59,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
 
   private final INameFactory              nameFactory_;
   private final String                    region_;
+  private final String                    accountId_;
   private final boolean                   initialize_;
 
   /* package */ Map<String, SnsPublisher> publisherNameMap_   = new HashMap<>();
@@ -66,8 +67,6 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   /* package */ List<TopicName>           topicNames_         = new ArrayList<>();
 
   /* package */ AmazonSNS                 snsClient_;
-  /* package */ String                    accountId_;
-  /* package */ AWSSecurityTokenService   stsClient_;
 
   /**
    * Constructor.
@@ -75,28 +74,21 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
    * @param nameFactory A name factory.
    * @param region      The AWS region to use.
    */
-  public SnsPublisherManager(INameFactory nameFactory, String region)
+  public SnsPublisherManager(INameFactory nameFactory, String region, String accountId)
   {
-    this(nameFactory, region, false);
+    this(nameFactory, region, accountId, false);
   }
   
-  protected SnsPublisherManager(INameFactory nameFactory, String region, boolean initialize)
+  protected SnsPublisherManager(INameFactory nameFactory, String region, String accountId, boolean initialize)
   {
     super(SnsPublisherManager.class);
     
     nameFactory_ = nameFactory;
     region_ = region;
+    accountId_ = accountId;
     initialize_ = initialize;
     
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
-    
-    stsClient_ = AWSSecurityTokenServiceClientBuilder.standard()
-        .withRegion(region_)
-        .build();
-    
-    GetCallerIdentityResult id = stsClient_.getCallerIdentity(new GetCallerIdentityRequest());
-    
-    accountId_ = id.getAccount();
     
     snsClient_ = AmazonSNSClientBuilder.standard()
       .withRegion(region_)

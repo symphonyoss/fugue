@@ -48,9 +48,9 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
    * @param nameFactory A name factory.
    * @param region      The AWS region to use.
    */
-  public SnsPublisherAdmin(INameFactory nameFactory, String region)
+  public SnsPublisherAdmin(INameFactory nameFactory, String region, String accountId)
   {
-    super(nameFactory, region, true);
+    super(nameFactory, region, accountId, true);
   }
 
   @Override
