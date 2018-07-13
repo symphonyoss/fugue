@@ -23,9 +23,22 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
+import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
+import org.symphonyoss.s2.fugue.pubsub.Subscription;
+
+import com.amazonaws.services.sqs.AmazonSQS;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
 /**
  * AWS SQS implementation of SubscriberManager.
@@ -33,8 +46,19 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
  * @author Bruce Skingle
  *
  */
-public class SqsSubscriberManager extends SqsAbstractSubscriberManager<SqsSubscriberManager>
+public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsSubscriberManager>
 {
+  private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberManager.class);
+
+  private final int                           threadPoolSize_ = 20;
+  private final INameFactory                  nameFactory_;
+  private final String                        region_;
+  private final boolean                       startSubscriptions_;
+  private final LinkedBlockingQueue<Runnable> executorQueue_  = new LinkedBlockingQueue<Runnable>();
+
+  private AmazonSQS                           sqsClient_;
+  private ThreadPoolExecutor                  executor_;
+  
   /**
    * Constructor.
    * 
@@ -47,6 +71,89 @@ public class SqsSubscriberManager extends SqsAbstractSubscriberManager<SqsSubscr
       ITraceContextFactory traceFactory,
       IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
-    super(SqsSubscriberManager.class, nameFactory, region, traceFactory, unprocessableMessageConsumer);
+    super(SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
+    
+    if(unprocessableMessageConsumer==null)
+      throw new NullPointerException("unprocessableMessageConsumer is required.");
+    
+    nameFactory_ = nameFactory;
+    region_ = region;
+    startSubscriptions_ = true;
+    
+    executor_ = new ThreadPoolExecutor(threadPoolSize_, threadPoolSize_,
+        0L, TimeUnit.MILLISECONDS,
+        executorQueue_);
+  }
+
+  @Override
+  public void start()
+  {
+    sqsClient_ = AmazonSQSClientBuilder.standard()
+        .withRegion(region_)
+        .build();
+    
+    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    
+    super.start();
+  }
+
+  @Override
+  protected void startSubscription(Subscription<String> subscription)
+  {
+    if(startSubscriptions_)
+    {
+      for(String topic : subscription.getTopicNames())
+      {
+        TopicName topicName = nameFactory_.getTopicName(topic);
+        
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+
+        log_.info("Subscribing to queue " + subscriptionName + "...");
+        
+        String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
+            sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
+        
+        SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer());
+
+        log_.info("Subscribing to " + subscriptionName + "...");
+      
+        submit(subscriber, true);
+      }
+    }
+  }
+
+  @Override
+  protected void stopSubscriptions()
+  {
+    if(startSubscriptions_)
+    {
+      executor_.shutdown();
+      
+      try {
+        // Wait a while for existing tasks to terminate
+        if (!executor_.awaitTermination(60, TimeUnit.SECONDS)) {
+          executor_.shutdownNow(); // Cancel currently executing tasks
+          // Wait a while for tasks to respond to being cancelled
+          if (!executor_.awaitTermination(60, TimeUnit.SECONDS))
+              System.err.println("Pool did not terminate");
+        }
+      } catch (InterruptedException ie) {
+        // (Re-)Cancel if current thread also interrupted
+        executor_.shutdownNow();
+        // Preserve interrupt status
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  /* package */ void submit(Runnable subscriber, boolean force)
+  {
+    if(force || executorQueue_.size() < threadPoolSize_)
+      executor_.submit(subscriber);
+  }
+
+  void printQueueSize()
+  {
+    log_.debug("Queue size " + executorQueue_.size());
   }
 }

@@ -23,18 +23,15 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
@@ -50,7 +47,7 @@ import com.google.common.cache.CacheBuilder;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<P,T>> extends FugueLifecycleComponent<T> implements ISubscriberManager<P,T>
+public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<P,T>> extends AbstractSubscriberBase<P,T> implements ISubscriberManager<P,T>
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
   protected static final long          FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
@@ -61,7 +58,6 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
 
   private final ITraceContextFactory        traceFactory_;
   private final IThreadSafeErrorConsumer<P> unprocessableMessageConsumer_;
-  private List<Subscription<P>>             subscribers_                  = new ArrayList<>();
   private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
                                                                             .maximumSize(5000)
                                                                             .expireAfterAccess(30, TimeUnit.MINUTES)
@@ -78,25 +74,22 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   }
 
   @Override
-  public synchronized T withSubscription(String topicName, String subscriptionName, 
-      IThreadSafeRetryableConsumer<P> consumer)
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String topicName,
+      String... additionalTopicNames)
   {
-    assertConfigurable();
-    
-    subscribers_.add(new Subscription<P>(topicName, subscriptionName, consumer));
-    
-    return self();
+    return super.withSubscription(consumer, subscriptionName, topicName, additionalTopicNames);
+  }
+
+  @Override
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, List<String> topicNames)
+  {
+    return super.withSubscription(consumer, subscriptionName, topicNames);
   }
   
   @Override
-  public synchronized T withSubscriptionsByConfig(List<String> topicNames, String subscriptionName, 
-      IThreadSafeRetryableConsumer<P> consumer)
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String[] topicNames)
   {
-    assertConfigurable();
-    
-    subscribers_.add(new Subscription<P>(topicNames, subscriptionName, consumer));
-    
-    return self();
+    return super.withSubscription(consumer, subscriptionName, topicNames);
   }
 
   protected abstract void startSubscription(Subscription<P> subscription);
@@ -111,17 +104,12 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     return traceFactory_;
   }
 
-  protected List<Subscription<P>> getSubscribers()
-  {
-    return subscribers_;
-  }
-
   @Override
   public synchronized void start()
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
-    for(Subscription<P> s : subscribers_)
+    for(Subscription<P> s : getSubscribers())
     {
       startSubscription(s);
     }

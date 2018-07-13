@@ -45,7 +45,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriber.class);
   
-  private final SqsAbstractSubscriberManager<?>      manager_;
+  private final SqsSubscriberManager                 manager_;
   private final AmazonSQS                            sqsClient_;
   private final String                               queueUrl_;
   private final ITraceContextFactory                 traceFactory_;
@@ -53,7 +53,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
   private int messageBatchSize_ = 10;
 
-  /* package */ SqsSubscriber(SqsAbstractSubscriberManager<?> manager, AmazonSQS sqsClient, String queueUrl,
+  /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer)
   {
