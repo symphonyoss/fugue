@@ -23,43 +23,62 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
+/**
+ * A subscription.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <P> The type of message produced by this subscription.
+ */
 public class Subscription<P>
 {
   private final IThreadSafeRetryableConsumer<P> consumer_;
   private final List<String>                    topicNames_;
   private final String                          subscriptionName_;
 
-  public Subscription(List<String> topicNames, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer)
+  /**
+   * Constructor.
+   * 
+   * @param topicNames        One or more topics on which to subscribe.
+   * @param subscriptionName  The simple subscription name.
+   * @param consumer          A consumer for received messages.
+   */
+  public Subscription(List<String> topicNames, String subscriptionName, @Nullable IThreadSafeRetryableConsumer<P> consumer)
   {
     consumer_ = consumer;
     topicNames_ = topicNames;
     subscriptionName_ = subscriptionName;
   }
-  
-  public Subscription(String topicName, String subscriptionName, IThreadSafeRetryableConsumer<P> consumer)
-  {
-    consumer_ = consumer;
-    topicNames_ = new ArrayList<>(1);
-    topicNames_.add(topicName);
-    subscriptionName_ = subscriptionName;
-  }
 
+  /**
+   * 
+   * @return The list of topic names.
+   */
   public Collection<String> getTopicNames()
   {
     return topicNames_;
   }
 
+  /**
+   * 
+   * @return The simple subscription name.
+   */
   public String getSubscriptionName()
   {
     return subscriptionName_;
   }
 
+  /**
+   * 
+   * @return The consumer for received messages.
+   */
   public IThreadSafeRetryableConsumer<P> getConsumer()
   {
     return consumer_;

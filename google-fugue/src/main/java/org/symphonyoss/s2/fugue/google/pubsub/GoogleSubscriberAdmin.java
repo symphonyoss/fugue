@@ -12,12 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pubsub.ISubscriberAdmin;
+import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
 import com.google.api.gax.rpc.AlreadyExistsException;
@@ -33,9 +32,12 @@ import com.google.pubsub.v1.PushConfig;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberAdmin extends GoogleAbstractSubscriberManager<GoogleSubscriberAdmin> implements ISubscriberAdmin<ImmutableByteArray, GoogleSubscriberAdmin>
+public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByteArray, GoogleSubscriberAdmin>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberAdmin.class);
+  
+  private final INameFactory           nameFactory_;
+  private final String                 projectId_;
   
   /**
    * Normal constructor.
@@ -47,7 +49,10 @@ public class GoogleSubscriberAdmin extends GoogleAbstractSubscriberManager<Googl
   public GoogleSubscriberAdmin(INameFactory nameFactory, String projectId,
       ITraceContextFactory traceFactory)
   {
-    super(GoogleSubscriberAdmin.class, nameFactory, projectId, traceFactory);
+    super(GoogleSubscriberAdmin.class);
+    
+    nameFactory_ = nameFactory;
+    projectId_ = projectId;
   }
 
   @Override

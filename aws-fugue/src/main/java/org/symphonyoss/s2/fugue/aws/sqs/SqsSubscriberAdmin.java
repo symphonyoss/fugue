@@ -31,14 +31,15 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pubsub.ISubscriberAdmin;
+import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.CreateTopicRequest;
 import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
 import com.amazonaws.services.sns.util.Topics;
+import com.amazonaws.services.sqs.AmazonSQS;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
@@ -49,24 +50,42 @@ import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
  * @author Bruce Skingle
  *
  */
-public class SqsSubscriberAdmin extends SqsAbstractSubscriberManager<SqsSubscriberAdmin> implements ISubscriberAdmin<String, SqsSubscriberAdmin>
+public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubscriberAdmin>
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
-  private final String accountId_;
+  private final INameFactory  nameFactory_;
+  private final String        region_;
+  private final String        accountId_;
 
+  private AmazonSQS           sqsClient_;
+  
   /**
    * Constructor.
    * 
    * @param nameFactory   A name factory.
-   * @param region The AWS region in which to operate.
-   * @param accountId The AWS account ID 
+   * @param region        The AWS region in which to operate.
+   * @param accountId     The AWS account ID 
    * @param traceFactory  A trace factory.
    */
   public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId, ITraceContextFactory traceFactory)
   {
-    super(SqsSubscriberAdmin.class, nameFactory, region, traceFactory);
+    super(SqsSubscriberAdmin.class);
     
     accountId_ = accountId;
+    nameFactory_ = nameFactory;
+    region_ = region;
+  }
+  
+  @Override
+  public void start()
+  {
+    sqsClient_ = AmazonSQSClientBuilder.standard()
+        .withRegion(region_)
+        .build();
+    
+    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    
+    super.start();
   }
 
   @Override

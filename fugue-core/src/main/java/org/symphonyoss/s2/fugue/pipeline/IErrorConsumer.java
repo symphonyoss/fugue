@@ -62,4 +62,26 @@ public interface IErrorConsumer<T> extends AutoCloseable
    * @param cause A throwable indicating the cause of the failure to process normally.
    */
   void consume(T item, ITraceContext trace, @Nullable String message, @Nullable Throwable cause);
+  
+  /**
+   * An indication that all items have been presented.
+   * 
+   * It is an error to call consume() after this method has been called.
+   * 
+   * The implementation may release resources when this method is called.
+   * Note that although this interface extends {@link AutoCloseable}
+   * (with the effect that an IConsumer can be used in a try with resources
+   * statement) that it throws no checked exceptions.
+   * 
+   * Since there is nothing the calling code can do about a failure to close
+   * something it seems to be incorrect to declare a close method to throw
+   * any checked exception.
+   * 
+   * It would, however, be appropriate for an implementation to throw an unchecked
+   * exception such a {@link IllegalStateException} if this method is called twice
+   * although it would also not be incorrect to allow close after successful
+   * close to be a no op.
+   */
+  @Override
+  void close();
 }
