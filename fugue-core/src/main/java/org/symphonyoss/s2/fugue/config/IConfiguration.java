@@ -58,6 +58,15 @@ public interface IConfiguration
   /**
    * Return the value of the given configuration property.
    * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   */
+  String getString(String name, String defaultValue);
+
+  /**
+   * Return the value of the given configuration property.
+   * 
    * This method throws a ProgramFault if the value does not exist.
    * 
    * @param name  The name of the required property.

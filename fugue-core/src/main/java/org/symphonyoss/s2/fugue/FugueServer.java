@@ -158,6 +158,8 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
           if(started_)
             stopFugueServer();
         });
+    
+    register(new HealthCheckServlet());
   }
 
   @Override

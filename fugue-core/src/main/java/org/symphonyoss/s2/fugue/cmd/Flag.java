@@ -75,4 +75,10 @@ public class Flag<T> extends AbstractFlag
     else
       throw new IllegalArgumentException(this + ": value required.");
   }
+
+  @Override
+  public void process(String value)
+  {
+    set(converter_.convert(value));
+  }
 }

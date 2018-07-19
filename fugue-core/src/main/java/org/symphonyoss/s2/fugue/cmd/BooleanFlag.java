@@ -59,4 +59,10 @@ public class BooleanFlag extends AbstractFlag
   {
     set(boolVal);
   }
+
+  @Override
+  public void process(String value)
+  {
+    set("true".equalsIgnoreCase(value));
+  }
 }

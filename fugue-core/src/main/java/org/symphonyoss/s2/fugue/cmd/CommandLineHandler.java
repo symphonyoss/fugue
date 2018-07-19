@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.symphonyoss.s2.fugue.http.ui.servlet.ISetter;
@@ -79,7 +80,7 @@ public class CommandLineHandler
     return this;
   }
   
-  public CommandLineHandler process(String[] args)
+  public CommandLineHandler process(String[] args, boolean checkPropertiesAndEnvironment)
   {
     ArrayIterator it = new ArrayIterator(args);
     
@@ -118,6 +119,31 @@ public class CommandLineHandler
           
           if(paramCnt_ < paramSetters_.size() - 1)
             paramCnt_++;
+        }
+      }
+    }
+    
+    if(checkPropertiesAndEnvironment)
+    {
+      for(Entry<String, AbstractFlag> entry : longMap_.entrySet())
+      {
+        AbstractFlag flag = entry.getValue();
+        
+        if(doneSet_.contains(flag) == false || flag.isMultiple())
+        {
+          String flagStr = "--" + entry.getKey();
+          String value = System.getProperty(flagStr);
+          
+          if(value == null)
+            value = System.getenv(flagStr);
+          
+          if(value != null)
+          {
+            requiredSet_.remove(flag);
+            doneSet_.add(flag);
+            
+            flag.process(value);
+          }
         }
       }
     }

@@ -38,24 +38,8 @@ public class Fugue
 {
   /** 
    * Environment variable containing a pointer to the configuration.
-   * 
-   * This configuration is a common view of configuration seen by all processes in an environment.
    */
   public static final String FUGUE_CONFIG = "FUGUE_CONFIG";
- 
-  /**
-   * Environment variable containing an optional pointer to the task configuration.
-   * 
-   * A task configuration is a set of instructions describing the reuired actions. These
-   * are usually needed only for administration tasks such as deploying new instances etc.
-   */
-  public static final String FUGUE_TASK = "FUGUE_TASK";
- 
-  /**
-   * Environment variable containing a pointer to the sub-tree in the configuration which applies
-   * to the current process. 
-   */
-  public static final String FUGUE_ID = "FUGUE_ID";
   
   /** Environment variable containing the process instance ID */
   public static final String FUGUE_INSTANCE = "FUGUE_INSTANCE";
@@ -74,6 +58,43 @@ public class Fugue
       value = System.getenv(name);
     
     return value;
+  }
+  
+  /**
+   * Get the requested value as a System Property or environment variable.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if the given name is not defined.
+   * @return              The value of the property or <code>null</code>
+   */
+  public static String  getProperty(String name, String defaultValue)
+  {
+    String value = System.getProperty(name);
+    
+    if(value == null)
+      value = System.getenv(name);
+    
+    if(value == null)
+      value = defaultValue;
+    
+    return value;
+  }
+  
+  /**
+   * Get the requested boolean value as a System Property or environment variable.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if the given name is not defined.
+   * @return              The value of the property or <code>null</code>
+   */
+  public static boolean  getBooleanProperty(String name, boolean defaultValue)
+  {
+    String s = getProperty(name);
+    
+    if(s == null)
+      return defaultValue;
+    
+    return "true".equalsIgnoreCase(s.trim());
   }
   
   /**

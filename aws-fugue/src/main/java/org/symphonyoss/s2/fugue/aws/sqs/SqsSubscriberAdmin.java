@@ -25,6 +25,7 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.Map;
 
+import org.checkerframework.checker.units.qual.s;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -36,6 +37,8 @@ import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
+import com.amazonaws.services.sns.model.GetSubscriptionAttributesResult;
+import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
 import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
 import com.amazonaws.services.sns.util.Topics;
 import com.amazonaws.services.sqs.AmazonSQS;
@@ -122,19 +125,36 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
     return "arn:aws:sns:" + region_ + ":" + accountId_ + ":" + topicName;
   }
   
+  private String getQueueARN(SubscriptionName subscriptionName)
+  {
+    return "arn:aws:sqs:" + region_ + ":" + accountId_ + ":" + subscriptionName;
+  }
+  
   private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
-    // TODO: implement dryRun
-    
-    log_.info("Creating subscription " + subscriptionName + "...");
-    String myTopicArn = getTopicARN(topicName);
-    String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
-    
-    String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, myTopicArn, myQueueUrl);
-    
-    snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
-    
-    log_.info("Created subscription " + subscriptionName + " as " + myQueueUrl);
+    try
+    {
+      String existingQueueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
+      
+      log_.info("Subscription " + subscriptionName + " already exists as " + existingQueueUrl);
+    }
+    catch(QueueDoesNotExistException e)
+    {
+      if(dryRun)
+      {
+        log_.info("Subscription " + subscriptionName + " would be created (dry run)");
+      }
+      else
+      {
+        String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
+        
+        String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, getTopicARN(topicName), myQueueUrl);
+        
+        snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
+        
+        log_.info("Created subscription " + subscriptionName + " as " + myQueueUrl);
+      }
+    }
   }
 
   @Override
@@ -161,45 +181,41 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   {
     try
     {
-      String queueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
-      Map<String, String> attr = sqsClient_.getQueueAttributes(new GetQueueAttributesRequest(subscriptionName.toString())).getAttributes();
-
+      String existingQueueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
+      
       if(dryRun)
       {
-        log_.info("Subscription " + subscriptionName + " with URL " + queueUrl + " would be deleted (dry run)");
+        log_.info("Subscription " + subscriptionName + " with URL " + existingQueueUrl + " would be deleted (dry run)");
       }
       else
       {
-        // TODO: implement me
-        log_.error("Delete is not yet implemented");
-//        deleted queue object-subscriber but not subscription,
-//        
-//        snsClient.unsubscribe(subscriptionArn)
-//        log_.info("Deleting subscription " + subscriptionName + " with URL " + queueUrl + "...");
-//        
-//        sqsClient_.deleteQueue(queueUrl);
-//        
-//        log_.info("Deleted.");
+        //GetSubscriptionAttributesResult sa = snsClient.getSubscriptionAttributes(getQueueARN(subscriptionName));
+        
+        ListSubscriptionsByTopicResult subscriptionResult = snsClient.listSubscriptionsByTopic(getTopicARN(topicName));
+        
+        if(subscriptionResult != null)
+        {
+          String queueArn = getQueueARN(subscriptionName);
+          
+          for(com.amazonaws.services.sns.model.Subscription subscription : subscriptionResult.getSubscriptions())
+          {
+            if(queueArn.equals(subscription.getEndpoint()))
+            {
+              snsClient.unsubscribe(subscription.getSubscriptionArn());
+              
+              log_.info("Deleted subscription " + subscription.getSubscriptionArn());
+            }
+          }
+        }
+
+        sqsClient_.deleteQueue(existingQueueUrl);
+
+        log_.info("Deleted subscription " + subscriptionName + " with URL " + existingQueueUrl);
       }
     }
     catch(QueueDoesNotExistException e)
     {
       log_.info("Subscription " + subscriptionName + " does not exist.");
     }
-//    sqsClient_.getQueueAttributes(new GetQueueAttributesRequest(queueUrl))
-    
-    
-    
-    // TODO: implement dryRun
-    // TODO: this is creating the topic which it should not do. Implement an STS client and pass it in here and to SNSPublisherManager
-    
-//    String myTopicArn = snsClient.createTopic(new CreateTopicRequest(topicName.toString())).getTopicArn();
-//    String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
-//    
-//    String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, myTopicArn, myQueueUrl);
-//    
-//    snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
-//    
-//    log_.info("Created subscription " + subscriptionName + " as " + myQueueUrl);
   }
 }

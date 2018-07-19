@@ -51,17 +51,19 @@ public abstract class DeployConfig extends CommandLineHandler
 
   private String service_;
   private String environment_;
+  private String environmentType_;
   private String realm_;
   private String region_ = "default";
   private String target_ = "-";
   
   public DeployConfig()
   {
-    withFlag('s', "service",      String.class, false, true, (v) -> service_ = v);
-    withFlag('e', "environment",  String.class, false, true, (v) -> environment_ = v);
-    withFlag('r', "realm",        String.class, false, true, (v) -> realm_ = v);
-    withFlag('g', "region",       String.class, false, false, (v) -> region_ = v);
-    withFlag('t', "target",       String.class, false, false, (v) -> target_ = v);
+    withFlag('s', "service",          String.class, false, true, (v) -> service_ = v);
+    withFlag('v', "environmentType",  String.class, false, true, (v) -> environmentType_ = v);
+    withFlag('e', "environment",      String.class, false, true, (v) -> environment_ = v);
+    withFlag('r', "realm",            String.class, false, true, (v) -> realm_ = v);
+    withFlag('g', "region",           String.class, false, false, (v) -> region_ = v);
+    withFlag('t', "target",           String.class, false, false, (v) -> target_ = v);
   }
   
   public DeployConfig(DeployConfig master)
@@ -87,29 +89,19 @@ public abstract class DeployConfig extends CommandLineHandler
     return environment_;
   }
 
-  public void setEnvironment(String environment)
-  {
-    environment_ = environment;
-  }
-
   public String getRealm()
   {
     return realm_;
   }
-
-  public void setRealm(String realm)
-  {
-    realm_ = realm;
-  }
-
+  
   public String getRegion()
   {
     return region_;
   }
 
-  public void setRegion(String region)
+  public String getEnvironmentType()
   {
-    region_ = region;
+    return environmentType_;
   }
 
   public abstract MutableJsonObject fetchConfig(String folderName, String fileName) throws IOException;

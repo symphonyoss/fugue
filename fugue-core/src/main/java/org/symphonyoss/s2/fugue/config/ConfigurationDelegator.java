@@ -57,6 +57,12 @@ public class ConfigurationDelegator implements IConfiguration
   }
 
   @Override
+  public String getString(String name, String defaultValue)
+  {
+    return delegate_.getString(name, defaultValue);
+  }
+
+  @Override
   public String getRequiredString(String name)
   {
     return delegate_.getRequiredString(name);

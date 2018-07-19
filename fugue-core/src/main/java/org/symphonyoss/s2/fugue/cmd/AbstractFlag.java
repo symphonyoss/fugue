@@ -54,6 +54,7 @@ public abstract class AbstractFlag
   public abstract boolean isRequired();
   
   public abstract void process(ArrayIterator it, boolean boolVal);
+  public abstract void process(String value);
 
   @Override
   public String toString()

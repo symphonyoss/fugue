@@ -92,6 +92,19 @@ public class Configuration implements IConfiguration
   }
 
   @Override
+  public String getString(String name, String defaultValue)
+  {
+    try
+    {
+      return getString(name);
+    }
+    catch (NotFoundException e)
+    {
+      return defaultValue;
+    }
+  }
+
+  @Override
   public @Nonnull String getRequiredString(@Nonnull String name)
   {
     try
