@@ -28,16 +28,18 @@ import org.symphonyoss.s2.fugue.http.ui.servlet.ISetter;
 
 public abstract class AbstractFlag
 {
-  private final Character  shortFlag_;
-  private final String     longFlag_;
+  private final Character shortFlag_;
+  private final String    longFlag_;
+  private final String    envName_;
 
-  public AbstractFlag(Character shortFlag, String longFlag)
+  public AbstractFlag(Character shortFlag, String longFlag, String envName)
   {
     if(shortFlag == null && longFlag == null)
       throw new IllegalArgumentException("Short and long flags may not both be null");
     
     shortFlag_ = shortFlag;
     longFlag_ = longFlag;
+    envName_ = envName;
   }
 
   public Character getShortFlag()
@@ -48,6 +50,11 @@ public abstract class AbstractFlag
   public String getLongFlag()
   {
     return longFlag_;
+  }
+
+  public String getEnvName()
+  {
+    return envName_;
   }
 
   public abstract boolean isMultiple();

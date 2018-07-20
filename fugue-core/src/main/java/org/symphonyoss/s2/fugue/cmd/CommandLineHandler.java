@@ -38,15 +38,16 @@ public class CommandLineHandler
 {
   private Map<Character, AbstractFlag> shortMap_     = new HashMap<>();
   private Map<String, AbstractFlag>    longMap_      = new HashMap<>();
+  private Map<String, AbstractFlag>    envMap_      = new HashMap<>();
   private Set<AbstractFlag>            doneSet_      = new HashSet<>();
   private Set<AbstractFlag>            requiredSet_  = new HashSet<>();
   private List<ISetter<String>>        paramSetters_ = new ArrayList<>();
   private int                          paramCnt_;
   private int                          errors_;
   
-  public <T> CommandLineHandler withFlag(Character shortFlag, String longFlag, Class<T> type, boolean multiple, boolean required, ISetter<T> setter)
+  public <T> CommandLineHandler withFlag(Character shortFlag, String longFlag, String envName, Class<T> type, boolean multiple, boolean required, ISetter<T> setter)
   {
-    return withFlag(new Flag(shortFlag, longFlag, type, multiple, required, setter));
+    return withFlag(new Flag(shortFlag, longFlag, envName, type, multiple, required, setter));
   }
   
   public CommandLineHandler withFlag(AbstractFlag flag)
@@ -67,6 +68,14 @@ public class CommandLineHandler
       }
     }
     
+    if(flag.getEnvName() != null)
+    {
+      if(envMap_.put(flag.getEnvName(), flag) != null)
+      {
+        throw new IllegalArgumentException("Duplicate environment variable name \"" + flag.getEnvName() + "\"");
+      }
+    }
+    
     if(flag.isRequired())
       requiredSet_.add(flag);
     
@@ -80,7 +89,7 @@ public class CommandLineHandler
     return this;
   }
   
-  public CommandLineHandler process(String[] args, boolean checkPropertiesAndEnvironment)
+  public CommandLineHandler process(String[] args)
   {
     ArrayIterator it = new ArrayIterator(args);
     
@@ -123,27 +132,24 @@ public class CommandLineHandler
       }
     }
     
-    if(checkPropertiesAndEnvironment)
+    for(Entry<String, AbstractFlag> entry : envMap_.entrySet())
     {
-      for(Entry<String, AbstractFlag> entry : longMap_.entrySet())
+      AbstractFlag flag = entry.getValue();
+      
+      if(doneSet_.contains(flag) == false || flag.isMultiple())
       {
-        AbstractFlag flag = entry.getValue();
+        String flagStr = entry.getKey();
+        String value = System.getProperty(flagStr);
         
-        if(doneSet_.contains(flag) == false || flag.isMultiple())
+        if(value == null)
+          value = System.getenv(flagStr);
+        
+        if(value != null)
         {
-          String flagStr = "--" + entry.getKey();
-          String value = System.getProperty(flagStr);
+          requiredSet_.remove(flag);
+          doneSet_.add(flag);
           
-          if(value == null)
-            value = System.getenv(flagStr);
-          
-          if(value != null)
-          {
-            requiredSet_.remove(flag);
-            doneSet_.add(flag);
-            
-            flag.process(value);
-          }
+          flag.process(value);
         }
       }
     }

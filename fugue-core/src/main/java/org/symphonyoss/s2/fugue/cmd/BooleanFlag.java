@@ -30,9 +30,9 @@ public class BooleanFlag extends AbstractFlag
 {
   private final ISetter<Boolean> setter_;
 
-  public BooleanFlag(Character shortFlag, String longFlag, ISetter<Boolean> setter)
+  public BooleanFlag(Character shortFlag, String longFlag, String envName, ISetter<Boolean> setter)
   {
-    super(shortFlag, longFlag);
+    super(shortFlag, longFlag, envName);
 
     setter_ = setter;
   }

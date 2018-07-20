@@ -52,10 +52,10 @@ public class GitHubDeployConfig extends DeployConfig
   
   public GitHubDeployConfig()
   {
-    withFlag('O', "gitOrganization", String.class, false, false, (v) -> organization_ = v);
-    withFlag('R', "gitRepo",         String.class, false, true, (v) -> repo_ = v);
-    withFlag('B', "gitBranch",       String.class, false, false, (v) -> branch_ = v);
-    withFlag('T', "gitToken",        String.class, false, true, (v) -> accessToken_ = v);
+    withFlag('O', "gitOrganization", "GITHUB_ORG",    String.class, false, false, (v) -> organization_ = v);
+    withFlag('R', "gitRepo",         "GITHUB_REPO",   String.class, false, true,  (v) -> repo_ = v);
+    withFlag('B', "gitBranch",       "GITHIB_BRANCH", String.class, false, false, (v) -> branch_ = v);
+    withFlag('T', "gitToken",        "GITHUB_TOKEN",  String.class, false, true,  (v) -> accessToken_ = v);
   }
 
   public GitHubDeployConfig(GitHubDeployConfig master, String organization, String repo, String branch, String accessToken)
@@ -71,7 +71,7 @@ public class GitHubDeployConfig extends DeployConfig
   {
     GitHubDeployConfig dc = new GitHubDeployConfig();
     
-    dc.process(args, true);
+    dc.process(args);
     
     dc.deployEnvironment();
     

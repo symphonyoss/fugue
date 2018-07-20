@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 
-import org.checkerframework.framework.qual.PostconditionAnnotation;
 import org.symphonyoss.s2.common.dom.IStringProvider;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
@@ -58,12 +57,12 @@ public abstract class DeployConfig extends CommandLineHandler
   
   public DeployConfig()
   {
-    withFlag('s', "service",          String.class, false, true, (v) -> service_ = v);
-    withFlag('v', "environmentType",  String.class, false, true, (v) -> environmentType_ = v);
-    withFlag('e', "environment",      String.class, false, true, (v) -> environment_ = v);
-    withFlag('r', "realm",            String.class, false, true, (v) -> realm_ = v);
-    withFlag('g', "region",           String.class, false, false, (v) -> region_ = v);
-    withFlag('t', "target",           String.class, false, false, (v) -> target_ = v);
+    withFlag('s', "service",          "FUGUE_SERVICE",          String.class, false, true, (v) -> service_ = v);
+    withFlag('v', "environmentType",  "FUGUE_ENVIRONMENT_TYPE", String.class, false, true, (v) -> environmentType_ = v);
+    withFlag('e', "environment",      "FUGUE_ENVIRONMENT",      String.class, false, true, (v) -> environment_ = v);
+    withFlag('r', "realm",            "FUGUE_REALM",            String.class, false, true, (v) -> realm_ = v);
+    withFlag('g', "region",           "FUGUE_REGION",           String.class, false, false, (v) -> region_ = v);
+    withFlag('t', "target",           "FUGUE_CONFIG_TARGET",    String.class, false, false, (v) -> target_ = v);
   }
   
   public DeployConfig(DeployConfig master)

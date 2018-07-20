@@ -34,9 +34,9 @@ public class Flag<T> extends AbstractFlag
   private final ISetter<T>          setter_;
   private final IStringConverter<T> converter_;
 
-  public Flag(Character shortFlag, String longFlag, Class<T> type, boolean multiple, boolean required, ISetter<T> setter)
+  public Flag(Character shortFlag, String longFlag, String envName, Class<T> type, boolean multiple, boolean required, ISetter<T> setter)
   {
-    super(shortFlag, longFlag);
+    super(shortFlag, longFlag, envName);
     
     type_ = type;
     multiple_ = multiple;
