@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.config.manager;
+package org.symphonyoss.s2.fugue.deploy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 
@@ -39,8 +41,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class GitHubDeployConfig extends DeployConfig
+public class GitHubConfigProvider extends ConfigProvider
 {
+  private static final Logger log_ = LoggerFactory.getLogger(GitHubConfigProvider.class);
+  
   private static final String TYPE = "type";
   private static final String TYPE_FILE = "file";
   private static final String TYPE_DIR = "dir";
@@ -50,134 +54,27 @@ public class GitHubDeployConfig extends DeployConfig
   private String branch_ = "master";
   private String accessToken_;
   
-  public GitHubDeployConfig()
+  @Override
+  public void init(FugueDeploy deployConfig)
   {
-    withFlag('O', "gitOrganization", "GITHUB_ORG",    String.class, false, false, (v) -> organization_ = v);
-    withFlag('R', "gitRepo",         "GITHUB_REPO",   String.class, false, true,  (v) -> repo_ = v);
-    withFlag('B', "gitBranch",       "GITHIB_BRANCH", String.class, false, false, (v) -> branch_ = v);
-    withFlag('T', "gitToken",        "GITHUB_TOKEN",  String.class, false, true,  (v) -> accessToken_ = v);
+    super.init(deployConfig);
+    
+    deployConfig
+      .withFlag('O', "gitHubOrganization", "GITHUB_ORG",    String.class, false, false, (v) -> organization_ = v)
+      .withFlag('R', "gitHubRepo",         "GITHUB_REPO",   String.class, false, true,  (v) -> repo_ = v)
+      .withFlag('B', "gitHubBranch",       "GITHUB_BRANCH", String.class, false, false, (v) -> branch_ = v)
+      .withFlag('T', "gitHubToken",        "GITHUB_TOKEN",  String.class, false, true,  (v) -> accessToken_ = v);
   }
 
-  public GitHubDeployConfig(GitHubDeployConfig master, String organization, String repo, String branch, String accessToken)
-  {
-    super(master);
-    organization_ = organization;
-    repo_ = repo;
-    branch_ = branch;
-    accessToken_ = accessToken;
-  }
+//  public GitHubDeployConfig(GitHubDeployConfig master, String organization, String repo, String branch, String accessToken)
+//  {
+//    super(master);
+//    organization_ = organization;
+//    repo_ = repo;
+//    branch_ = branch;
+//    accessToken_ = accessToken;
+//  }
 
-  public static void main(String[] args) throws IOException
-  {
-    GitHubDeployConfig dc = new GitHubDeployConfig();
-    
-    dc.process(args);
-    
-    dc.deployEnvironment();
-    
-//    String  token         = null;
-//    String  organization  = null;
-//    String  repo          = null;
-//    String  environment   = null;
-//    String  service       = null;
-//    String  branch       ;
-//    String  region        ;
-//    int     errors        =0;
-//    
-//    for(String arg : argv)
-//    {
-//      if(arg.startsWith("-") && arg.length()>2)
-//      {
-//        char flag = arg.charAt(1);
-//        String value = arg.substring(2);
-//        
-//        switch(flag)
-//        {
-//          case 't':
-//            token = value;
-//            break;
-//
-//          case 'o':
-//            organization = value;
-//            break;
-//
-//          case 'p':
-//            repo = value;
-//            break;
-//            
-//          case 'b':
-//            branch = value;
-//            break;
-//            
-//          case 'e':
-//            environment = value;
-//            break;
-//            
-//          case 's':
-//            service = value;
-//            break;
-//            
-//          case 'r':
-//            region = value;
-//            break;
-//            
-//          default:
-//            System.err.println("Unrecognized flag " + arg + " ignored.");
-//        }
-//      }
-//      else
-//      {
-//        System.err.println("Unrecognized argument " + arg + " ignored.");
-//      }
-//    }
-//    
-//    if(token == null)
-//    {
-//      System.err.println("GitHub API token required with -t");
-//      errors++;
-//    }
-//    
-//    if(organization == null)
-//    {
-//      System.err.println("GitHub organization required with -o");
-//      errors++;
-//    }
-//    
-//    if(repo == null)
-//    {
-//      System.err.println("GitHub repo required with -p");
-//      errors++;
-//    }
-//    
-//    if(service == null)
-//    {
-//      System.err.println("service name required with -s");
-//      errors++;
-//    }
-//    
-//    if(environment == null)
-//    {
-//      System.err.println("environment name required with -e");
-//      errors++;
-//    }
-//    
-//    if(region == null)
-//    {
-//      System.err.println("region name required with -r");
-//      errors++;
-//    }
-//    
-//    if(errors == 0)
-//    {
-//      GitHubDeployConfig dc = new GitHubDeployConfig(environment, service, region, organization, repo, branch, token);
-//      
-//      dc.deployEnvironment();
-//    }
-//    else
-//    {
-//      System.err.println("Aborted.");
-//    }
-  }
   
   public URL getUrl(String folderName, String fileName)
   {
@@ -217,7 +114,7 @@ public class GitHubDeployConfig extends DeployConfig
     
     URL configUrl = getUrl(folderName, fileName);
     
-    System.err.println("fetch " + configUrl);
+    log_.debug("fetch " + configUrl);
     
     try(InputStream in =configUrl.openStream())
     {
@@ -299,20 +196,20 @@ public class GitHubDeployConfig extends DeployConfig
     return result;
   }
 
-  @Override
-  public DeployConfig getServiceConfig(URL serviceRepoUrl)
-  {
-    String host = serviceRepoUrl.getHost();
-    
-    switch(host)
-    {
-      case "github.com":
-        String[] pathPart = serviceRepoUrl.getPath().split("/");
-        
-        return new GitHubDeployConfig(this, pathPart[1], pathPart[2], branch_, accessToken_);
-        
-      default:
-        throw new IllegalArgumentException("Unknown url type " + serviceRepoUrl);
-    }
-  }
+//  @Override
+//  public DeployConfig getServiceConfig(URL serviceRepoUrl)
+//  {
+//    String host = serviceRepoUrl.getHost();
+//    
+//    switch(host)
+//    {
+//      case "github.com":
+//        String[] pathPart = serviceRepoUrl.getPath().split("/");
+//        
+//        return new GitHubDeployConfig(this, pathPart[1], pathPart[2], branch_, accessToken_);
+//        
+//      default:
+//        throw new IllegalArgumentException("Unknown url type " + serviceRepoUrl);
+//    }
+//  }
 }

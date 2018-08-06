@@ -21,42 +21,9 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.deploy;
 
-public class TableName extends Name
+public enum FugueDeployAction
 {
-  private final String environmentTypeId_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
-
-  public TableName(String environmentTypeId, String environmentId, String realmId, String table)
-  {
-    super(environmentTypeId, environmentId, realmId, table);
-    
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
-  }
-
-  public String getEnvironmentTypeId()
-  {
-    return environmentTypeId_;
-  }
-
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
-  }
+  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig;
 }

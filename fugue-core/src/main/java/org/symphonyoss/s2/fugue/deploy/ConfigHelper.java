@@ -21,42 +21,52 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.deploy;
 
-public class TableName extends Name
+import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
+
+public class ConfigHelper
 {
-  private final String environmentTypeId_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
+  private FugueDeploy deployConfig_;
 
-  public TableName(String environmentTypeId, String environmentId, String realmId, String table)
+  public void init(FugueDeploy deployConfig)
   {
-    super(environmentTypeId, environmentId, realmId, table);
-    
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
+    deployConfig_ = deployConfig;
+  }
+  
+  public void fetchDefaults(MutableJsonObject json)
+  {}
+  
+  public void fetchOverrides(MutableJsonObject json)
+  {}
+
+  public String getService()
+  {
+    return deployConfig_.getService();
   }
 
-  public String getEnvironmentTypeId()
+  public String getEnvironment()
   {
-    return environmentTypeId_;
+    return deployConfig_.getEnvironment();
   }
 
-  public String getEnvironmentId()
+  public String getRealm()
   {
-    return environmentId_;
+    return deployConfig_.getRealm();
   }
 
-  public String getRealmId()
+  public String getRegion()
   {
-    return realmId_;
+    return deployConfig_.getRegion();
   }
 
-  public String getTable()
+  public String getEnvironmentType()
   {
-    return table_;
+    return deployConfig_.getEnvironmentType();
+  }
+
+  public String getTenant()
+  {
+    return deployConfig_.getTenant();
   }
 }

@@ -21,42 +21,18 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.naming;
+package org.symphonyoss.s2.fugue.deploy;
 
-public class TableName extends Name
+import java.io.IOException;
+import java.util.List;
+
+import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
+
+public abstract class ConfigProvider extends ConfigHelper
 {
-  private final String environmentTypeId_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
 
-  public TableName(String environmentTypeId, String environmentId, String realmId, String table)
-  {
-    super(environmentTypeId, environmentId, realmId, table);
-    
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
-  }
+  public abstract List<String> fetchFiles(String folderName);
+  public abstract List<String> fetchDirs(String folderName);
 
-  public String getEnvironmentTypeId()
-  {
-    return environmentTypeId_;
-  }
-
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
-  }
+  public abstract MutableJsonObject fetchConfig(String folderName, String fileName) throws IOException;
 }

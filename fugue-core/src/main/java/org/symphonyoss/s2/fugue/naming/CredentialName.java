@@ -26,30 +26,37 @@ package org.symphonyoss.s2.fugue.naming;
 public class CredentialName extends Name
 {
   private static final String SUFFIX = "cred";
-  
+
+  private final String environmentTypeId_;
   private final String environmentId_;
   private final String realmId_;
   private final String tenantId_;
   private final String owner_;
 
-  public CredentialName(String environmentId, String owner)
-  {
-    this(environmentId, null, null, owner);
-  }
+//  public CredentialName(String environmentId, String owner)
+//  {
+//    this(environmentId, null, null, owner);
+//  }
+//  
+//  public CredentialName(String realmId, String environmentId, String owner)
+//  {
+//    this(realmId, environmentId, null, owner);
+//  }
   
-  public CredentialName(String realmId, String environmentId, String owner)
+  public CredentialName(String environmentTypeId, String environmentId, String realmId, String tenantId, String owner)
   {
-    this(realmId, environmentId, null, owner);
-  }
-  
-  public CredentialName(String environmentId, String realmId, String tenantId, String owner)
-  {
-    super(environmentId, realmId, tenantId, owner, SUFFIX);
-    
+    super(environmentTypeId, environmentId, realmId, tenantId, owner, SUFFIX);
+
+    environmentTypeId_ = environmentTypeId;
     environmentId_ = environmentId;
     realmId_ = realmId;
     tenantId_ = tenantId;
     owner_ = owner;
+  }
+
+  public String getEnvironmentTypeId()
+  {
+    return environmentTypeId_;
   }
 
   public String getEnvironmentId()

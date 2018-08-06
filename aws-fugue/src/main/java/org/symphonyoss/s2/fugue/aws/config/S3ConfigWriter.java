@@ -110,7 +110,7 @@ public class S3ConfigWriter
   }
 
 
-  private void saveConfig(String region, String bucket, String key, ImmutableJsonDom json)
+  public void saveConfig(String region, String bucket, String key, ImmutableJsonDom json)
   {
     log_.info("Saving config to region: " + region + " bucket: " + bucket + " key: " + key);
     AmazonS3 s3Client = AmazonS3ClientBuilder.standard()

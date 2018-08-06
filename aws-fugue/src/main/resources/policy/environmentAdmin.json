@@ -1,0 +1,31 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetPolicy",
+                "iam:CreatePolicy",
+                "iam:GetRole",
+                "iam:CreateRole",
+                "s3:PutObject",
+                "s3:GetObject",
+                "iam:ListAttachedRolePolicies",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy",
+                "s3:PutObjectTagging",
+                "iam:GetPolicyVersion",
+                "iam:CreatePolicyVersion",
+                "iam:DeletePolicyVersion",
+                "iam:ListPolicyVersions"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:group/${environmentType}-${environmentId}-*",
+                "arn:aws:iam::*:policy/${environmentType}-${environmentId}-*",
+                "arn:aws:iam::*:role/${environmentType}-${environmentId}-*",
+                "arn:aws:s3:::${awsConfigBucket}/config/${environmentType}-${environmentId}-*"
+            ]
+        }
+    ]
+}
