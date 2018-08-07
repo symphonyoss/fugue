@@ -28,6 +28,13 @@ import java.net.URL;
 
 import org.symphonyoss.s2.common.fault.ProgramFault;
 
+/**
+ * @deprecated Use pubsubConfig_.fetchGoogleCredentials()
+ * 
+ * @author Bruce Skingle
+ *
+ */
+@Deprecated
 public class S3GoogleConfig extends S3ConfigFileMapper
 {
 

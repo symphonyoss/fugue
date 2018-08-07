@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
@@ -66,10 +67,12 @@ public abstract class FugueDeploy extends CommandLineHandler
   public static final String   REGION           = "region";
   /** The label for a service */
   public static final String   SERVICE          = "service";
+  /** The label for a policy / role */
+  public static final String   POLICY           = "policy";
   /** The label for a tenant */
   public static final String   TENANT           = "tenant";
   /** The label for an action */
-  public static final String   ACTION          = "action";
+  public static final String   ACTION           = "action";
   /** The file name extension for a JSON document */
   public static final String   DOT_JSON         = ".json";
   /** The label for an ID */
@@ -91,6 +94,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String  SHORT_INSTANCE_NAME = "shortInstanceName";
 
   private static final Logger log_ = LoggerFactory.getLogger(FugueDeploy.class);
+  private static final String SINGLE_TENANT = "singleTenant";
+  private static final String MULTI_TENANT = "multiTenant";
   
   private final String         cloudServiceProvider_;
   private final ConfigProvider provider_;
@@ -112,7 +117,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   protected abstract void createEnvironmentType();
   protected abstract void createEnvironment();
-  protected abstract void processRole(String name, String roleSpec);
+  protected abstract void processRole(String name, String roleSpec, String tenant);
   protected abstract void validateAccount(MutableJsonObject config);
   protected abstract void saveConfig(String target, ImmutableJsonDom dom);
   
@@ -267,11 +272,32 @@ public abstract class FugueDeploy extends CommandLineHandler
         {
           try
           {
-            MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
+            
+            
+            
+            String dir = SERVICE_DIR + "/" + service_;
+            
+            MutableJsonObject serviceJson = provider_.fetchConfig(dir, SERVICE + ".json");
             
             log_.info("Service=" + serviceJson.immutify());
             
-            processService(serviceJson);
+            dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
+            
+            if(tenant_ != null)
+              fetchPolicies(dir, SINGLE_TENANT, tenant_);
+            
+            fetchPolicies(dir, MULTI_TENANT, null);
+            
+            
+            
+            
+            
+            
+//            MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
+//            
+//            log_.info("Service=" + serviceJson.immutify());
+//            
+//            processService(serviceJson);
           }
           catch(IOException e)
           {
@@ -288,6 +314,28 @@ public abstract class FugueDeploy extends CommandLineHandler
   }
   
 
+  private void fetchPolicies(String parentDir, String subDir, String tenant) throws IOException
+  {
+    String            dir   = parentDir + "/" + subDir;
+    List<String>      files = provider_.fetchFiles(dir);
+    StringSubstitutor sub   = new StringSubstitutor(templateVariables_);
+    
+    for(String file : files)
+    {
+      if(file.endsWith(DOT_JSON))
+      {
+        String name     = file.substring(0, file.length() - DOT_JSON.length());
+        String template = provider_.fetchConfig(dir, file).immutify().toString();
+        
+        String roleSpec = sub.replace(template);
+        
+        processRole(name, roleSpec, tenant);
+      }
+      else
+        throw new IllegalStateException("Unrecognized file type found in config: " + dir + "/" + file);
+    }
+  }
+  
   private void fetchConfig()
   {
     configDom_ = new MutableJsonDom();
@@ -395,32 +443,14 @@ public abstract class FugueDeploy extends CommandLineHandler
    * 
    * @return The expanded template.
    */
-  public String loadTemplate(String fileName)
+  public String loadTemplateFromResource(String fileName)
   {
-    StringBuilder s = new StringBuilder();
-    
     try(InputStream template = getClass().getClassLoader().getResourceAsStream(fileName))
     {
       if(template == null)
         throw new IllegalArgumentException("Template \"" + fileName + "\" not found");
       
-      try(BufferedReader in = new BufferedReader(new InputStreamReader(template)))
-      {
-        StringSubstitutor sub = new StringSubstitutor(templateVariables_);
-        String            line;
-        
-        while((line=in.readLine()) != null)
-        {
-          s.append(sub.replace(line));
-          s.append(System.lineSeparator());
-        }
-        
-        return s.toString();
-      }
-      catch (IOException e)
-      {
-        throw new IllegalArgumentException("Unable to read template \"" + fileName + "\"", e);
-      }
+      return loadTemplateFromStream(template, fileName);
     }
     catch (IOException e)
     {
@@ -428,51 +458,84 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
 
-  private void processService(MutableJsonObject serviceJson)
+  /**
+   * Load a template and perform variable substitution.
+   * 
+   * The template is provided as a Java resource and the expanded template is returned as a String.
+   * 
+   * @param template An InputStream containing the template.
+   * @param fileName The "Name" of the template for error messages.
+   * 
+   * @return The expanded template.
+   */
+  public String loadTemplateFromStream(InputStream template, String fileName)
   {
-    processServiceRoles(serviceJson);
-  }
-
-  private void processServiceRoles(MutableJsonObject serviceJson)
-  {
-    IJsonDomNode roles = serviceJson.get(ROLES);
+    StringBuilder s = new StringBuilder();
     
-    if(roles instanceof IJsonObject)
+    try(BufferedReader in = new BufferedReader(new InputStreamReader(template)))
     {
-      IJsonObject<?> rolesObject = (IJsonObject<?>)roles;
-      Iterator<String> it = rolesObject.getNameIterator();
+      StringSubstitutor sub = new StringSubstitutor(templateVariables_);
+      String            line;
       
-      while(it.hasNext())
+      while((line=in.readLine()) != null)
       {
-        String name = it.next();
-        IJsonDomNode roleNode = rolesObject.get(name);
-        
-        if(roleNode instanceof IJsonObject)
-        {
-          IJsonDomNode role = ((IJsonObject<?>)roleNode).get(cloudServiceProvider_);
-          
-          if(role == null)
-          {
-            throw new IllegalArgumentException("Role \"" + name + "\" has no definition for CSP " + cloudServiceProvider_);
-          }
-          
-          String template = role.immutify().toString();
-          StringSubstitutor sub = new StringSubstitutor(templateVariables_);
-          String roleSpec = sub.replace(template);
-          
-          processRole(name, roleSpec);
-        }
-        else
-        {
-          throw new IllegalArgumentException("Role \"" + name + "\" must be an object");
-        }
+        s.append(sub.replace(line));
+        s.append(System.lineSeparator());
       }
+      
+      return s.toString();
     }
-    else
+    catch (IOException e)
     {
-      throw new IllegalArgumentException("Roles must be an object");
+      throw new IllegalArgumentException("Unable to read template \"" + fileName + "\"", e);
     }
   }
+  
+//  private void processService(MutableJsonObject serviceJson)
+//  {
+//    processServiceRoles(serviceJson);
+//  }
+//
+//  private void processServiceRoles(MutableJsonObject serviceJson)
+//  {
+//    IJsonDomNode roles = serviceJson.get(ROLES);
+//    
+//    if(roles instanceof IJsonObject)
+//    {
+//      IJsonObject<?> rolesObject = (IJsonObject<?>)roles;
+//      Iterator<String> it = rolesObject.getNameIterator();
+//      
+//      while(it.hasNext())
+//      {
+//        String name = it.next();
+//        IJsonDomNode roleNode = rolesObject.get(name);
+//        
+//        if(roleNode instanceof IJsonObject)
+//        {
+//          IJsonDomNode role = ((IJsonObject<?>)roleNode).get(cloudServiceProvider_);
+//          
+//          if(role == null)
+//          {
+//            throw new IllegalArgumentException("Role \"" + name + "\" has no definition for CSP " + cloudServiceProvider_);
+//          }
+//          
+//          String template = role.immutify().toString();
+//          StringSubstitutor sub = new StringSubstitutor(templateVariables_);
+//          String roleSpec = sub.replace(template);
+//          
+//          processRole(name, roleSpec);
+//        }
+//        else
+//        {
+//          throw new IllegalArgumentException("Role \"" + name + "\" must be an object");
+//        }
+//      }
+//    }
+//    else
+//    {
+//      throw new IllegalArgumentException("Roles must be an object");
+//    }
+//  }
 
 
   private MutableJsonObject fetch(boolean required) throws IOException

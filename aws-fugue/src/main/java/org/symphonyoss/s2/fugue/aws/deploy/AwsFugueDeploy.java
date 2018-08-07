@@ -305,7 +305,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     String name = baseName + ADMIN_SUFFIX;
     
-    String policyArn = createPolicyFromFile(name, "policy/environmentAdmin.json");
+    String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
     String groupName = createGroup(name, policyArn);
     createUser(name, groupName, System.out);
   }
@@ -328,7 +328,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     String name = baseName + ADMIN_SUFFIX;
     
-    String policyArn = createPolicyFromFile(name, "policy/environmentTypeAdmin.json");
+    String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
     String groupName = createGroup(name, policyArn);
     createUser(name, groupName, System.out);
   }
@@ -337,7 +337,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     String name = baseName + CICD_SUFFIX;
     
-    String policyArn = createPolicyFromFile(name, "policy/environmentTypeCicd.json");
+    String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
     String groupName = createGroup(name, policyArn);
     createUser(name, groupName, System.out);
   }
@@ -591,9 +591,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return roleName;
   }
   
-  private String createPolicyFromFile(String name, String fileName)
+  private String createPolicyFromResource(String name, String fileName)
   {
-    return createPolicy(name, loadTemplate(fileName));
+    return createPolicy(name, loadTemplateFromResource(fileName));
   }
 
   private String createPolicy(String name, String templateOutput)
@@ -706,9 +706,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
 
   @Override
-  protected void processRole(String roleName, String roleSpec)
+  protected void processRole(String roleName, String roleSpec, String tenant)
   {
-    String name = new Name(getEnvironmentType(), getEnvironment(), getTenant(), getService(), roleName).toString();
+    String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService(), roleName).toString();
     
     String policyArn = createPolicy(name, roleSpec);
     createRole(name, policyArn);

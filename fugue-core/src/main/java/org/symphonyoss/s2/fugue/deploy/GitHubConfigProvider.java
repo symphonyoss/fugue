@@ -160,7 +160,7 @@ public class GitHubConfigProvider extends ConfigProvider
     return fetchDirItems(folderName, TYPE_DIR);
   }
   
-  public List<String> fetchDirItems(String folderName, String requiredType)
+  private List<String> fetchDirItems(String folderName, String requiredType)
   {
     List<String> result = new ArrayList<>();
     URL configUrl = getUrl(folderName);
