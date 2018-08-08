@@ -49,6 +49,11 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
     <dependency>
+	    <groupId>org.apache.commons</groupId>
+	    <artifactId>commons-text</artifactId>
+	 </dependency>
+    
+    <dependency>
       <groupId>org.symphonyoss.s2.common</groupId>
       <artifactId>S2-common-dom-jackson</artifactId>
     </dependency>

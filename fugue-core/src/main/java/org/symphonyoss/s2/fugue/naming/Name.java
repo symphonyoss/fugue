@@ -27,14 +27,14 @@ import javax.annotation.Nonnull;
 
 public class Name
 {
-  private static final String SEPARATOR = "-";
+  public static final String SEPARATOR = "-";
   
   private final String name_;
 
   /**
    * Base class for Names.
    * 
-   * The namespace may be <code>null</code> the name may not. Any optional additional suffix components will be
+   * The name may not be <code>null</code>. Any optional additional non-null suffix components will be
    * appended to the final name each with the standard separator.
    * 
    * @param name        The name

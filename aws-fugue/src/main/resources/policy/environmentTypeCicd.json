@@ -1,0 +1,85 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:SubmitTaskStateChange",
+                "iam:GetRole",
+                "iam:GetPolicy",
+                "iam:PassRole",
+                "ecs:StartTask",
+                "ecs:DescribeClusters",
+                "s3:GetObject",
+                "ecs:SubmitContainerStateChange",
+                "ecs:ListContainerInstances",
+                "ecs:DescribeContainerInstances"
+            ],
+            "Resource": [
+                "arn:aws:ecs:*:*:task-definition/${environmentType}-*",
+                "arn:aws:ecs:*:*:container-instance/*",
+                "arn:aws:ecs:*:*:task/${environmentType}-*",
+                "arn:aws:ecs:*:*:cluster/*",
+                "arn:aws:s3:::${awsConfigBucket}/config/${environmentType}-*",
+                "arn:aws:s3:::sym-build-secrets/*",
+                "arn:aws:iam::*:policy/${environmentType}-*",
+                "arn:aws:iam::*:role/${environmentType}-*"
+            ]
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:ListServices",
+                "ecs:UpdateService",
+                "ecs:CreateService",
+                "ecs:ListTaskDefinitionFamilies",
+                "ecs:DeleteService",
+                "ecs:DescribeServices",
+                "ecs:DescribeTaskDefinition",
+                "ecs:ListTaskDefinitions",
+                "ecs:ListClusters",
+                "ecs:RegisterTaskDefinition",
+                "ecs:RunTask",
+                "ecs:ListTasks",
+                "ecs:StopTask",
+                "ecs:DescribeTasks"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ContainerRegistryAll",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "Route53DotIsymDotIoDot",
+            "Effect": "Allow",
+            "Action": [
+                "route53:ListResourceRecordSets",
+                "route53:ChangeResourceRecordSets"
+            ],
+            "Resource": [
+                "arn:aws:route53:::hostedzone/*"
+            ]
+        },
+        {
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:DescribeLogGroups",
+                "logs:PutRetentionPolicy",
+                "logs:FilterLogEvents",
+                "logs:DescribeLogStreams",
+                "logs:PutRetentionPolicy",
+                "logs:GetLogEvents"
+            ],
+            "Effect": "Allow",
+            "Resource": "*",
+            "Sid": "Logs"
+        }
+    ]
+}

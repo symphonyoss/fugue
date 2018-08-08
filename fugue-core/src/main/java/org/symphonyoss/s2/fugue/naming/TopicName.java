@@ -25,17 +25,40 @@ package org.symphonyoss.s2.fugue.naming;
 
 public class TopicName extends Name
 {
+  private final String environmentTypeId_;
   private final String environmentId_;
   private final String realmId_;
   private final String topic_;
 
-  public TopicName(String environmentId, String realmId, String topic)
+  public TopicName(String environmentTypeId, String environmentId, String realmId, String topic)
   {
-    super(environmentId, realmId, topic);
+    super(environmentTypeId, environmentId, realmId, topic);
     
+    environmentTypeId_ = environmentTypeId;
     environmentId_ = environmentId;
     realmId_ = realmId;
     topic_ = topic;
+  }
+
+  /**
+   * Constructor for SBE topics.
+   * 
+   * @param tenantId  Actually a pod name.
+   * @param topic     Topic name.
+   */
+  public TopicName(String tenantId, String topic)
+  {
+    super(tenantId, topic);
+    
+    environmentTypeId_ = null;
+    environmentId_ = null;
+    realmId_ = null;
+    topic_ = topic;
+  }
+
+  public String getEnvironmentTypeId()
+  {
+    return environmentTypeId_;
   }
 
   public String getEnvironmentId()
