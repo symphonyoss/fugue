@@ -175,10 +175,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
   @Override
-  public void saveConfig(String target, ImmutableJsonDom dom)
+  public void saveConfig(String target, ImmutableJsonDom multiTenantConfig, ImmutableJsonDom singleTenantConfig)
+  {
+    saveConfig(target, multiTenantConfig, getConfigName(null));
+    
+    if(singleTenantConfig != null)
+      saveConfig(target, singleTenantConfig, getConfigName(getTenant()));
+  }
+
+  private void saveConfig(String target, ImmutableJsonDom dom, String name)
   {
     String bucketName = environmentTypeConfigBuckets_.get(awsRegion_);
-    String key = CONFIG + "/" + getConfigName() + DOT_JSON;
+    String key = CONFIG + "/" + name + DOT_JSON;
     
     log_.info("Saving config to region: " + awsRegion_ + " bucket: " + bucketName + " key: " + key);
     

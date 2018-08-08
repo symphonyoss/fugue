@@ -110,8 +110,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String               target_          = "-";
   private String               regionShortCode_;
   private FugueDeployAction          action_         = FugueDeployAction.DeployConfig;
-  private MutableJsonObject    config_;
-  private MutableJsonDom       configDom_;
+  private MutableJsonObject    singleTenantConfig_;
+  private MutableJsonDom       singleTenantConfigDom_;
+  private MutableJsonObject    multiTenantConfig_;
+  private MutableJsonDom       multiTenantConfigDom_;
   private MutableJsonObject    configId_;
   private Map<String, String>  templateVariables_ = new HashMap<>();
   
@@ -119,7 +121,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   protected abstract void createEnvironment();
   protected abstract void processRole(String name, String roleSpec, String tenant);
   protected abstract void validateAccount(MutableJsonObject config);
-  protected abstract void saveConfig(String target, ImmutableJsonDom dom);
+  protected abstract void saveConfig(String target, ImmutableJsonDom multiTenantConfig, ImmutableJsonDom singleTenantConfig);
   
   /**
    * Constructor.
@@ -212,15 +214,15 @@ public abstract class FugueDeploy extends CommandLineHandler
     return tenant_;
   }
   
-  protected MutableJsonObject getConfig()
-  {
-    return config_;
-  }
-
-  protected MutableJsonObject getConfigId()
-  {
-    return configId_;
-  }
+//  protected MutableJsonObject getConfig()
+//  {
+//    return config_;
+//  }
+//
+//  protected MutableJsonObject getConfigId()
+//  {
+//    return configId_;
+//  }
   
   protected FugueDeployAction getAction()
   {
@@ -253,7 +255,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     fetchConfig();
 
-    validateAccount(config_);
+    validateAccount(multiTenantConfig_);
     
     switch (action_)
     {
@@ -305,7 +307,7 @@ public abstract class FugueDeploy extends CommandLineHandler
           }
         }
         
-        saveConfig(target_, configDom_.immutify());
+        saveConfig(target_, multiTenantConfigDom_.immutify(), singleTenantConfigDom_ == null ? null : singleTenantConfigDom_.immutify());
         break;
         
       default:
@@ -338,15 +340,22 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   private void fetchConfig()
   {
-    configDom_ = new MutableJsonDom();
+    multiTenantConfigDom_ = new MutableJsonDom();
+    multiTenantConfig_    = new MutableJsonObject();
+    multiTenantConfigDom_.add(multiTenantConfig_);
     
-    config_ = fetchService();
+    if(tenant_ != null)
+    {
+      singleTenantConfigDom_ = new MutableJsonDom();
+      singleTenantConfig_    = new MutableJsonObject();
+      singleTenantConfigDom_.add(singleTenantConfig_);
+    }
     
-    configDom_.add(config_);
+    fetchService(multiTenantConfig_, singleTenantConfig_);
     
-    configId_ = fetchOverrides(config_);
+    configId_ = fetchOverrides(multiTenantConfig_, singleTenantConfig_);
     
-    regionShortCode_ = config_.getRequiredString(REGION_SHORTCODE);
+    regionShortCode_ = multiTenantConfig_.getRequiredString(REGION_SHORTCODE);
     
     Iterator<String> it = configId_.getNameIterator();
     
@@ -367,40 +376,55 @@ public abstract class FugueDeploy extends CommandLineHandler
   }
 
 
-  private void fetchDefaults(MutableJsonObject json)
+  private void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {
-    provider_.fetchDefaults(json);
+    provider_.fetchDefaults(multiTenantConfig, singleTenantConfig);
     
     for(ConfigHelper helper : helpers_)
-      helper.fetchDefaults(json);
+      helper.fetchDefaults(multiTenantConfig, singleTenantConfig);
   }
   
-  private MutableJsonObject fetchOverrides(MutableJsonObject json)
+  private MutableJsonObject fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {
     MutableJsonObject id  = new MutableJsonObject();
     
-    json.add("id", id);
+    populateId(id);
+    multiTenantConfig.add("id", id);
+    
+    if(singleTenantConfig != null)
+    {
+      id  = new MutableJsonObject();
+      
+      populateId(id);
+
+      id.addIfNotNull(TENANT + ID_SUFFIX,       getTenant());
+      
+      singleTenantConfig.add("id", id);
+    }
     
     for(ConfigHelper helper : helpers_)
-      helper.fetchOverrides(json);
+      helper.fetchOverrides(multiTenantConfig, singleTenantConfig);
     
-    provider_.fetchOverrides(json);
+    provider_.fetchOverrides(multiTenantConfig, singleTenantConfig);
     
+    
+    
+    
+    return id;
+  }
+  
+  private void populateId(MutableJsonObject id)
+  {
     id.addIfNotNull(ENVIRONMENT + ID_SUFFIX,  getEnvironment());
     id.addIfNotNull(ENVIRONMENT_TYPE,         getEnvironmentType());
     id.addIfNotNull(REALM + ID_SUFFIX,        getRealm());
     id.addIfNotNull(REGION + ID_SUFFIX,       getRegion());
     id.addIfNotNull(SERVICE + ID_SUFFIX,      getService());
-    id.addIfNotNull(TENANT + ID_SUFFIX,       getTenant());
-    
-    return id;
   }
   
-  private MutableJsonObject fetchService()
+  private void fetchService(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {
-    MutableJsonObject json  = new MutableJsonObject();
-
-    fetchDefaults(json);
+    fetchDefaults(multiTenantConfig, singleTenantConfig);
     
 //    if(service_ != null)
 //    {
@@ -424,9 +448,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     try
     {
-      json.addAll(fetch(true), "#");
-      
-      return json;
+      multiTenantConfig.addAll(fetch(true), "#");
+      singleTenantConfig.addAll(fetch(true), "#");
     }
     catch(IOException e)
     {
@@ -629,8 +652,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 //  }
 //
   
-  protected String getConfigName()
+  protected String getConfigName(String tenant)
   {
-    return new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenant_, getService()).toString();
+    return new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenant, getService()).toString();
   }
 }

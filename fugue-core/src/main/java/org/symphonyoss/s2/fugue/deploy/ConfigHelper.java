@@ -34,10 +34,10 @@ public class ConfigHelper
     deployConfig_ = deployConfig;
   }
   
-  public void fetchDefaults(MutableJsonObject json)
+  public void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {}
   
-  public void fetchOverrides(MutableJsonObject json)
+  public void fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {}
 
   public String getService()
