@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+import javax.annotation.Nonnull;
+
 /**
  * The name of a subscription.
  * 
@@ -60,19 +62,21 @@ public class SubscriptionName extends Name
    * In situations where the subscription may belong to an external environment, it is necessary to construct
    * the name from the subscription simple name and the topic name, in that order.
    * 
-   * @param topicName     The TopicName of the topic to be subscribed to.
-   * @param subscription  The simple subscription name.
+   * @param topicName         The TopicName of the topic to be subscribed to.
+   * @param subscription      The simple subscription name.
+   * @param name              The name
+   * @param additional        Zero or more optional suffix elements.
    * 
    * @return A new SubscriptionName 
    */
-  public static SubscriptionName newExternalInstance(TopicName topicName, String subscription)
+  public static SubscriptionName newExternalInstance(TopicName topicName, String subscription, @Nonnull String name, String ...additional)
   {
-    return new SubscriptionName(topicName, subscription, subscription, topicName.toString());
+    return new SubscriptionName(topicName, subscription, name, additional);
   }
   
-  private SubscriptionName(TopicName topicName, String subscription, String part1, String part2)
+  private SubscriptionName(TopicName topicName, String subscription, @Nonnull String name, String ...additional)
   {
-    super(part1, part2);
+    super(name, additional);
     
     topicName_ = topicName;
     subscription_ = subscription;

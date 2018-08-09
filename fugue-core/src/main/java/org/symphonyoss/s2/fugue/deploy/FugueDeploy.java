@@ -36,6 +36,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import org.apache.commons.text.StringSubstitutor;
+import org.checkerframework.framework.qual.PostconditionAnnotation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.IStringProvider;
@@ -44,6 +45,7 @@ import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.Name;
 
@@ -116,6 +118,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private MutableJsonDom       multiTenantConfigDom_;
   private MutableJsonObject    configId_;
   private Map<String, String>  templateVariables_ = new HashMap<>();
+  private MutableJsonObject tenantConfig_;
   
   protected abstract void createEnvironmentType();
   protected abstract void createEnvironment();
@@ -255,6 +258,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     fetchConfig();
 
+    ImmutableByteArray theConfig = singleTenantConfig_.immutify().serialize();
+    System.out.println(theConfig);
+    
+    
     validateAccount(multiTenantConfig_);
     
     switch (action_)
@@ -349,9 +356,29 @@ public abstract class FugueDeploy extends CommandLineHandler
       singleTenantConfigDom_ = new MutableJsonDom();
       singleTenantConfig_    = new MutableJsonObject();
       singleTenantConfigDom_.add(singleTenantConfig_);
+      
+      tenantConfig_ = new MutableJsonObject();
+      
+      try
+      {
+        fetch(false, tenantConfig_, CONFIG + "/" + TENANT, tenant_, "tenant", tenant_);
+      }
+      catch(IOException e)
+      {
+        throw new IllegalStateException("Unable to read tenant config", e);
+      }
+      
+      singleTenantConfig_.addAll(tenantConfig_);
     }
     
     fetchService(multiTenantConfig_, singleTenantConfig_);
+    
+    if(tenant_ != null)
+    {
+      // ensure that our stuff was not overwritten by consul.
+      
+      singleTenantConfig_.addAll(tenantConfig_);
+    }
     
     configId_ = fetchOverrides(multiTenantConfig_, singleTenantConfig_);
     
@@ -426,6 +453,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     fetchDefaults(multiTenantConfig, singleTenantConfig);
     
+    IJsonDomNode message_bus = singleTenantConfig.get("message_bus");
+    
 //    if(service_ != null)
 //    {
 //      MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
@@ -449,7 +478,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     try
     {
       multiTenantConfig.addAll(fetch(true), "#");
-      singleTenantConfig.addAll(fetch(true), "#");
+      
+      if(singleTenantConfig != null)
+        singleTenantConfig.addAll(fetch(true), "#");
     }
     catch(IOException e)
     {
