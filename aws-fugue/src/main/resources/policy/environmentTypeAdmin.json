@@ -25,12 +25,18 @@
                 "iam:DetachGroupPolicy",
                 "iam:GetUser",
                 "iam:CreatePolicyVersion",
-                "iam:DeletePolicyVersion"
+                "iam:DeletePolicyVersion",
+                "iam:GetRole",
+                "iam:CreateRole",
+                "iam:ListAttachedRolePolicies",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy"
             ],
             "Resource": [
                 "arn:aws:iam::*:group/${environmentType}-*",
                 "arn:aws:iam::*:policy/${environmentType}-*",
-                "arn:aws:iam::*:user/${environmentType}-*"
+                "arn:aws:iam::*:user/${environmentType}-*",
+                "arn:aws:iam::*:role/${environmentType}-*"
             ]
         }
     ]

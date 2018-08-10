@@ -316,6 +316,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
     String groupName = createGroup(name, policyArn);
     createUser(name, groupName, System.out);
+    
+    createRole(name, policyArn);
   }
 
   @Override
@@ -348,6 +350,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
     String groupName = createGroup(name, policyArn);
     createUser(name, groupName, System.out);
+    
+    createRole(name, policyArn);
   }
   
   private void createConfigBucket(String region, String name)

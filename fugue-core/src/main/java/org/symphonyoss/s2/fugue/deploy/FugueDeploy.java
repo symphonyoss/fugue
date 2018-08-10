@@ -258,10 +258,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     fetchConfig();
 
-    ImmutableByteArray theConfig = singleTenantConfig_.immutify().serialize();
-    System.out.println(theConfig);
-    
-    
     validateAccount(multiTenantConfig_);
     
     switch (action_)
@@ -413,20 +409,30 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   private MutableJsonObject fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {
-    MutableJsonObject id  = new MutableJsonObject();
+    MutableJsonObject id  = (MutableJsonObject) multiTenantConfig.get(ID);
+    
+    if(id == null)
+    {
+      id = new MutableJsonObject();
+      multiTenantConfig.add(ID, id);
+    }
     
     populateId(id);
-    multiTenantConfig.add("id", id);
+   
     
     if(singleTenantConfig != null)
     {
-      id  = new MutableJsonObject();
+      id  = (MutableJsonObject) singleTenantConfig.get(ID);
+      
+      if(id == null)
+      {
+        id = new MutableJsonObject();
+        singleTenantConfig.add(ID, id);
+      }
       
       populateId(id);
 
       id.addIfNotNull(TENANT + ID_SUFFIX,       getTenant());
-      
-      singleTenantConfig.add("id", id);
     }
     
     for(ConfigHelper helper : helpers_)
@@ -452,8 +458,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   private void fetchService(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
   {
     fetchDefaults(multiTenantConfig, singleTenantConfig);
-    
-    IJsonDomNode message_bus = singleTenantConfig.get("message_bus");
     
 //    if(service_ != null)
 //    {
