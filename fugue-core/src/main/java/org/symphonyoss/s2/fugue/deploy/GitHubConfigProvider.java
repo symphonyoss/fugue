@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -187,6 +188,10 @@ public class GitHubConfigProvider extends ConfigProvider
       {
         throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", received a non-array response.");
       }
+    }
+    catch (FileNotFoundException e)
+    {
+      log_.warn("No such directory \"" + folderName + "\" returning empty list.");
     }
     catch (IOException e)
     {

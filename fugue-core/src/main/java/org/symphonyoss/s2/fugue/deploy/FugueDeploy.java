@@ -357,7 +357,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       try
       {
-        fetch(false, tenantConfig_, CONFIG + "/" + TENANT, tenant_, "tenant", tenant_);
+        fetch(true, tenantConfig_, CONFIG + "/" + TENANT, tenant_, "tenant", tenant_);
       }
       catch(IOException e)
       {
@@ -658,7 +658,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     catch(FileNotFoundException e)
     {
       if(required)
-        throw new IllegalArgumentException("No such " + entityType + " \"" + entityName + "\"");
+        throw new IllegalArgumentException("No such " + entityType + " \"" + entityName + "\"", e);
       
       log_.warn("No " + entityType + " config");
     }
