@@ -91,8 +91,8 @@ public class Name
   /**
    * Returns a short name of at most the given length.
    * 
-   * If the full name is short enough it is returned. Otherwise if maxLen is >= 27 the
-   * Base62 encoded SHA-1 hash of the name is returned, otherwise if maxLen is >= 22 the
+   * If the full name is short enough it is returned. Otherwise if maxLen is 27 or more the
+   * Base62 encoded SHA-1 hash of the name is returned, otherwise if maxLen is 22 or more the
    * Base62 encoded MD5 hash of the name is returned.
    * 
    * Base62 encoding uses only [a-zA-Z0-9], names are constructed from a series of elements
