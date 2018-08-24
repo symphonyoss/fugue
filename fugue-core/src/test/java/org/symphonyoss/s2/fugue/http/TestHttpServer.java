@@ -44,8 +44,8 @@ public class TestHttpServer
   public void testEmptyServer() throws IOException
   {
     HttpServerBuilder builder = new HttpServerBuilder()
-        .setHttpPort(0)
-        .addServlet(new HelloServlet());
+        .withHttpPort(0)
+        .withServlet(new HelloServlet());
     
     HttpServer server = builder.build();
     

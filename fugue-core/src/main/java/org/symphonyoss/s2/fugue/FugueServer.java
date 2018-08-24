@@ -284,24 +284,24 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       if(localWebLogin_)
       {
         filter = new RandomAuthFilter();
-        httpServerBuilder.addFilter(filter);
+        httpServerBuilder.withFilter(filter);
       }
       for(IResourceProvider provider : getResourceProviders())
         httpServerBuilder.withResources(provider);
       
       httpServerBuilder
-        .setHttpPort(httpPort_);
+        .withHttpPort(httpPort_);
 
       List<IResourceProvider> resourceProviders = getResourceProviders();
       
       if(!resourceProviders.isEmpty())
       {
         statusServlet_ = new StatusServlet(resourceProviders.get(0), this);
-        httpServerBuilder.addServlet(statusServlet_);
+        httpServerBuilder.withServlet(statusServlet_);
         
         for(ICommand command : getCommands())
         {
-          httpServerBuilder.addServlet(command.getPath(),  new CommandServlet(command.getHandler()));
+          httpServerBuilder.withServlet(command.getPath(),  new CommandServlet(command.getHandler()));
           statusServlet_.addCommand(command);
         }
       }
@@ -315,7 +315,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
         
         for(IUrlPathServlet servlet : getServlets())
         {
-          httpServerBuilder.addServlet(servlet);
+          httpServerBuilder.withServlet(servlet);
         }
 
         server_ = httpServerBuilder.build();

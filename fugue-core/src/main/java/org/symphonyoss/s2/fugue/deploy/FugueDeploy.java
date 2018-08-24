@@ -28,24 +28,27 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
 
 import org.apache.commons.text.StringSubstitutor;
-import org.checkerframework.framework.qual.PostconditionAnnotation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.IStringProvider;
+import org.symphonyoss.s2.common.dom.TypeAdaptor;
+import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
+import org.symphonyoss.s2.common.exception.InvalidValueException;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.Name;
 
@@ -98,6 +101,12 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final Logger log_ = LoggerFactory.getLogger(FugueDeploy.class);
   private static final String SINGLE_TENANT = "singleTenant";
   private static final String MULTI_TENANT = "multiTenant";
+  private static final String PORT = "port";
+  private static final String PATHS = "paths";
+  private static final String HEALTH_CHECK_PATH = "healthCheckPath";
+  private static final String CONTAINERS = "containers";
+
+  private static final String            DNS_SUFFIX                      = "dnsSuffix";
   
   private final String         cloudServiceProvider_;
   private final ConfigProvider provider_;
@@ -119,12 +128,15 @@ public abstract class FugueDeploy extends CommandLineHandler
   private MutableJsonObject    configId_;
   private Map<String, String>  templateVariables_ = new HashMap<>();
   private MutableJsonObject tenantConfig_;
+  private String dnsSuffix_;
   
   protected abstract void createEnvironmentType();
   protected abstract void createEnvironment();
   protected abstract void processRole(String name, String roleSpec, String tenant);
   protected abstract void validateAccount(MutableJsonObject config);
   protected abstract void saveConfig(String target, ImmutableJsonDom multiTenantConfig, ImmutableJsonDom singleTenantConfig);
+  protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, String tenantId);
+  protected abstract void deployService(boolean hasSingleTenantContainer, boolean hasMultiTenantContainer);
   
   /**
    * Constructor.
@@ -201,6 +213,14 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   /**
    * 
+   * @return the region short code.
+   */
+  public String getRegionShortCode()
+  {
+    return regionShortCode_;
+  }
+  /**
+   * 
    * @return The environment type "dev", "qa" etc.
    */
   public String getEnvironmentType()
@@ -251,6 +271,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     return Name.SEPARATOR + tenant_;
   }
 
+  public String getDnsSuffix()
+  {
+    return dnsSuffix_;
+  }
   /**
    * Perform the deployment.
    */
@@ -258,6 +282,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     fetchConfig();
 
+    dnsSuffix_   = multiTenantConfig_.getRequiredString(DNS_SUFFIX);
+    
     validateAccount(multiTenantConfig_);
     
     switch (action_)
@@ -271,46 +297,16 @@ public abstract class FugueDeploy extends CommandLineHandler
         log_.info("Creating environment \"" + environment_ + "\"");
         createEnvironment();
         break;
+      
+      case Deploy:
+        MutableJsonObject serviceJson = deployConfig();
+        
+        if(serviceJson != null)
+          deployContainers(serviceJson);
+        break;
         
       case DeployConfig:
-        if(service_ != null)
-        {
-          try
-          {
-            
-            
-            
-            String dir = SERVICE_DIR + "/" + service_;
-            
-            MutableJsonObject serviceJson = provider_.fetchConfig(dir, SERVICE + ".json");
-            
-            log_.info("Service=" + serviceJson.immutify());
-            
-            dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
-            
-            if(tenant_ != null)
-              fetchPolicies(dir, SINGLE_TENANT, tenant_);
-            
-            fetchPolicies(dir, MULTI_TENANT, null);
-            
-            
-            
-            
-            
-            
-//            MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
-//            
-//            log_.info("Service=" + serviceJson.immutify());
-//            
-//            processService(serviceJson);
-          }
-          catch(IOException e)
-          {
-            throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
-          }
-        }
-        
-        saveConfig(target_, multiTenantConfigDom_.immutify(), singleTenantConfigDom_ == null ? null : singleTenantConfigDom_.immutify());
+        deployConfig();
         break;
         
       default:
@@ -318,8 +314,163 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
   
+  private MutableJsonObject deployConfig()
+  {
+    MutableJsonObject serviceJson = null;
+    
+    if(service_ != null)
+    {
+      try
+      {
+        String dir = SERVICE_DIR + "/" + service_;
+        
+        serviceJson = provider_.fetchConfig(dir, SERVICE + ".json");
+        
+        log_.info("Service=" + serviceJson.immutify());
+        
+        dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
+        
+        
+        if(tenant_ != null)
+        {
+          processPolicies(dir, SINGLE_TENANT, tenant_);
+          
+        }
+        
+        processPolicies(dir, MULTI_TENANT, null);
+        
+//        MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
+//        
+//        log_.info("Service=" + serviceJson.immutify());
+//        
+//        processService(serviceJson);
+      }
+      catch(IOException e)
+      {
+        throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
+      }
+    }
+    
+    saveConfig(target_, multiTenantConfigDom_.immutify(), singleTenantConfigDom_ == null ? null : singleTenantConfigDom_.immutify());
+    
+    return serviceJson;
+  }
+  
+  private void deployContainers(MutableJsonObject serviceJson)
+  {
+    IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
+    Iterator<String>                it                      = containerJson.getNameIterator();
+    Map<String, MutableJsonObject>  singleTenantInitMap     = new HashMap<>();
+    Map<String, MutableJsonObject>  multiTenantInitMap      = new HashMap<>();
+    Map<String, MutableJsonObject>  singleTenantServiceMap  = new HashMap<>();
+    Map<String, MutableJsonObject>  multiTenantServiceMap   = new HashMap<>();
+    
+    while(it.hasNext())
+    {
+      String name = it.next();
+      IJsonDomNode c = containerJson.get(name);
+      
+      if(c instanceof MutableJsonObject)
+      {
+        MutableJsonObject container = (MutableJsonObject)c;
+        
+        String tenancy = container.getRequiredString("tenancy");
+        
+        boolean singleTenant = "SINGLE".equals(tenancy);
+        
+        if("INIT".equals(container.getString("containerType", "SERVICE")))
+        {
+          if(singleTenant)
+            singleTenantInitMap.put(name, container);
+          else
+            multiTenantInitMap.put(name, container);
+        }
+        else
+        {
+          if(singleTenant)
+            singleTenantServiceMap.put(name, container);
+          else
+            multiTenantServiceMap.put(name, container);
+        }
+      }
+    }
+    
+    deployService(!singleTenantServiceMap.isEmpty(), !multiTenantServiceMap.isEmpty());
+    
+    deployInitContainers(multiTenantInitMap, null);
+    
+    if(tenant_ != null)
+    {
+      deployInitContainers(singleTenantInitMap, tenant_);
+    }
+    
+    deployServiceContainers(multiTenantServiceMap, null);
+    
+    if(tenant_ != null)
+    {
+      deployServiceContainers(singleTenantServiceMap, tenant_);
+    }
+    
+  }
+  
+  private void deployServiceContainers(Map<String, MutableJsonObject> map, String tenantId)
+  {
+    for(String name : map.keySet())
+    {
+      MutableJsonObject container = map.get(name);
+      
+      deployServiceContainer(name, container, tenantId);
+    }
+  }
+  
+  private void deployInitContainers(Map<String, MutableJsonObject> map, String tenantId)
+  {
+    for(String name : map.keySet())
+    {
+      MutableJsonObject container = map.get(name);
+      
+      deployInitContainer(name, container, tenantId);
+    }
+  }
+  
+  private void deployInitContainer(String name, MutableJsonObject container, String tenantId)
+  {
+    // TODO Auto-generated method stub
+    
+  }
+  
+  private void deployServiceContainer(String name, MutableJsonObject container, String tenantId)
+  {
+    try
+    {
+      IJsonDomNode        portNode = container.get(PORT);
+      int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+      Collection<String>  paths = getListOfStrings(container, PATHS);
+      String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+      
+      deployServiceContainer(name, port, paths, healthCheckPath, tenantId);
+    }
+    catch(InvalidValueException e)
+    {
+      throw new IllegalStateException(e);
+    }
+  }
 
-  private void fetchPolicies(String parentDir, String subDir, String tenant) throws IOException
+  private Collection<String> getListOfStrings(MutableJsonObject object, String name) throws InvalidValueException
+  {
+    List<String> result = new LinkedList<>();
+    IJsonDomNode node = object.get(name); 
+    
+    if(node instanceof IJsonArray)
+    {
+      for(IJsonDomNode v : ((IJsonArray<?>)node))
+        result.add( TypeAdaptor.adapt(String.class, v));
+    }
+    
+    return result;
+  }
+  
+  private void processPolicies(String parentDir, String subDir, String tenant) throws IOException
   {
     String            dir   = parentDir + "/" + subDir;
     List<String>      files = provider_.fetchFiles(dir);

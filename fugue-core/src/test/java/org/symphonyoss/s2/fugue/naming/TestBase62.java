@@ -21,9 +21,26 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.deploy;
+package org.symphonyoss.s2.fugue.naming;
 
-public enum FugueDeployAction
+import static org.junit.Assert.assertEquals;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import org.junit.Test;
+
+public class TestBase62
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy;
+  @Test
+  public void testBase62() throws NoSuchAlgorithmException
+  {
+    assertEquals("48", Base62.encodeToString(new byte[] {0}));
+    assertEquals("7KGg9BkCKClLlq", Base62.encodeToString("HelloWorld".getBytes()));
+    
+    byte[] hash = MessageDigest.getInstance("SHA-1").digest("HelloWorld".getBytes(StandardCharsets.UTF_8));
+    
+    assertEquals("15QQ5bHH0SiGNv3nJOeH0BxfoR3k", Base62.encodeToString(hash));
+  }
 }

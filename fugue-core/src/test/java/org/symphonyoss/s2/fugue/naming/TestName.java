@@ -21,9 +21,23 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.deploy;
+package org.symphonyoss.s2.fugue.naming;
 
-public enum FugueDeployAction
+import static org.junit.Assert.assertEquals;
+
+import java.security.NoSuchAlgorithmException;
+
+import org.junit.Test;
+
+public class TestName
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy;
+  @Test
+  public void testBase62() throws NoSuchAlgorithmException
+  {
+    Name name = new Name("Hello", "this", "is", "a", "test", "of", "averylongnameindeed");
+    
+    assertEquals("Hello-this-is-a-test-of-averylongnameindeed", name.toString());
+    assertEquals("VAifaGQuoQUaFE6FC61zR2XAK7y", name.getShortName(32));
+    assertEquals("8xOYxLPpWC8cHgCqZwxwGP", name.getShortName(25));
+  }
 }

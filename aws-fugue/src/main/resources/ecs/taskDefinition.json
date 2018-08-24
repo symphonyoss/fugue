@@ -1,0 +1,99 @@
+{
+    "taskRoleArn": "${TASK_ROLE_ARN}",
+    "family": "${SERVICE}",
+    "containerDefinitions": [
+        {
+            "name": "${SERVICE}",
+            "image": "${SERVICE_IMAGE}",
+            "memory": ${MEMORY},
+            "portMappings": [
+                {
+                    "hostPort": 0,
+                    "protocol": "tcp",
+                    "containerPort": ${SERVICE_PORT}
+                }
+            ],
+            "essential": true,
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "${LOG_GROUP}",
+                    "awslogs-region": "${AWSREGION}",
+                    "awslogs-stream-prefix": "${SERVICE}"
+                }
+            },
+            "environment": [
+                {
+                    "name": "FUGUE_ENVIRONMENT_TYPE",
+                    "value": "${FUGUE_ENVIRONMENT_TYPE}"
+                },
+                {
+                    "name": "FUGUE_ENVIRONMENT",
+                    "value": "${FUGUE_ENVIRONMENT}"
+                },
+                {
+                    "name": "FUGUE_REALM",
+                    "value": "${FUGUE_REALM}"
+                },
+                {
+                    "name": "FUGUE_REGION",
+                    "value": "${FUGUE_REGION}"
+                },
+                {
+                    "name": "FUGUE_CONFIG",
+                    "value": "${FUGUE_CONFIG}"
+                },
+                {
+                    "name": "FUGUE_SERVICE",
+                    "value": "${SERVICE}"
+                },
+                {
+                    "name": "FUGUE_TENANT",
+                    "value": "${FUGUE_TENANT}"
+                },
+                
+                
+                
+                {
+                    "name": "FUGUE_CONFIG",
+                    "value": "${FUGUE_CONFIG}"
+                },
+                {
+                    "name": "CONSUL_URL",
+                    "value": "https://consul-${ENV}.symphony.com:8080"
+                },
+                {
+                    "name": "CONSUL_TOKEN",
+                    "value": "${CONSUL_TOKEN}"
+                },
+                {
+                    "name": "GITHUB_TOKEN",
+                    "value": "${GITHUB_TOKEN}"
+                },
+                
+                
+                
+                {
+                    "name": "AWS_REGION",
+                    "value": "${AWSREGION}"
+                },
+                {
+                    "name": "INFRA_NAME",
+                    "value": "${PERSIST_POD_ID}"
+                },
+                {
+                    "name": "POD_NAME",
+                    "value": "${LEGACY_POD_ID}"
+                },
+                {
+                    "name": "SYM_ENV",
+                    "value": "${ENV}"
+                },
+                {
+                    "name": "SYM_ES_JAVA_ARGS",
+                    "value": "-Xms${JVM_MEM}m -Xmx${JVM_MEM}m -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=50 -XX:+ScavengeBeforeFullGC -XX:+CMSScavengeBeforeRemark -XX:+PrintGCDateStamps -verbose:gc -XX:+PrintGCDetails -Dcom.sun.management.jmxremote.port=10483 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+                }
+            ]
+        }
+    ]
+}

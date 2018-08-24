@@ -28,6 +28,8 @@ import java.io.PrintStream;
 import java.io.StringReader;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -37,6 +39,8 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.dom.IStringProvider;
+import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
@@ -48,6 +52,59 @@ import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
 import org.symphonyoss.s2.fugue.naming.Name;
 
+import com.amazonaws.services.ecs.AmazonECS;
+import com.amazonaws.services.ecs.AmazonECSClientBuilder;
+import com.amazonaws.services.ecs.model.Cluster;
+import com.amazonaws.services.ecs.model.CreateClusterRequest;
+import com.amazonaws.services.ecs.model.CreateClusterResult;
+import com.amazonaws.services.ecs.model.CreateServiceRequest;
+import com.amazonaws.services.ecs.model.CreateServiceResult;
+import com.amazonaws.services.ecs.model.DeploymentConfiguration;
+import com.amazonaws.services.ecs.model.DescribeClustersRequest;
+import com.amazonaws.services.ecs.model.DescribeClustersResult;
+import com.amazonaws.services.ecs.model.DescribeServicesRequest;
+import com.amazonaws.services.ecs.model.DescribeServicesResult;
+import com.amazonaws.services.ecs.model.RegisterTaskDefinitionRequest;
+import com.amazonaws.services.ecs.model.RegisterTaskDefinitionResult;
+import com.amazonaws.services.ecs.model.Service;
+import com.amazonaws.services.ecs.model.UpdateServiceRequest;
+import com.amazonaws.services.ecs.model.UpdateServiceResult;
+import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
+import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
+import com.amazonaws.services.elasticloadbalancingv2.model.Action;
+import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
+import com.amazonaws.services.elasticloadbalancingv2.model.AddListenerCertificatesRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
+import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DeleteRuleRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancerAttributesRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.Listener;
+import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
+import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerAttribute;
+import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerNotFoundException;
+import com.amazonaws.services.elasticloadbalancingv2.model.ModifyLoadBalancerAttributesRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
+import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
+import com.amazonaws.services.elasticloadbalancingv2.model.RuleCondition;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
+import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundException;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
@@ -68,6 +125,8 @@ import com.amazonaws.services.identitymanagement.model.GetPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.GetPolicyResult;
 import com.amazonaws.services.identitymanagement.model.GetPolicyVersionRequest;
 import com.amazonaws.services.identitymanagement.model.GetRoleRequest;
+import com.amazonaws.services.identitymanagement.model.GetServerCertificateRequest;
+import com.amazonaws.services.identitymanagement.model.GetServerCertificateResult;
 import com.amazonaws.services.identitymanagement.model.GetUserRequest;
 import com.amazonaws.services.identitymanagement.model.Group;
 import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
@@ -77,6 +136,31 @@ import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsRequest
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsResult;
 import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.identitymanagement.model.PolicyVersion;
+import com.amazonaws.services.identitymanagement.model.ServerCertificate;
+import com.amazonaws.services.logs.AWSLogs;
+import com.amazonaws.services.logs.AWSLogsClientBuilder;
+import com.amazonaws.services.logs.model.CreateLogGroupRequest;
+import com.amazonaws.services.logs.model.CreateLogGroupResult;
+import com.amazonaws.services.logs.model.DescribeLogGroupsRequest;
+import com.amazonaws.services.logs.model.DescribeLogGroupsResult;
+import com.amazonaws.services.logs.model.LogGroup;
+import com.amazonaws.services.route53.AmazonRoute53;
+import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
+import com.amazonaws.services.route53.model.Change;
+import com.amazonaws.services.route53.model.ChangeAction;
+import com.amazonaws.services.route53.model.ChangeBatch;
+import com.amazonaws.services.route53.model.ChangeResourceRecordSetsRequest;
+import com.amazonaws.services.route53.model.ChangeResourceRecordSetsResult;
+import com.amazonaws.services.route53.model.CreateHostedZoneRequest;
+import com.amazonaws.services.route53.model.CreateHostedZoneResult;
+import com.amazonaws.services.route53.model.HostedZone;
+import com.amazonaws.services.route53.model.ListHostedZonesByNameRequest;
+import com.amazonaws.services.route53.model.ListHostedZonesByNameResult;
+import com.amazonaws.services.route53.model.ListResourceRecordSetsRequest;
+import com.amazonaws.services.route53.model.ListResourceRecordSetsResult;
+import com.amazonaws.services.route53.model.RRType;
+import com.amazonaws.services.route53.model.ResourceRecord;
+import com.amazonaws.services.route53.model.ResourceRecordSet;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
@@ -108,6 +192,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            ACCOUNT_ID                    = "accountId";
   private static final String            REGION                        = "regionName";
   private static final String            REGIONS                       = "environmentTypeRegions";
+  private static final String            VPC_ID                        = "vpcId";
+  private static final String            LOAD_BALANCER_CERTIFICATE_ARN = "loadBalancerCertificateArn";
+  private static final String            LOAD_BALANCER_SECURITY_GROUPS = "loadBalancerSecurityGroups";
+  private static final String            LOAD_BALANCER_SUBNETS         = "loadBalancerSubnets";
+//  private static final String            IALB_ARN                      = "ialbArn";
+//  private static final String            IALB_DNS                      = "ialbDns";
+//  private static final String            R53_ZONE                      = "r53Zone";
   private static final String            POLICY_SUFFIX                 = "-policy";
   private static final String            GROUP_SUFFIX                  = "-group";
   private static final String            ROLE_SUFFIX                   = "-role";
@@ -136,6 +227,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       "  ]\n" + 
       "}";
 
+  private static final String HOST_HEADER = "host-header";
+
+  private static final String PATH_PATERN = "path-pattern";
+
+  private static final String DEFAULT = "default";
+
+
   private final AmazonIdentityManagement iam_                          = AmazonIdentityManagementClientBuilder
       .defaultClient();
   private final AWSSecurityTokenService  sts_                          = AWSSecurityTokenServiceClientBuilder
@@ -144,9 +242,52 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private String                         awsAccountId_;
 //  private User                           awsUser_;
   private String                         awsRegion_;
+  private String                         awsVpcId_;
+  private String                         awsLoadBalancerCertArn_;
+  private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
+  private List<String>                   awsLoadBalancerSubnets_        = new LinkedList<>();
+//  private String                         awsIalbArn_;
+//  private String                         awsIalbDns_;
+//  private String                         awsR53Zone_;
 
   private List<String>                   environmentTypeRegions_       = new LinkedList<>();
   private Map<String, String>            environmentTypeConfigBuckets_ = new HashMap<>();
+  private String                         callerRefPrefix_              = UUID.randomUUID().toString() + "-";
+
+  private AmazonElasticLoadBalancing     elbClient_;
+  private AmazonRoute53                  r53Clinet_;
+  private AmazonIdentityManagement       iamClient_;
+
+  private String baseZoneId_;
+//  private String s2ZoneId_;
+//  private String environmentTypeZoneId_;
+//  private String environmentZoneId_;
+//  private String regionZoneId_;
+//  private String regionalServiceZoneId_;
+//  private String serviceZoneId_;
+//  private String tenantZoneId_;
+//  private String regionalTenantZoneId_;
+  private LoadBalancer singleTenantLoadBalancer_;
+  private LoadBalancer multiTenantLoadBalancer_;
+
+  private String singleTenantDefaultTargetGroupArn_;
+  private String multiTenantDefaultTargetGroupArn_;
+
+  private String singleTenantListenerArn_;
+
+  private String multiTenantListenerArn_;
+
+  private AmazonECS ecsClient_;
+
+  private Name clusterName_;
+
+  private String clusterArn_;
+
+  private AWSLogs logsClient_;
+
+
+
+
   
   /**
    * Constructor.
@@ -232,6 +373,706 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     s3Client.putObject(request);
   }
+  
+  @Override
+  protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, String tenantId)
+  {
+    int debug=3;
+    try
+    {
+    Name targetGroupName = new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+    
+    String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+    
+    String hostName = new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    
+    configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath, tenantId);
+    
+    createR53RecordSet(hostName, regionalHostName, tenantId == null ? multiTenantLoadBalancer_ : singleTenantLoadBalancer_);
+    
+    getOrCreateCluster();
+    
+//    registerTaskDef(name, port, healthCheckPath, tenantId);
+    
+    createService(regionalHostName, targetGroupArn, name, port, tenantId);
+    
+    System.err.println("All done!");
+    }
+    catch(RuntimeException e)
+    {
+      e.printStackTrace();
+      
+      throw e;
+    }
+  }
+  
+  // Need to figure out how to do templates for this...
+//  private void registerTaskDef(String name, int port, String healthCheckPath, String tenantId)
+//  {
+//    Name logGroupName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), tenantId, getService());
+//    
+//    createLogGroupIfNecessary(logGroupName.toString());
+//    
+//    //TODO: allow per service override of template
+//    String taskDef = loadTemplateFromResource("ecs/taskDefinition.json");
+//    
+//    RegisterTaskDefinitionResult registerResult = ecsClient_.registerTaskDefinition(new RegisterTaskDefinitionRequest()
+//        .withFamily("family")
+//        );
+//  }
+//
+//  private void createLogGroupIfNecessary(String logGroupName)
+//  {
+//    DescribeLogGroupsResult describeLogsResult = logsClient_.describeLogGroups(new DescribeLogGroupsRequest()
+//        .withLimit(1)
+//        .withLogGroupNamePrefix(logGroupName.toString())
+//        );
+//    
+//    for(LogGroup logGroup : describeLogsResult.getLogGroups())
+//    {
+//      if(logGroupName.equals(logGroup.getLogGroupName()))
+//      {
+//        log_.info("LogGroup " + logGroupName + " already exists.");
+//        return;
+//      }
+//    }
+//    
+//    CreateLogGroupResult createResult = logsClient_.createLogGroup(new CreateLogGroupRequest()
+//        .withLogGroupName(logGroupName)
+//        );
+//    
+//    log_.info("LogGroup " + logGroupName + " created.");
+//  }
+
+  private void getOrCreateCluster()
+  {
+    clusterName_ = new Name(getEnvironmentType(), getEnvironment(),getRealm(), getRegion());
+    
+    DescribeClustersResult describeResult = ecsClient_.describeClusters(new DescribeClustersRequest()
+        .withClusters(clusterName_.toString())
+        );
+    
+    for(Cluster cluster : describeResult.getClusters())
+    {
+      if(clusterName_.toString().equals(cluster.getClusterName()))
+      {
+        clusterArn_ = cluster.getClusterArn();
+        
+        break;
+      }
+    }
+    
+    if(clusterArn_ == null)
+    {
+      log_.info("Cluster does not exist, creating...");
+      
+      CreateClusterResult createResult = ecsClient_.createCluster(new CreateClusterRequest()
+          .withClusterName(clusterName_.toString())
+          );
+      
+      clusterArn_ = createResult.getCluster().getClusterArn();
+      
+      log_.info("Cluster " + clusterArn_ + " created.");
+    }
+    else
+    {
+      log_.info("Cluster " + clusterArn_ + " aready exists.");
+    }
+  }
+
+  private void createService(String regionalHostName, String targetGroupArn, String name, int port, String tenantId)
+  {
+    // TODO: FIXME:
+    String clusterName = "sym-ms-devb-ause1";
+    
+    Name    serviceName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
+    boolean create      = true;
+    
+    DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
+        .withCluster(clusterName)
+        .withServices(serviceName.toString())
+        );
+    
+    for(Service service : describeResult.getServices())
+    {
+      if(serviceName.toString().equals(service.getServiceName()))
+      {
+        log_.info("Service " + serviceName + " exists with status " + service.getStatus());
+        
+        switch(service.getStatus())
+        {
+          case "INACTIVE":
+          case "DRAINING":
+            create = true;
+            
+          default:
+            create = false;
+        }
+      }
+    }
+    
+    if(create)
+    {
+      log_.info("Creating service " + serviceName + "...");
+      
+      CreateServiceResult createServiceResult = ecsClient_.createService(new CreateServiceRequest()
+          .withCluster(clusterName)
+          .withServiceName(serviceName.toString())
+          .withTaskDefinition(serviceName.toString())
+          .withDesiredCount(1)
+  //        .withDeploymentConfiguration(new DeploymentConfiguration()
+  //            .withMaximumPercent(maximumPercent)
+  //            .withMinimumHealthyPercent(minimumHealthyPercent)
+  //            )
+          .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
+              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
+              .withContainerPort(port)
+              .withTargetGroupArn(targetGroupArn)
+              )
+          );
+      
+      System.err.println(createServiceResult);
+      
+      System.err.println(createServiceResult.getService());
+      
+      log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
+    }
+    else
+    {
+      log_.info("Updating service " + serviceName + "...");
+      
+      UpdateServiceResult updateResult = ecsClient_.updateService(new UpdateServiceRequest()
+          .withCluster(clusterName)
+          .withService(serviceName.toString())
+          .withTaskDefinition(serviceName.toString())
+          .withDesiredCount(1)
+//          .withForceNewDeployment(true)
+          );
+      
+      System.err.println(updateResult);
+      
+      log_.info("Updated service " + serviceName + "as" + updateResult.getService().getServiceArn() + " with status " + updateResult.getService().getStatus() + ".");
+    }
+  }
+
+  @Override
+  protected void deployService(boolean hasSingleTenantContainer, boolean hasMultiTenantContainer)
+  {
+    createDnsZones();
+    
+    createLoadBalancer(hasSingleTenantContainer, hasMultiTenantContainer);
+  }
+  
+  private void createLoadBalancer(boolean hasSingleTenantContainer, boolean hasMultiTenantContainer)
+  {
+    if(hasSingleTenantContainer && getTenant() != null)
+    {
+      singleTenantLoadBalancer_ = createLoadBalancer(getTenant());
+      
+      if(singleTenantDefaultTargetGroupArn_ == null)
+      {
+        Name name = new Name(getEnvironmentType(), getEnvironment(), getTenant(), getService(), DEFAULT);
+        
+        singleTenantDefaultTargetGroupArn_ = createTargetGroup(name, "/HealthCheck", 80);
+      }
+      
+      singleTenantListenerArn_ = createLoadBalancerListener(singleTenantLoadBalancer_, singleTenantDefaultTargetGroupArn_);
+    }
+    
+    if(hasMultiTenantContainer)
+    {
+      multiTenantLoadBalancer_ = createLoadBalancer(null);
+      
+      if(multiTenantDefaultTargetGroupArn_ == null){
+        Name name = new Name(getEnvironmentType(), getEnvironment(), getService(), DEFAULT);
+
+        multiTenantDefaultTargetGroupArn_ = createTargetGroup(name, "/HealthCheck", 80);
+      }
+
+      multiTenantListenerArn_ = createLoadBalancerListener(multiTenantLoadBalancer_, multiTenantDefaultTargetGroupArn_);
+    }
+  }
+
+  private String createLoadBalancerListener(LoadBalancer loadBalancer, String defaultTargetGroupArn)
+  {
+    DescribeListenersResult describeResponse = elbClient_.describeListeners(new DescribeListenersRequest()
+        .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+        );
+    
+    List<Listener> listeners = describeResponse.getListeners();
+    
+    if(!listeners.isEmpty())
+    {
+      String listenerArn = listeners.get(0).getListenerArn();
+      log_.info("Listener " + listenerArn + " already exists.");
+      return listenerArn;
+    }
+//    for(Listener listener : listeners)
+//    {
+//      if(ProtocolEnum.HTTPS.equals(listener.getProtocol()))
+//      {
+//        for(Certificate cert : listener.getCertificates())
+//        {
+//          cert.getCertificateArn()
+//        }
+//      }
+//    }
+    
+    
+    log_.info("Creating listener...");
+    
+//    elbClient_.Cer
+//    GetServerCertificateResult certificateResult = iamClient_.getServerCertificate(new GetServerCertificateRequest()
+//        .withServerCertificateName("NAME")
+//        );
+//    
+//    Certificate certificate = certificateResult.getServerCertificate();
+    
+//    elbClient_.addListenerCertificates(new AddListenerCertificatesRequest()
+//        .withCertificates(certificates)
+//        );
+    
+    CreateListenerResult createResult = elbClient_.createListener(new CreateListenerRequest()
+        .withCertificates(new Certificate()
+          .withCertificateArn(awsLoadBalancerCertArn_)
+        )
+        .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+        .withProtocol(ProtocolEnum.HTTPS)
+        .withPort(443)
+        .withDefaultActions(new Action()
+            .withType(ActionTypeEnum.Forward)
+            .withTargetGroupArn(defaultTargetGroupArn)
+            )
+        );
+    
+    listeners = createResult.getListeners();
+    
+    String listenerArn = listeners.get(0).getListenerArn();
+    log_.info("Listener " + listenerArn + " created.");
+    return listenerArn;
+  }
+
+  private LoadBalancer createLoadBalancer(String tenant)
+  {
+    String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
+    
+    try
+    {
+      DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
+          .withNames(name)
+          );
+      
+      List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
+      
+      if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
+      {
+        LoadBalancer loadBalancer = loadBalancerList.get(0);
+  
+        log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+        
+        boolean ok = true;
+        
+        // So the LB exists, check that ithas the correct security groups and subnets
+        int     cnt = awsLoadBalancerSecurityGroups_.size();
+        
+        for(String sg : loadBalancer.getSecurityGroups())
+        {
+          if(awsLoadBalancerSecurityGroups_.contains(sg))
+          {
+            cnt--;
+          }
+          else
+          {
+            ok = false;
+            break;
+          }
+        }
+        
+        if(cnt > 0)
+          ok = false;
+        
+        if(ok)
+        {
+          cnt = awsLoadBalancerSubnets_.size();
+          for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
+          {
+            if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
+            {
+              cnt--;
+            }
+            else
+            {
+              ok = false;
+              break;
+            }
+          }
+          
+          if(cnt > 0)
+            ok = false;
+        }
+        
+        if(ok)
+        {
+          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
+          return loadBalancer;
+        }
+        else
+        {
+          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
+          
+          // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
+          throw new IllegalStateException("Loadbalancer needs to be updated");
+        }
+      }
+    }
+    catch(LoadBalancerNotFoundException e)
+    {
+      log_.info("Load balancer " + name + " does not exist, creating...");
+    }
+
+    CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
+        .withName(name)
+        .withSecurityGroups(awsLoadBalancerSecurityGroups_)
+        .withSubnets(awsLoadBalancerSubnets_)
+        );
+    
+    LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
+    
+    log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
+    
+    return loadBalancer;
+  }
+
+  private void createDnsZones()
+  {
+    String name       = getDnsSuffix();
+    
+    if(baseZoneId_ == null)
+      baseZoneId_ = createOrGetHostedZone(name);
+    
+//    name = getEnvironmentType() + "." + name;
+//    
+////    if(environmentTypeZoneId_ == null)
+////      environmentTypeZoneId_ = createOrGetHostedZone(name);
+//    
+//    name = getEnvironment() + "." + name;
+//    
+////    if(environmentZoneId_ == null)
+////      environmentZoneId_ = createOrGetHostedZone(name);
+//    
+//    String regionalName = getRegion() + "." + name;
+//    
+////    if(regionZoneId_ == null)
+////      regionZoneId_ = createOrGetHostedZone(regionalName);
+//    
+//    name = getService() + "." + name;
+//    
+//    if(serviceZoneId_ == null)
+//      serviceZoneId_ = createOrGetHostedZone(name);
+//    
+//    regionalName = getService() + "." + regionalName;
+//    
+//    if(regionalServiceZoneId_ == null)
+//      regionalServiceZoneId_ = createOrGetHostedZone(regionalName);
+//    
+////    if(getTenant() != null)
+////    {
+////      name = getTenant() + "." + name;
+////      
+////      if(tenantZoneId_ == null)
+////        tenantZoneId_ = createOrGetHostedZone(name);
+////      
+////      regionalName = getTenant() + "." + regionalName;
+////      
+////      if(regionalTenantZoneId_ == null)
+////        regionalTenantZoneId_ = createOrGetHostedZone(regionalName);
+////    }
+  }
+  
+  private String createOrGetHostedZone(String name)
+  {
+    String dnsName = name.toLowerCase();
+    
+    ListHostedZonesByNameResult listResult = r53Clinet_.listHostedZonesByName(new ListHostedZonesByNameRequest()
+        .withDNSName(dnsName)
+        .withMaxItems("1")
+        );
+    
+    List<HostedZone> zoneList = listResult.getHostedZones();
+    String zoneName = dnsName + ".";
+    
+    if(zoneList.size()>0 && zoneName.equals(zoneList.get(0).getName()))
+    {
+      log_.info("Zone " + dnsName + " exists as " + zoneList.get(0).getId());
+      
+      return zoneList.get(0).getId();
+    }
+    else
+    {
+      log_.info("Creating zone " + dnsName + "...");
+      
+      CreateHostedZoneResult createResult = r53Clinet_.createHostedZone(new CreateHostedZoneRequest()
+          .withName(dnsName)
+          .withCallerReference(callerRefPrefix_ + dnsName)
+          );
+      
+      log_.info("Zone " + dnsName + " created as " + createResult.getHostedZone().getId());
+      
+      return createResult.getHostedZone().getId();
+    }
+}
+  
+  private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
+  {
+    createR53RecordSet(host, regionalHost, true);
+    createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
+  }
+  
+  private void createR53RecordSet(String source, String target, boolean multiValue)
+  {
+    String sourceDomain = source + ".";
+    
+    ListResourceRecordSetsResult result = r53Clinet_.listResourceRecordSets(new ListResourceRecordSetsRequest()
+        .withHostedZoneId(baseZoneId_)
+        .withStartRecordName(source)
+        );
+    
+    List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
+    boolean                 ok            = false;
+    
+    for(ResourceRecordSet recordSet : recordSetList)
+    {
+      if(sourceDomain.equals(recordSet.getName()))
+      {
+        log_.info("R53 record set exists for " + source);
+        
+        for(ResourceRecord record : recordSet.getResourceRecords())
+        {
+          if(target.equals(record.getValue()))
+          {
+              ok = true;
+              break;
+          }
+        }
+      }
+      else
+      {
+        // records come back in order...
+        break;
+      }
+    }
+    if(ok)
+    {
+      log_.info("R53 record set for " + source + " to " + target + " exists, nothing to do here.");
+    }
+    else
+    {
+      log_.info("Creating R53 record set for " + source + " to " + target + "...");
+      
+      ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
+          .withName(source)
+          .withType(RRType.CNAME)
+          .withTTL(300L)
+          .withResourceRecords(new ResourceRecord()
+              .withValue(target)
+              )
+          ;
+      
+      if(multiValue)
+      {
+        resourceRecordSet
+          .withWeight(1L)
+          .withSetIdentifier(getRegion().toLowerCase())
+          ;
+      }
+      
+      ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
+          .withHostedZoneId(baseZoneId_)
+          .withChangeBatch(new ChangeBatch()
+              .withChanges(new Change()
+                  .withAction(ChangeAction.CREATE)
+                  .withResourceRecordSet(resourceRecordSet)
+                  )
+              )
+          );
+        
+      System.out.println(rresult);
+    }
+    
+/*
+
+    
+    
+    
+    
+    if(!R53RecordSetExist(environmentType, environment, tenant)) {
+        def rs_template_args = ['SERVICE_NAME':servicename,
+                                'TENANT_ID':tenant,
+                                'DNS_SUFFIX':ECSClusterMaps.env_cluster[environment]['dns_suffix'],
+                                'ALB_DNS':ECSClusterMaps.env_cluster[environment]['ialb_dns']
+        ]
+        def rs_def = (new org.apache.commons.lang3.text.StrSubstitutor(rs_template_args)).replace(record_set_template)
+        def rs_def_file = 'r53-rs-'+environment+'-'+tenant+'-'+servicename+'.json'
+        steps.writeFile file:rs_def_file, text:rs_def
+        //steps.sh 'ls -alh'
+        steps.withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'sym-aws-'+environmentType, secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+            steps.sh 'aws --region us-east-1 route53 change-resource-record-sets --hosted-zone-id '+ECSClusterMaps.env_cluster[environment]['r53_zone']+' --change-batch file://'+rs_def_file+' > r53-rs-create-out-'+environment+'-'+tenant+'-'+servicename+'.json'
+        
+        }
+    }
+    */
+  }
+
+  private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath,
+      String tenantId)
+  {
+    
+    List<String> remainingPaths = new ArrayList<>();
+    
+    remainingPaths.addAll(paths);
+    
+    DescribeRulesResult ruleDescription = elbClient_.describeRules(new DescribeRulesRequest()
+        .withListenerArn(tenantId == null ? multiTenantListenerArn_ : singleTenantListenerArn_)
+        );
+    
+    List<Rule> ruleList = ruleDescription.getRules();
+    int        priority = 1000;
+    
+    for(Rule rule : ruleList)
+    {
+      String conditionHost = null;
+      String conditionPath = null;
+      
+      for(RuleCondition c : rule.getConditions())
+      {
+        if(c.getField().equals(HOST_HEADER))
+        {
+          if(c.getValues().size() > 0)
+            conditionHost = c.getValues().get(0);
+        }
+        else if(c.getField().equals(PATH_PATERN))
+        {
+          if(c.getValues().size() > 0)
+            conditionPath = c.getValues().get(0);
+        }
+      }
+      
+      String actionTargetArn = null;
+      
+      // since there is only one action I cant see how there will not always be exactly one of these but....
+      for(Action action : rule.getActions())
+      {
+        actionTargetArn = action.getTargetGroupArn();
+      }
+      
+      if(host.equals(conditionHost))
+      {
+        if(remainingPaths.remove(conditionPath))
+        {
+          if(targetGroupArn.equals(actionTargetArn))
+          {
+            log_.debug("Rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath + " is OK, nothing to do");
+          }
+          else
+          {
+            log_.info("Updating rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
+            // the rule is there but it's wrong
+            elbClient_.modifyRule(new ModifyRuleRequest()
+                .withActions(new Action()
+                    .withTargetGroupArn(targetGroupArn)
+                    .withType(ActionTypeEnum.Forward)
+                    )
+                );
+          }
+        }
+        else
+        {
+          // this rule is for a path which we don't have, maybe it was removed from the service
+          
+          log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for non-existant path " + conditionPath);
+          
+          elbClient_.deleteRule(new DeleteRuleRequest()
+              .withRuleArn(rule.getRuleArn())
+              );
+        }
+      }
+      
+      if(!"default".equals(rule.getPriority()))
+      {
+        try
+        {
+          int p = Integer.parseInt(rule.getPriority());
+          
+          if(p >= priority)
+            priority = p + 1;
+        }
+        catch(NumberFormatException e)
+        {
+          log_.warn("Rule has non-integer priority: " + rule);
+        }
+      }
+    }
+    
+    for(String path : remainingPaths)
+    {
+      log_.info("Creating rule for host " + host + " for non-existant path " + path + "...");
+      
+      CreateRuleResult createRuleResult = elbClient_.createRule(new CreateRuleRequest()
+          .withListenerArn(tenantId == null ? multiTenantListenerArn_ : singleTenantListenerArn_)
+          .withConditions(
+              new RuleCondition()
+                .withField(HOST_HEADER)
+                .withValues(host),
+              new RuleCondition()
+                .withField(PATH_PATERN)
+                .withValues(path)
+              )
+          .withActions(new Action()
+              .withTargetGroupArn(targetGroupArn)
+              .withType(ActionTypeEnum.Forward)
+              )
+          .withPriority(priority)
+          );
+      
+      log_.info("Created rule " + createRuleResult.getRules().get(0).getRuleArn() + " for host " + host + " for non-existant path " + path);
+    }
+  }
+
+  private String createTargetGroup(Name name, String healthCheckPath, int port)
+  {
+    String shortName = name.getShortName(32);
+    
+    try
+    {
+      DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
+      
+      List<TargetGroup> groups = desc.getTargetGroups();
+      
+      if(groups.size() != 1)
+          throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
+      
+      return groups.get(0).getTargetGroupArn();
+    }
+    catch(TargetGroupNotFoundException e)
+    {
+      log_.info("Target group " + name + " does not exist, will create it...");
+    }
+    
+    CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
+        .withName(shortName)
+        .withHealthCheckPath(healthCheckPath)
+        .withHealthCheckProtocol(ProtocolEnum.HTTP)
+        .withProtocol(ProtocolEnum.HTTP)
+        .withVpcId(awsVpcId_)
+        .withPort(port)
+        );
+    
+    System.out.println("result=" + result);
+    
+    return result.getTargetGroups().get(0).getTargetGroupArn();
+  }
 
 
   @Override
@@ -241,56 +1082,85 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     if(node instanceof IJsonObject)
     {
-        awsAccountId_ = ((IJsonObject<?>)node).getRequiredString(ACCOUNT_ID);
-        awsRegion_ = ((IJsonObject<?>)node).getRequiredString(REGION);
-        
-        GetCallerIdentityResult callerIdentity = sts_.getCallerIdentity(new GetCallerIdentityRequest());
-        
-        log_.info("Connected as user " + callerIdentity.getArn());
-        
-        String actualAccountId = callerIdentity.getAccount();
-        
-        if(!actualAccountId.equals(awsAccountId_))
-        {
-          throw new IllegalStateException("AWS Account ID is " + awsAccountId_ + " but our credentials are for account " + actualAccountId);
-        }
-        
-        //awsUser_ = iam_.getUser().getUser();
+      IJsonObject<?> amazon = ((IJsonObject<?>)node);
+      
+      awsAccountId_           = amazon.getRequiredString(ACCOUNT_ID);
+      awsRegion_              = amazon.getRequiredString(REGION);
+      awsVpcId_               = amazon.getRequiredString(VPC_ID);
+      awsLoadBalancerCertArn_ = amazon.getRequiredString(LOAD_BALANCER_CERTIFICATE_ARN);
+      
+//        awsIalbArn_   = amazon.getRequiredString(IALB_ARN);
+//        awsIalbDns_   = amazon.getRequiredString(IALB_DNS);
+//        awsR53Zone_   = amazon.getRequiredString(R53_ZONE);
+      
+      
+      GetCallerIdentityResult callerIdentity = sts_.getCallerIdentity(new GetCallerIdentityRequest());
+      
+      log_.info("Connected as user " + callerIdentity.getArn());
+      
+      String actualAccountId = callerIdentity.getAccount();
+      
+      if(!actualAccountId.equals(awsAccountId_))
+      {
+        throw new IllegalStateException("AWS Account ID is " + awsAccountId_ + " but our credentials are for account " + actualAccountId);
+      }
+      
+      //awsUser_ = iam_.getUser().getUser();
+      
+      getStringArray(amazon, LOAD_BALANCER_SUBNETS, awsLoadBalancerSubnets_);
+      getStringArray(amazon, LOAD_BALANCER_SECURITY_GROUPS, awsLoadBalancerSecurityGroups_);
 
-        IJsonDomNode regionsNode = ((IJsonObject<?>)node).get(REGIONS);
-        if(regionsNode instanceof IJsonObject)
+      IJsonDomNode regionsNode = amazon.get(REGIONS);
+      if(regionsNode instanceof IJsonObject)
+      {
+        IJsonObject<?> regionsObject = (IJsonObject<?>)regionsNode;
+        
+        Iterator<String> it = regionsObject.getNameIterator();
+        
+        while(it.hasNext())
         {
-          IJsonObject<?> regionsObject = (IJsonObject<?>)regionsNode;
+          String name = it.next();
           
-          Iterator<String> it = regionsObject.getNameIterator();
+          environmentTypeRegions_.add(name);
           
-          while(it.hasNext())
-          {
-            String name = it.next();
-            
-            environmentTypeRegions_.add(name);
-            
-            IJsonObject<?> regionObject = regionsObject.getRequiredObject(name);
-            
-            String bucketName = regionObject.getString(AWS_CONFIG_BUCKET,
-                FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
-            
-            environmentTypeConfigBuckets_.put(name, bucketName);
-            
-            if(name.equals(awsRegion_))
-              getTemplateVariables().put(AWS_CONFIG_BUCKET, bucketName);
-          }
+          IJsonObject<?> regionObject = regionsObject.getRequiredObject(name);
+          
+          String bucketName = regionObject.getString(AWS_CONFIG_BUCKET,
+              FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
+          
+          environmentTypeConfigBuckets_.put(name, bucketName);
+          
+          if(name.equals(awsRegion_))
+            getTemplateVariables().put(AWS_CONFIG_BUCKET, bucketName);
         }
-        else
-        {
-          if(regionsNode == null)
-            throw new IllegalStateException("A top level configuration object called \"/" + AMAZON + "/" + REGIONS + "\" is required.");
-          
-          throw new IllegalStateException("The top level configuration object called \"/" + AMAZON + "/" + REGIONS + "\" must be an object not a " + node.getClass().getSimpleName());
-        }
+      }
+      else
+      {
+        if(regionsNode == null)
+          throw new IllegalStateException("A top level configuration object called \"/" + AMAZON + "/" + REGIONS + "\" is required.");
+        
+        throw new IllegalStateException("The top level configuration object called \"/" + AMAZON + "/" + REGIONS + "\" must be an object not a " + node.getClass().getSimpleName());
+      }
 
-        
-        
+      elbClient_ = AmazonElasticLoadBalancingClientBuilder.standard()
+          .withRegion(awsRegion_)
+          .build();
+      
+      r53Clinet_ = AmazonRoute53ClientBuilder.standard()
+          .withRegion(awsRegion_)
+          .build();
+      
+      iamClient_ = AmazonIdentityManagementClientBuilder.standard()
+        .withRegion(awsRegion_)
+        .build();
+      
+      ecsClient_ = AmazonECSClientBuilder.standard()
+          .withRegion(awsRegion_)
+          .build();
+      
+      logsClient_ = AWSLogsClientBuilder.standard()
+          .withRegion(awsRegion_)
+          .build();
     }
     else
     {
@@ -301,6 +1171,34 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
   }
   
+  private void getStringArray(IJsonObject<?> amazon, String nodeName, List<String> list)
+  {
+    IJsonDomNode sgNode = amazon.get(nodeName);
+    if(sgNode instanceof IJsonArray)
+    {
+      IJsonArray<?> securityGroups = (IJsonArray<?>)sgNode;
+      
+      for(IJsonDomNode n : securityGroups)
+      {
+        if(n instanceof IStringProvider)
+        {
+          list.add(((IStringProvider)n).asString());
+        }
+        else
+        {
+          throw new IllegalStateException("The top level configuration object called \"/" + AMAZON + "/" + nodeName + "\" must be an array of strings, but it contains a " + n.getClass().getSimpleName());
+        }
+      }
+    }
+    else
+    {
+      if(sgNode == null)
+        throw new IllegalStateException("A top level configuration object called \"/" + AMAZON + "/" + nodeName + "\" is required.");
+      
+      throw new IllegalStateException("The top level configuration object called \"/" + AMAZON + "/" + nodeName + "\" must be an array of strings not a " + sgNode.getClass().getSimpleName());
+    }
+  }
+
   @Override
   protected void createEnvironment()
   {
@@ -333,7 +1231,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createConfigBucket(region, environmentTypeConfigBuckets_.get(region));
     }
   }
-  
+
   private void createEnvironmentTypeAdminUser(String baseName)
   {
     String name = baseName + ADMIN_SUFFIX;

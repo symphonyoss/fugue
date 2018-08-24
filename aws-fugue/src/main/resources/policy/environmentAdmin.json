@@ -26,6 +26,84 @@
                 "arn:aws:iam::*:role/${environmentType}-${environmentId}-*",
                 "arn:aws:s3:::${awsConfigBucket}/config/${environmentType}-${environmentId}-*"
             ]
+        },
+        {
+            "Sid": "ElbCreate",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:CreateLoadBalancer"
+            ],
+            "Resource": "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+        },
+        {
+            "Sid": "ElbWrite",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:ModifyRule",
+                "elasticloadbalancing:CreateRule"
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*/*"
+            ]
+        },
+        {
+            "Sid": "ElbRead",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeRules"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "All",
+            "Effect": "Allow",
+            "Action": [
+                "route53:ListResourceRecordSets",
+                "route53:ListHostedZonesByName",
+                "route53:CreateHostedZone",
+                "ecs:ListServices",
+                "ecs:DescribeServices",
+                "ecs:UpdateService",
+                "ecs:CreateService",
+                "ecs:ListTaskDefinitions",
+                "ecs:DescribeClusters",
+                "ecs:CreateCluster",
+                "logs:DescribeLogGroups",
+                "logs:CreateLogGroup"
+            ],
+            "Resource": [
+                "*"
+            ]
+        },
+        {
+            "Sid": "R53Write",
+            "Effect": "Allow",
+            "Action": [
+                "route53:ChangeResourceRecordSets"
+            ],
+            "Resource": [
+                "arn:aws:route53:::hostedzone/*"
+            ]
+        },
+        {
+            "Sid": "ECS",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:StartTask",
+                "ecs:RunTask"
+            ],
+            "Resource": [
+                "arn:aws:ecs:*:*:task-definition/${environmentType}-${environmentId}-*:*",
+                "arn:aws:ecs:*:*:task/${environmentType}-${environmentId}-*"
+            ]
         }
     ]
 }

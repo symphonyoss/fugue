@@ -27,8 +27,8 @@ import javax.servlet.Servlet;
 
 public interface IServletContainer
 {
-  IServletContainer addServlet(String path, Servlet servlet);
+  IServletContainer withServlet(String path, Servlet servlet);
 
-  IServletContainer addServlet(IUrlPathServlet servlet);
+  IServletContainer withServlet(IUrlPathServlet servlet);
 
 }

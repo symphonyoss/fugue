@@ -54,6 +54,7 @@ public class HttpServerBuilder implements IServletContainer
   private Map<String, Servlet> servletMap_       = new HashMap<>();
   private List<Handler>        resourceHandlers_ = new ArrayList<>();
   private List<Filter>         filters_          = new ArrayList<>();
+  private String               pathPrefix_       = "";
   private int                  httpPort_         = -1;
   private int                  httpsPort_        = -1;
   private String               keyStorePath_;
@@ -61,7 +62,7 @@ public class HttpServerBuilder implements IServletContainer
   
   
   @Override
-  public HttpServerBuilder addServlet(String path, Servlet servlet)
+  public HttpServerBuilder withServlet(String path, Servlet servlet)
   {
     if(servletMap_.containsKey(path))
       throw new ProgramFault("Path \"" + path + "\" is already mapped.");
@@ -79,7 +80,7 @@ public class HttpServerBuilder implements IServletContainer
   }
   
   @Override
-  public HttpServerBuilder addServlet(IUrlPathServlet servlet)
+  public HttpServerBuilder withServlet(IUrlPathServlet servlet)
   {
     if(servletMap_.containsKey(servlet.getUrlPath()))
       throw new ProgramFault("Path \"" + servlet.getUrlPath() + "\" is already mapped.");
@@ -89,28 +90,35 @@ public class HttpServerBuilder implements IServletContainer
     return this;
   }
   
-  public HttpServerBuilder setHttpPort(int httpPort)
+  public HttpServerBuilder withPathPrefix(String pathPrefix)
+  {
+    pathPrefix_ = pathPrefix;
+    
+    return this;
+  }
+  
+  public HttpServerBuilder withHttpPort(int httpPort)
   {
     httpPort_ = httpPort;
     
     return this;
   }
   
-  public HttpServerBuilder setHttpsPort(int httpsPort)
+  public HttpServerBuilder withHttpsPort(int httpsPort)
   {
     httpsPort_ = httpsPort;
     
     return this;
   }
   
-  public HttpServerBuilder setKeyStorePath(String keyStorePath)
+  public HttpServerBuilder withKeyStorePath(String keyStorePath)
   {
     keyStorePath_ = keyStorePath;
     
     return this;
   }
 
-  public HttpServerBuilder setKeyStorePassword(String keyStorePassword)
+  public HttpServerBuilder withKeyStorePassword(String keyStorePassword)
   {
     keyStorePassword_ = keyStorePassword;
     
@@ -221,7 +229,7 @@ public class HttpServerBuilder implements IServletContainer
 
     for (Entry<String, Servlet> entry : servletMap_.entrySet())
     {
-      sch.addServlet(new ServletHolder(entry.getValue()),entry.getKey());
+      sch.addServlet(new ServletHolder(entry.getValue()),pathPrefix_ + entry.getKey());
       servletCnt++;
     }
     
@@ -248,7 +256,7 @@ public class HttpServerBuilder implements IServletContainer
     return server;
   }
 
-  public void addFilter(Filter filter)
+  public void withFilter(Filter filter)
   {
     filters_.add(filter);
   }

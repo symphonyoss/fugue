@@ -23,13 +23,21 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import javax.annotation.Nonnull;
+
+import org.symphonyoss.s2.common.fault.CodingFault;
 
 public class Name
 {
   public static final String SEPARATOR = "-";
   
   private final String name_;
+  private final String sha1Name_;
+  private final String md5Name_;
 
   /**
    * Base class for Names.
@@ -57,11 +65,55 @@ public class Name
     }
     
     name_ = b.toString();
+    
+    try
+    {
+      byte[] hash = MessageDigest.getInstance("SHA-1").digest(name_.getBytes(StandardCharsets.UTF_8));
+      
+      sha1Name_ = Base62.encodeToString(hash);
+      
+      hash = MessageDigest.getInstance("MD5").digest(name_.getBytes(StandardCharsets.UTF_8));
+      
+      md5Name_ = Base62.encodeToString(hash);
+    }
+    catch(NoSuchAlgorithmException e)
+    {
+      throw new CodingFault(e); // "Can't happen"
+    }
   }
 
   @Override
   public String toString()
   {
     return name_;
+  }
+
+  /**
+   * Returns a short name of at most the given length.
+   * 
+   * If the full name is short enough it is returned. Otherwise if maxLen is >= 27 the
+   * Base62 encoded SHA-1 hash of the name is returned, otherwise if maxLen is >= 22 the
+   * Base62 encoded MD5 hash of the name is returned.
+   * 
+   * Base62 encoding uses only [a-zA-Z0-9], names are constructed from a series of elements
+   * separated by hyphens so as long as a long name has more than one element, the Base62
+   * encoded short versions cannot clash with unencoded names.
+   * 
+   * @param maxLen The maximum length of the name.
+   * 
+   * @return the short name.
+   */
+  public String getShortName(int maxLen)
+  {
+    if(name_.length() <= maxLen)
+      return name_;
+    
+    if(sha1Name_.length() <= maxLen)
+      return sha1Name_;
+    
+    if(md5Name_.length() <= maxLen)
+      return md5Name_;
+    
+    throw new IllegalArgumentException(md5Name_.length() + " is the shortest abbreviated name.");
   }
 }
