@@ -50,7 +50,7 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
-  private final int                           threadPoolSize_ = 20;
+  private final int                           threadPoolSize_ = 50;
   private final INameFactory                  nameFactory_;
   private final String                        region_;
   private final boolean                       startSubscriptions_;

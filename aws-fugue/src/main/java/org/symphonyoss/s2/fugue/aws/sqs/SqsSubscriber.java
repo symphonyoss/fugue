@@ -102,7 +102,9 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
       }
       else
       {
-        if(messages.size() == messageBatchSize_)
+        log_.info("Read " + messages.size() + " for " + queueUrl_);
+        
+        if(messages.size() > 2 /*== messageBatchSize_*/)
         {
           manager_.submit(nonIdleSubscriber_, false);
 
@@ -111,7 +113,6 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         
         for (Message m : messages)
         {
-  
           ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
   
           long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace, m.getMessageId());

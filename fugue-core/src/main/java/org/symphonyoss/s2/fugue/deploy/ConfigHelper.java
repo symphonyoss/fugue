@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
+import java.util.Map;
+
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 
 public class ConfigHelper
@@ -34,10 +36,10 @@ public class ConfigHelper
     deployConfig_ = deployConfig;
   }
   
-  public void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
+  public void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig, Map<String, String>  templateVariables)
   {}
   
-  public void fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
+  public void fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig, Map<String, String>  templateVariables)
   {}
 
   public String getService()

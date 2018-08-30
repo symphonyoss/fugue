@@ -518,7 +518,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       singleTenantConfig_.addAll(tenantConfig_);
     }
     
-    fetchService(multiTenantConfig_, singleTenantConfig_);
+    fetchService();
     
     if(tenant_ != null)
     {
@@ -527,7 +527,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       singleTenantConfig_.addAll(tenantConfig_);
     }
     
-    configId_ = fetchOverrides(multiTenantConfig_, singleTenantConfig_);
+    configId_ = fetchOverrides();
     
     regionShortCode_ = multiTenantConfig_.getRequiredString(REGION_SHORTCODE);
     
@@ -545,40 +545,40 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
     
     templateVariables_.put(FQ_INSTANCE_NAME, new Name(environmentType_, environment_, realm_, region_, tenant_, service_).toString());
-    templateVariables_.put(FQ_SERVICE_NAME, new Name(environmentType_, environment_, tenant_, service_).toString());
+    templateVariables_.put(FQ_SERVICE_NAME, new Name(environmentType_, environment_, realm_, region_, service_).toString());
     templateVariables_.put(SHORT_INSTANCE_NAME, new Name(regionShortCode_, tenant_, service_).toString());
   }
 
 
-  private void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
+  private void fetchDefaults()
   {
-    provider_.fetchDefaults(multiTenantConfig, singleTenantConfig);
+    provider_.fetchDefaults(multiTenantConfig_, singleTenantConfig_, templateVariables_);
     
     for(ConfigHelper helper : helpers_)
-      helper.fetchDefaults(multiTenantConfig, singleTenantConfig);
+      helper.fetchDefaults(multiTenantConfig_, singleTenantConfig_, templateVariables_);
   }
   
-  private MutableJsonObject fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
+  private MutableJsonObject fetchOverrides()
   {
-    MutableJsonObject id  = (MutableJsonObject) multiTenantConfig.get(ID);
+    MutableJsonObject id  = (MutableJsonObject) multiTenantConfig_.get(ID);
     
     if(id == null)
     {
       id = new MutableJsonObject();
-      multiTenantConfig.add(ID, id);
+      multiTenantConfig_.add(ID, id);
     }
     
     populateId(id);
    
     
-    if(singleTenantConfig != null)
+    if(singleTenantConfig_ != null)
     {
-      id  = (MutableJsonObject) singleTenantConfig.get(ID);
+      id  = (MutableJsonObject) singleTenantConfig_.get(ID);
       
       if(id == null)
       {
         id = new MutableJsonObject();
-        singleTenantConfig.add(ID, id);
+        singleTenantConfig_.add(ID, id);
       }
       
       populateId(id);
@@ -587,9 +587,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
     
     for(ConfigHelper helper : helpers_)
-      helper.fetchOverrides(multiTenantConfig, singleTenantConfig);
+      helper.fetchOverrides(multiTenantConfig_, singleTenantConfig_, templateVariables_);
     
-    provider_.fetchOverrides(multiTenantConfig, singleTenantConfig);
+    provider_.fetchOverrides(multiTenantConfig_, singleTenantConfig_, templateVariables_);
     
     
     
@@ -606,9 +606,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     id.addIfNotNull(SERVICE + ID_SUFFIX,      getService());
   }
   
-  private void fetchService(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig)
+  private void fetchService()
   {
-    fetchDefaults(multiTenantConfig, singleTenantConfig);
+    fetchDefaults();
     
 //    if(service_ != null)
 //    {
@@ -632,10 +632,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     try
     {
-      multiTenantConfig.addAll(fetch(true), "#");
+      multiTenantConfig_.addAll(fetch(true), "#");
       
-      if(singleTenantConfig != null)
-        singleTenantConfig.addAll(fetch(true), "#");
+      if(singleTenantConfig_ != null)
+        singleTenantConfig_.addAll(fetch(true), "#");
     }
     catch(IOException e)
     {

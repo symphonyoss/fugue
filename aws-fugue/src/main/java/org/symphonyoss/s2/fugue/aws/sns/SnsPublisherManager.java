@@ -37,10 +37,6 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
-import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
-import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
-import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
-import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.PublishRequest;
@@ -163,7 +159,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
       PublishRequest publishRequest = new PublishRequest(topicArn, msg);
       snsClient_.publish(publishRequest);
     }
-    catch (Exception e)
+    catch (RuntimeException e)
     {
       throw new TransactionFault(e);
     }

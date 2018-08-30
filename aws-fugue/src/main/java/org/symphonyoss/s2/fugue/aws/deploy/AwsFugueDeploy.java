@@ -47,6 +47,7 @@ import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
@@ -59,13 +60,10 @@ import com.amazonaws.services.ecs.model.CreateClusterRequest;
 import com.amazonaws.services.ecs.model.CreateClusterResult;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
 import com.amazonaws.services.ecs.model.CreateServiceResult;
-import com.amazonaws.services.ecs.model.DeploymentConfiguration;
 import com.amazonaws.services.ecs.model.DescribeClustersRequest;
 import com.amazonaws.services.ecs.model.DescribeClustersResult;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
-import com.amazonaws.services.ecs.model.RegisterTaskDefinitionRequest;
-import com.amazonaws.services.ecs.model.RegisterTaskDefinitionResult;
 import com.amazonaws.services.ecs.model.Service;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
 import com.amazonaws.services.ecs.model.UpdateServiceResult;
@@ -73,7 +71,6 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
-import com.amazonaws.services.elasticloadbalancingv2.model.AddListenerCertificatesRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
@@ -87,7 +84,6 @@ import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupResu
 import com.amazonaws.services.elasticloadbalancingv2.model.DeleteRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancerAttributesRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesRequest;
@@ -96,9 +92,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsR
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.Listener;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
-import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerAttribute;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerNotFoundException;
-import com.amazonaws.services.elasticloadbalancingv2.model.ModifyLoadBalancerAttributesRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
@@ -125,8 +119,6 @@ import com.amazonaws.services.identitymanagement.model.GetPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.GetPolicyResult;
 import com.amazonaws.services.identitymanagement.model.GetPolicyVersionRequest;
 import com.amazonaws.services.identitymanagement.model.GetRoleRequest;
-import com.amazonaws.services.identitymanagement.model.GetServerCertificateRequest;
-import com.amazonaws.services.identitymanagement.model.GetServerCertificateResult;
 import com.amazonaws.services.identitymanagement.model.GetUserRequest;
 import com.amazonaws.services.identitymanagement.model.Group;
 import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
@@ -136,14 +128,8 @@ import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsRequest
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsResult;
 import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.identitymanagement.model.PolicyVersion;
-import com.amazonaws.services.identitymanagement.model.ServerCertificate;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
-import com.amazonaws.services.logs.model.CreateLogGroupRequest;
-import com.amazonaws.services.logs.model.CreateLogGroupResult;
-import com.amazonaws.services.logs.model.DescribeLogGroupsRequest;
-import com.amazonaws.services.logs.model.DescribeLogGroupsResult;
-import com.amazonaws.services.logs.model.LogGroup;
 import com.amazonaws.services.route53.AmazonRoute53;
 import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
 import com.amazonaws.services.route53.model.Change;
@@ -167,11 +153,6 @@ import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.SSEAlgorithm;
-import com.amazonaws.services.s3.model.ServerSideEncryptionByDefault;
-import com.amazonaws.services.s3.model.ServerSideEncryptionConfiguration;
-import com.amazonaws.services.s3.model.ServerSideEncryptionRule;
-import com.amazonaws.services.s3.model.SetBucketEncryptionRequest;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
@@ -372,6 +353,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     PutObjectRequest request = new PutObjectRequest(bucketName, key, dom.serialize().getInputStream(), metadata);
     
     s3Client.putObject(request);
+  }
+  
+  private void abort(String message, Throwable cause)
+  {
+    log_.error(message, cause);
+    
+    throw new IllegalStateException(message, cause);
   }
   
   @Override
@@ -1053,11 +1041,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       if(groups.size() != 1)
           throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
       
+      log_.info("Target group " + name + " (" + shortName + ") already exists.");
       return groups.get(0).getTargetGroupArn();
     }
     catch(TargetGroupNotFoundException e)
     {
-      log_.info("Target group " + name + " does not exist, will create it...");
+      log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
     }
     
     CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
@@ -1228,7 +1217,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     for(String region : environmentTypeRegions_)
     {
-      createConfigBucket(region, environmentTypeConfigBuckets_.get(region));
+      createBucketIfNecessary(region, environmentTypeConfigBuckets_.get(region));
     }
   }
 
@@ -1252,117 +1241,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     createRole(name, policyArn);
   }
   
-  private void createConfigBucket(String region, String name)
+  private void createBucketIfNecessary(String region, String name)
   {
     AmazonS3 s3 = AmazonS3ClientBuilder
         .standard()
         .withRegion(region)
         .build();
 
-    try
-    {
-      String location = s3.getBucketLocation(name);
-      
-      log_.info("Bucket location is " + location);
-    }
-    catch(AmazonS3Exception e)
-    {
-      switch(e.getErrorCode())
-      {
-        case "NoSuchBucket":
-          log_.info("Config bucket " + name + " does not exist, creating...");
-          
-          createBucket(s3, region, name);
-          break;
-          
-        case "AuthorizationHeaderMalformed":
-          abort("Config bucket " + name + ", appears to be in the wrong region.", e);
-          break;
-        
-        case "AccessDenied":
-          boolean denied = true;
-          for(int i=0 ; i<5 && denied ; i++)
-          {
-            denied = bucketAccessDenied(s3, name);
-          }
-          
-          String message = "Cannot access config bucket " + name;
-          
-          if(denied)
-            abort(message + ", could not access 5 random bucket names either, check your policy permissions.");
-          else
-            abort(message + ", but we can access a random bucket name, "
-                + "this bucket could belong to another AWS customer.\n"
-                + "Configure a custome bucket name in the environmentType/region config.");
-          break;
-          
-        default:
-          abort("Unexpected S3 error looking for config bucket " + name, e);
-      }
-      
-    }
-    
-    
-//    try
-//    {
-//      ListObjectsV2Result list = s3.listObjectsV2(name, CONFIG);
-//      
-//      
-//      log_.info("Got " + list.getKeyCount() + " keys");
-//    }
-//    catch(AmazonS3Exception e)
-//    {
-//      switch(e.getErrorCode())
-//      {
-//        case "Not Found":
-//          log_.info("Config folder not found, creating it...");
-//          s3.
-//        
-//        default:
-//          abort("Unexpected S3 error looking for config folder " + name + "/" + CONFIG, e);
-//      }
-//    }
-  }
-
-  private void createBucket(AmazonS3 s3, String region, String name)
-  {
-    s3.createBucket(name);
-    
-    s3.setBucketEncryption(new SetBucketEncryptionRequest()
-        .withBucketName(name)
-        .withServerSideEncryptionConfiguration(new ServerSideEncryptionConfiguration()
-            .withRules(new ServerSideEncryptionRule()
-                .withApplyServerSideEncryptionByDefault(new ServerSideEncryptionByDefault()
-                    .withSSEAlgorithm(SSEAlgorithm.AES256)))));
-  }
-
-  private void abort(String message, Throwable cause)
-  {
-    log_.error(message, cause);
-    
-    throw new IllegalStateException(message, cause);
+    S3Helper.createBucketIfNecessary(s3, name);
   }
   
-  private void abort(String message)
-  {
-    log_.error(message);
-    
-    throw new IllegalStateException(message);
-  }
-
-  private boolean bucketAccessDenied(AmazonS3 s3, String name)
-  {
-    try
-    {
-      s3.getBucketLocation(name + UUID.randomUUID());
-      
-      return false;
-    }
-    catch(AmazonS3Exception e)
-    {
-      return e.getErrorCode().equals("AccessDenied");
-    }
-  }
+  
 
   private String createUser(String name, String groupName, PrintStream out)
   {

@@ -140,7 +140,6 @@ public class S3Configuration extends Configuration
     log_.info("Loading config from region: " + region + " bucket: " + bucket + " key: " + key);
     AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
         .withRegion(region)
-//        .withCredentials(new EnvironmentVariableCredentialsProvider())
         .build();
   
     S3Object s3object = s3Client.getObject(new GetObjectRequest(bucket, key));

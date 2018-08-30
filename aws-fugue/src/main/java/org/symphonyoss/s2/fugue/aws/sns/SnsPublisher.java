@@ -48,14 +48,7 @@ class SnsPublisher implements IPublisher<String>
     if(topicName_ == null)
       throw new IllegalStateException("Publisher is not started");
     
-    try
-    {
-      manager_.send(topicName_, item);
-    }
-    catch (Exception e)
-    {
-      throw new TransactionFault(e);
-    }
+    manager_.send(topicName_, item);
   }
 
   
