@@ -42,7 +42,8 @@
             "Action": [
                 "elasticloadbalancing:CreateTargetGroup",
                 "elasticloadbalancing:ModifyRule",
-                "elasticloadbalancing:CreateRule"
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule"
             ],
             "Resource": [
                 "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",

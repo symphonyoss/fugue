@@ -365,14 +365,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   @Override
   protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, String tenantId)
   {
-    int debug=3;
     try
     {
     Name targetGroupName = new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
     
     String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
     
-    String hostName = new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    String hostName = getServiceHostName(tenantId);
     String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     
@@ -434,6 +433,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    log_.info("LogGroup " + logGroupName + " created.");
 //  }
 
+  public String getServiceHostName(String tenantId)
+  {
+    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+  }
+
   private void getOrCreateCluster()
   {
     clusterName_ = new Name(getEnvironmentType(), getEnvironment(),getRealm(), getRegion());
@@ -474,6 +478,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     // TODO: FIXME:
     String clusterName = "sym-ms-devb-ause1";
+    
+    if("qa".equals(getEnvironmentType()))
+        clusterName = "sym-ms-qa-ause1";
+    
+    log_.info("Cluster name is " + clusterName);
     
     Name    serviceName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
     boolean create      = true;
@@ -738,7 +747,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     String name       = getDnsSuffix();
     
     if(baseZoneId_ == null)
-      baseZoneId_ = createOrGetHostedZone(name);
+      baseZoneId_ = createOrGetHostedZone(name, false);
     
 //    name = getEnvironmentType() + "." + name;
 //    
@@ -779,7 +788,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 ////    }
   }
   
-  private String createOrGetHostedZone(String name)
+  private String createOrGetHostedZone(String name, boolean create)
   {
     String dnsName = name.toLowerCase();
     
@@ -799,16 +808,23 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
     else
     {
-      log_.info("Creating zone " + dnsName + "...");
-      
-      CreateHostedZoneResult createResult = r53Clinet_.createHostedZone(new CreateHostedZoneRequest()
-          .withName(dnsName)
-          .withCallerReference(callerRefPrefix_ + dnsName)
-          );
-      
-      log_.info("Zone " + dnsName + " created as " + createResult.getHostedZone().getId());
-      
-      return createResult.getHostedZone().getId();
+      if(create)
+      {
+        log_.info("Creating zone " + dnsName + "...");
+        
+        CreateHostedZoneResult createResult = r53Clinet_.createHostedZone(new CreateHostedZoneRequest()
+            .withName(dnsName)
+            .withCallerReference(callerRefPrefix_ + dnsName)
+            );
+        
+        log_.info("Zone " + dnsName + " created as " + createResult.getHostedZone().getId());
+        
+        return createResult.getHostedZone().getId();
+      }
+      else
+      {
+        throw new IllegalStateException("\"Zone " + dnsName + " not found.");
+      }
     }
 }
   
@@ -820,10 +836,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   private void createR53RecordSet(String source, String target, boolean multiValue)
   {
+    String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
+    
     String sourceDomain = source + ".";
     
     ListResourceRecordSetsResult result = r53Clinet_.listResourceRecordSets(new ListResourceRecordSetsRequest()
-        .withHostedZoneId(baseZoneId_)
+        .withHostedZoneId(zoneId)
         .withStartRecordName(source)
         );
     
@@ -877,7 +895,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       
       ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
-          .withHostedZoneId(baseZoneId_)
+          .withHostedZoneId(zoneId)
           .withChangeBatch(new ChangeBatch()
               .withChanges(new Change()
                   .withAction(ChangeAction.CREATE)
@@ -957,15 +975,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(host.equals(conditionHost))
       {
+        // remove old host rules
+        
+        log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
+        
+        elbClient_.deleteRule(new DeleteRuleRequest()
+            .withRuleArn(rule.getRuleArn())
+            );
+      }
+      
+      if(conditionHost == null)
+      {
         if(remainingPaths.remove(conditionPath))
         {
           if(targetGroupArn.equals(actionTargetArn))
           {
-            log_.debug("Rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath + " is OK, nothing to do");
+            log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
           }
           else
           {
-            log_.info("Updating rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
+            log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
             // the rule is there but it's wrong
             elbClient_.modifyRule(new ModifyRuleRequest()
                 .withActions(new Action()
@@ -979,11 +1008,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         {
           // this rule is for a path which we don't have, maybe it was removed from the service
           
-          log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for non-existant path " + conditionPath);
-          
-          elbClient_.deleteRule(new DeleteRuleRequest()
-              .withRuleArn(rule.getRuleArn())
-              );
+          if(!"default".equals(rule.getPriority()))
+          {
+            log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
+            
+            elbClient_.deleteRule(new DeleteRuleRequest()
+                .withRuleArn(rule.getRuleArn())
+                );
+          }
         }
       }
       
@@ -1010,9 +1042,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       CreateRuleResult createRuleResult = elbClient_.createRule(new CreateRuleRequest()
           .withListenerArn(tenantId == null ? multiTenantListenerArn_ : singleTenantListenerArn_)
           .withConditions(
-              new RuleCondition()
-                .withField(HOST_HEADER)
-                .withValues(host),
+//              new RuleCondition()
+//                .withField(HOST_HEADER)
+//                .withValues(host),
               new RuleCondition()
                 .withField(PATH_PATERN)
                 .withValues(path)

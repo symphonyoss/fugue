@@ -247,6 +247,16 @@ public abstract class FugueDeploy extends CommandLineHandler
 //    return configId_;
 //  }
   
+  protected MutableJsonObject getSingleTenantConfig()
+  {
+    return singleTenantConfig_;
+  }
+  
+  protected MutableJsonObject getMultiTenantConfig()
+  {
+    return multiTenantConfig_;
+  }
+  
   protected FugueDeployAction getAction()
   {
     return action_;
