@@ -118,6 +118,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String               realm_;
   private String               region_          = "default";
   private String               tenant_;
+
+  private boolean              primaryEnvironment_ = false;
+  private boolean              primaryRegion_ = false;
+  
   private String               target_          = "-";
   private String               regionShortCode_;
   private FugueDeployAction          action_         = FugueDeployAction.DeployConfig;
@@ -156,14 +160,16 @@ public abstract class FugueDeploy extends CommandLineHandler
     for(ConfigHelper helper : helpers_)
       helper.init(this);
     
-    withFlag('s', SERVICE,          "FUGUE_SERVICE",          String.class, false, false, (v) -> service_ = v);
-    withFlag('v', ENVIRONMENT_TYPE, "FUGUE_ENVIRONMENT_TYPE", String.class, false, true,  (v) -> environmentType_ = v);
-    withFlag('e', ENVIRONMENT,      "FUGUE_ENVIRONMENT",      String.class, false, true,  (v) -> environment_ = v);
-    withFlag('r', REALM,            "FUGUE_REALM",            String.class, false, true,  (v) -> realm_ = v);
-    withFlag('g', REGION,           "FUGUE_REGION",           String.class, false, false, (v) -> region_ = v);
-    withFlag('o', "output",         "FUGUE_CONFIG_OUTPUT",    String.class, false, false, (v) -> target_ = v);
-    withFlag('t', TENANT,           "FUGUE_TENANT",           String.class, false, false, (v) -> tenant_ = v);
-    withFlag('a', ACTION,           "FUGUE_ACTION",           String.class, false, true,  (v) -> setAction(v));
+    withFlag('s', SERVICE,              "FUGUE_SERVICE",          String.class, false, false, (v) -> service_ = v);
+    withFlag('v', ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE", String.class, false, true,  (v) -> environmentType_ = v);
+    withFlag('e', ENVIRONMENT,          "FUGUE_ENVIRONMENT",      String.class, false, true,  (v) -> environment_ = v);
+    withFlag('r', REALM,                "FUGUE_REALM",            String.class, false, true,  (v) -> realm_ = v);
+    withFlag('g', REGION,               "FUGUE_REGION",           String.class, false, false, (v) -> region_ = v);
+    withFlag('o', "output",             "FUGUE_CONFIG_OUTPUT",    String.class, false, false, (v) -> target_ = v);
+    withFlag('t', TENANT,               "FUGUE_TENANT",           String.class, false, false, (v) -> tenant_ = v);
+    withFlag('a', ACTION,               "FUGUE_ACTION",           String.class, false, true,  (v) -> setAction(v));
+    withFlag('E', "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",      Boolean.class, false, true,  (v) -> primaryEnvironment_ = v);
+    withFlag('G', "primaryRegion",      "FUGUE_PRIMARY_REGION",           Boolean.class, false, false, (v) -> primaryRegion_ = v);
     
   }
 
@@ -252,6 +258,24 @@ public abstract class FugueDeploy extends CommandLineHandler
     return singleTenantConfig_;
   }
   
+  /**
+   * 
+   * @return true if this is the primary environment for this tenant/service
+   */
+  public boolean isPrimaryEnvironment()
+  {
+    return primaryEnvironment_;
+  }
+  
+  /**
+   * 
+   * @return true if this is the primary region for this tenant/service
+   */
+  public boolean isPrimaryRegion()
+  {
+    return primaryRegion_;
+  }
+  
   protected MutableJsonObject getMultiTenantConfig()
   {
     return multiTenantConfig_;
@@ -285,6 +309,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     return dnsSuffix_;
   }
+  
   /**
    * Perform the deployment.
    */

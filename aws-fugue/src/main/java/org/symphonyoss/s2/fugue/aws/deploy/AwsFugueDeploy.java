@@ -371,7 +371,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
     
-    String hostName = getServiceHostName(tenantId);
+    String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
     String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     
@@ -435,7 +435,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
   public String getServiceHostName(String tenantId)
   {
-    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+//    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    if(tenantId == null)
+      return new Name(getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    else
+      return new Name(tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
   }
 
   private void getOrCreateCluster()
@@ -823,14 +827,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
-        throw new IllegalStateException("\"Zone " + dnsName + " not found.");
+        throw new IllegalStateException("Zone " + dnsName + " not found.");
       }
     }
 }
   
   private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
   {
-    createR53RecordSet(host, regionalHost, true);
+    if(host != null)
+      createR53RecordSet(host, regionalHost, true);
+    
     createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
   }
   

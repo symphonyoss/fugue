@@ -37,6 +37,7 @@ public class StringConverter
     register(Long.class, (s) -> Long.parseLong(s));
     register(Double.class, (s) -> Double.parseDouble(s));
     register(Float.class, (s) -> Float.parseFloat(s));
+    register(Boolean.class, (s) -> Boolean.parseBoolean(s));
   }
   
   public static <T> void register(Class<T> type, IStringConverter<T> converter)
