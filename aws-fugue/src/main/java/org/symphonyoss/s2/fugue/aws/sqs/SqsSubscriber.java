@@ -96,7 +96,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         if(runIfIdle)
         {
           manager_.submit(this, runIfIdle);
-          log_.debug("Idle schedule " + queueUrl_);
+          log_.info("Idle schedule " + queueUrl_);
           manager_.printQueueSize();
         }
       }

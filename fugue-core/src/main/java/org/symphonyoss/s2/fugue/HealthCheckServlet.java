@@ -7,6 +7,7 @@
 package org.symphonyoss.s2.fugue;
 
 import java.io.IOException;
+import java.util.Date;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ public class HealthCheckServlet extends HttpServlet implements IUrlPathServlet
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException
   {
     log_.info("Reply OK to HealthCheck request from " + req.getRemoteAddr());
+    System.err.println(new Date() + " Reply OK to HealthCheck request from " + req.getRemoteAddr());
     
     resp.getOutputStream().println("<!DOCTYPE html>\n" + 
         "<html>\n" + 
