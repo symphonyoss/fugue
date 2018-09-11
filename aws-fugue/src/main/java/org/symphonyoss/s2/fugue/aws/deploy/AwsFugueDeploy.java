@@ -507,6 +507,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           case "INACTIVE":
           case "DRAINING":
             create = true;
+            break;
             
           default:
             create = false;
@@ -896,7 +897,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         resourceRecordSet
           .withWeight(1L)
-          .withSetIdentifier(getRegion().toLowerCase())
+          .withSetIdentifier(new Name(getEnvironmentType(), getEnvironment(), getRegion()).toString().toLowerCase())
           ;
       }
       
