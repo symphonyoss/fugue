@@ -104,6 +104,21 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
       {
         log_.info("Read " + messages.size() + " for " + queueUrl_);
         
+        // We need to do this before handling the message so that if there is an exception in thehandler code
+        // we don't loose this topic.
+        
+        if(runIfIdle)
+        {
+          manager_.submit(this, runIfIdle);
+          log_.debug("Idle re-schedule " + queueUrl_);
+        }
+        else
+        {
+          manager_.submit(nonIdleSubscriber_, runIfIdle);
+          log_.debug("Extra re-schedule " + queueUrl_);
+        }
+        manager_.printQueueSize();
+        
         if(messages.size() > 2 /*== messageBatchSize_*/)
         {
           manager_.submit(nonIdleSubscriber_, false);
@@ -133,17 +148,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
           trace.finished();
         }
         
-        if(runIfIdle)
-        {
-          manager_.submit(this, runIfIdle);
-          log_.debug("Idle re-schedule " + queueUrl_);
-        }
-        else
-        {
-          manager_.submit(nonIdleSubscriber_, runIfIdle);
-          log_.debug("Extra re-schedule " + queueUrl_);
-        }
-        manager_.printQueueSize();
+
       }
     }
     catch (RuntimeException e)
