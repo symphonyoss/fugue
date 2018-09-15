@@ -33,5 +33,7 @@ public interface ISecretManager
   IImmutableJsonDomNode getSecret(CredentialName secretName) throws NoSuchObjectException;
 
   void putSecret(CredentialName name, IImmutableJsonDomNode secret);
+  
+  void putSecret(CredentialName name, String secret);
 
 }

@@ -21,7 +21,7 @@
                 "arn:aws:ecs:*:*:container-instance/*",
                 "arn:aws:ecs:*:*:task/${environmentType}-*",
                 "arn:aws:ecs:*:*:cluster/*",
-                "arn:aws:s3:::${awsConfigBucket}/config/${environmentType}-*",
+                "arn:aws:s3:::fugue-*/config/${environmentType}-*",
                 "arn:aws:s3:::sym-build-secrets/*",
                 "arn:aws:iam::*:policy/${environmentType}-*",
                 "arn:aws:iam::*:role/${environmentType}-*"

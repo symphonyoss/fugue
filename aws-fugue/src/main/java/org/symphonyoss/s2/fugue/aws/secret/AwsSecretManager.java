@@ -110,10 +110,16 @@ public class AwsSecretManager implements ISecretManager
     {
       throw new NoSuchObjectException("Unable to find secret " + name, e);
     }
-  }
+}
   
   @Override
   public void putSecret(CredentialName name, IImmutableJsonDomNode secret)
+  {
+    putSecret(name, secret.toString());
+  }
+  
+  @Override
+  public void putSecret(CredentialName name, String secret)
   {
     CreateSecretRequest createSecretRequest = new CreateSecretRequest()
         .withName(name.toString())

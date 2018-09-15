@@ -93,10 +93,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String  SERVICE_DIR         = CONFIG_DIR + SERVICE;
   private static final String  DEFAULTS            = "defaults";
   private static final String  ROLES               = "roles";
-  private static final String  REGION_SHORTCODE    = "regionShortCode";
   private static final String  FQ_SERVICE_NAME    = "fullyQualifiedServiceName";
   private static final String  FQ_INSTANCE_NAME    = "fullyQualifiedInstanceName";
-  private static final String  SHORT_INSTANCE_NAME = "shortInstanceName";
 
   private static final Logger log_ = LoggerFactory.getLogger(FugueDeploy.class);
   private static final String SINGLE_TENANT = "singleTenant";
@@ -106,8 +104,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String HEALTH_CHECK_PATH = "healthCheckPath";
   private static final String CONTAINERS = "containers";
 
-  private static final String            DNS_SUFFIX                      = "dnsSuffix";
-  
+  private static final String  DNS_SUFFIX          = "dnsSuffix";
+
   private final String         cloudServiceProvider_;
   private final ConfigProvider provider_;
   private final ConfigHelper[] helpers_;
@@ -116,23 +114,22 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String               environment_;
   private String               environmentType_;
   private String               realm_;
-  private String               region_          = "default";
+  private String               region_             = "default";
   private String               tenant_;
 
   private boolean              primaryEnvironment_ = false;
-  private boolean              primaryRegion_ = false;
-  
-  private String               target_          = "-";
-  private String               regionShortCode_;
-  private FugueDeployAction          action_         = FugueDeployAction.DeployConfig;
+  private boolean              primaryRegion_      = false;
+
+  private String               target_             = "-";
+  private FugueDeployAction    action_             = FugueDeployAction.DeployConfig;
   private MutableJsonObject    singleTenantConfig_;
   private MutableJsonDom       singleTenantConfigDom_;
   private MutableJsonObject    multiTenantConfig_;
   private MutableJsonDom       multiTenantConfigDom_;
   private MutableJsonObject    configId_;
-  private Map<String, String>  templateVariables_ = new HashMap<>();
-  private MutableJsonObject tenantConfig_;
-  private String dnsSuffix_;
+  private Map<String, String>  templateVariables_  = new HashMap<>();
+  private MutableJsonObject    tenantConfig_;
+  private String               dnsSuffix_;
   
   protected abstract void createEnvironmentType();
   protected abstract void createEnvironment();
@@ -161,14 +158,14 @@ public abstract class FugueDeploy extends CommandLineHandler
       helper.init(this);
     
     withFlag('s', SERVICE,              "FUGUE_SERVICE",          String.class, false, false, (v) -> service_ = v);
-    withFlag('v', ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE", String.class, false, true,  (v) -> environmentType_ = v);
-    withFlag('e', ENVIRONMENT,          "FUGUE_ENVIRONMENT",      String.class, false, true,  (v) -> environment_ = v);
-    withFlag('r', REALM,                "FUGUE_REALM",            String.class, false, true,  (v) -> realm_ = v);
+    withFlag('v', ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE", String.class, false, false,  (v) -> environmentType_ = v);
+    withFlag('e', ENVIRONMENT,          "FUGUE_ENVIRONMENT",      String.class, false, false,  (v) -> environment_ = v);
+    withFlag('r', REALM,                "FUGUE_REALM",            String.class, false, false,  (v) -> realm_ = v);
     withFlag('g', REGION,               "FUGUE_REGION",           String.class, false, false, (v) -> region_ = v);
     withFlag('o', "output",             "FUGUE_CONFIG_OUTPUT",    String.class, false, false, (v) -> target_ = v);
     withFlag('t', TENANT,               "FUGUE_TENANT",           String.class, false, false, (v) -> tenant_ = v);
-    withFlag('a', ACTION,               "FUGUE_ACTION",           String.class, false, true,  (v) -> setAction(v));
-    withFlag('E', "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",      Boolean.class, false, true,  (v) -> primaryEnvironment_ = v);
+    withFlag('a', ACTION,               "FUGUE_ACTION",           String.class, false, false,  (v) -> setAction(v));
+    withFlag('E', "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",      Boolean.class, false, false,  (v) -> primaryEnvironment_ = v);
     withFlag('G', "primaryRegion",      "FUGUE_PRIMARY_REGION",           Boolean.class, false, false, (v) -> primaryRegion_ = v);
     
   }
@@ -187,16 +184,24 @@ public abstract class FugueDeploy extends CommandLineHandler
    */
   public String getService()
   {
-    return service_;
+    return require("service", service_);
   }
 
+  public <T> T require(String name, T value)
+  {
+    if(value == null)
+      throw new IllegalArgumentException("\"" + name + "\" is a required parameter");
+    
+    return value;
+  }
+  
   /**
    * 
    * @return The environment ID.
    */
   public String getEnvironment()
   {
-    return environment_;
+    return require("environment", environment_);
   }
 
   /**
@@ -205,7 +210,7 @@ public abstract class FugueDeploy extends CommandLineHandler
    */
   public String getRealm()
   {
-    return realm_;
+    return require("realm", realm_);
   }
   
   /**
@@ -214,24 +219,16 @@ public abstract class FugueDeploy extends CommandLineHandler
    */
   public String getRegion()
   {
-    return region_;
+    return require("region", region_);
   }
-
-  /**
-   * 
-   * @return the region short code.
-   */
-  public String getRegionShortCode()
-  {
-    return regionShortCode_;
-  }
+  
   /**
    * 
    * @return The environment type "dev", "qa" etc.
    */
   public String getEnvironmentType()
   {
-    return environmentType_;
+    return require("environmentType", environmentType_);
   }
 
   /**
@@ -283,7 +280,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   protected FugueDeployAction getAction()
   {
-    return action_;
+    return require("action", action_);
   }
 
   protected Map<String, String> getTemplateVariables()
@@ -564,8 +561,6 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     configId_ = fetchOverrides();
     
-    regionShortCode_ = multiTenantConfig_.getRequiredString(REGION_SHORTCODE);
-    
     Iterator<String> it = configId_.getNameIterator();
     
     while(it.hasNext())
@@ -581,7 +576,6 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     templateVariables_.put(FQ_INSTANCE_NAME, new Name(environmentType_, environment_, realm_, region_, tenant_, service_).toString());
     templateVariables_.put(FQ_SERVICE_NAME, new Name(environmentType_, environment_, realm_, region_, service_).toString());
-    templateVariables_.put(SHORT_INSTANCE_NAME, new Name(regionShortCode_, tenant_, service_).toString());
   }
 
 
@@ -634,11 +628,11 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   private void populateId(MutableJsonObject id)
   {
-    id.addIfNotNull(ENVIRONMENT + ID_SUFFIX,  getEnvironment());
-    id.addIfNotNull(ENVIRONMENT_TYPE,         getEnvironmentType());
-    id.addIfNotNull(REALM + ID_SUFFIX,        getRealm());
-    id.addIfNotNull(REGION + ID_SUFFIX,       getRegion());
-    id.addIfNotNull(SERVICE + ID_SUFFIX,      getService());
+    id.addIfNotNull(ENVIRONMENT + ID_SUFFIX,  environment_);
+    id.addIfNotNull(ENVIRONMENT_TYPE,         environmentType_);
+    id.addIfNotNull(REALM + ID_SUFFIX,        realm_);
+    id.addIfNotNull(REGION + ID_SUFFIX,       region_);
+    id.addIfNotNull(SERVICE + ID_SUFFIX,      service_);
   }
   
   private void fetchService()
@@ -794,13 +788,22 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     fetch(required, json, dir, ENVIRONMENT_TYPE, "environment type", environmentType_);  
     
+    if(environment_ == null)
+      return json;
+    
     dir = dir + "/" + environment_;
     
     fetch(required, json, dir, ENVIRONMENT, "environment", environment_);
     
+    if(realm_ == null)
+      return json;
+    
     dir = dir + "/" + realm_;
     
     fetch(required, json, dir, REALM, "realm", realm_);
+    
+    if(region_ == null)
+      return json;
     
     dir = dir + "/" + region_;
     

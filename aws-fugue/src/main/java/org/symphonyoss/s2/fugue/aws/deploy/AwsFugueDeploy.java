@@ -24,8 +24,9 @@
 package org.symphonyoss.s2.fugue.aws.deploy;
 
 import java.io.IOException;
-import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -48,9 +49,11 @@ import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
+import org.symphonyoss.s2.fugue.aws.secret.AwsSecretManager;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
+import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.Name;
 
 import com.amazonaws.services.ecs.AmazonECS;
@@ -219,10 +222,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       .defaultClient();
   private final AWSSecurityTokenService  sts_                          = AWSSecurityTokenServiceClientBuilder
       .defaultClient();
+  private final AwsSecretManager         secretManager_                = new AwsSecretManager("us-east-1");
 
   private String                         awsAccountId_;
 //  private User                           awsUser_;
   private String                         awsRegion_;
+  private String                         awsClientRegion_ = "us-east-1"; // used to create client instances
   private String                         awsVpcId_;
   private String                         awsLoadBalancerCertArn_;
   private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
@@ -281,6 +286,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     super(AMAZON, provider, helpers);
   }
   
+  public String getAwsRegion()
+  {
+    return require("AWS Region", awsRegion_);
+  }
+  
   private String getPolicyArn(String policyName)
   {
     return getIamPolicy("policy", policyName);
@@ -307,13 +317,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
   private void saveConfig(String target, ImmutableJsonDom dom, String name)
   {
-    String bucketName = environmentTypeConfigBuckets_.get(awsRegion_);
+    String bucketName = environmentTypeConfigBuckets_.get(getAwsRegion());
     String key = CONFIG + "/" + name + DOT_JSON;
     
-    log_.info("Saving config to region: " + awsRegion_ + " bucket: " + bucketName + " key: " + key);
+    log_.info("Saving config to region: " + getAwsRegion() + " bucket: " + bucketName + " key: " + key);
     
     AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
-        .withRegion(awsRegion_)
+        .withRegion(getAwsRegion())
         .build();
   
     try
@@ -1113,9 +1123,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       IJsonObject<?> amazon = ((IJsonObject<?>)node);
       
       awsAccountId_           = amazon.getRequiredString(ACCOUNT_ID);
-      awsRegion_              = amazon.getRequiredString(REGION);
+      awsRegion_              = amazon.getString(REGION, null);
       awsVpcId_               = amazon.getRequiredString(VPC_ID);
       awsLoadBalancerCertArn_ = amazon.getRequiredString(LOAD_BALANCER_CERTIFICATE_ARN);
+
+      if(awsRegion_ != null)
+        awsClientRegion_ = awsRegion_;
       
 //        awsIalbArn_   = amazon.getRequiredString(IALB_ARN);
 //        awsIalbDns_   = amazon.getRequiredString(IALB_DNS);
@@ -1158,7 +1171,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           environmentTypeConfigBuckets_.put(name, bucketName);
           
-          if(name.equals(awsRegion_))
+          if(awsRegion_ != null && name.equals(awsRegion_))
             getTemplateVariables().put(AWS_CONFIG_BUCKET, bucketName);
         }
       }
@@ -1171,23 +1184,23 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
 
       elbClient_ = AmazonElasticLoadBalancingClientBuilder.standard()
-          .withRegion(awsRegion_)
+          .withRegion(awsClientRegion_)
           .build();
       
       r53Clinet_ = AmazonRoute53ClientBuilder.standard()
-          .withRegion(awsRegion_)
+          .withRegion(awsClientRegion_)
           .build();
       
       iamClient_ = AmazonIdentityManagementClientBuilder.standard()
-        .withRegion(awsRegion_)
+        .withRegion(awsClientRegion_)
         .build();
       
       ecsClient_ = AmazonECSClientBuilder.standard()
-          .withRegion(awsRegion_)
+          .withRegion(awsClientRegion_)
           .build();
       
       logsClient_ = AWSLogsClientBuilder.standard()
-          .withRegion(awsRegion_)
+          .withRegion(awsClientRegion_)
           .build();
     }
     else
@@ -1232,16 +1245,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     String baseName = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
     
-    createEnvironmentAdminUser(baseName);
+    try
+    (
+        PrintWriter   secret = new PrintWriter(new StringWriter());
+    )
+    {
+      createEnvironmentAdminUser(baseName, secret);
+      
+      CredentialName  name = new CredentialName(getEnvironmentType(),
+          getEnvironment(), // environment
+          null, // realm
+          null, // tenant
+          "root");
+      
+      secretManager_.putSecret(name, secret.toString());
+    }
   }
   
-  private void createEnvironmentAdminUser(String baseName)
+  private void createEnvironmentAdminUser(String baseName, PrintWriter secret)
   {
     String name = baseName + ADMIN_SUFFIX;
     
     String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
     String groupName = createGroup(name, policyArn);
-    createUser(name, groupName, System.out);
+    createUser(name, groupName, secret);
     
     createRole(name, policyArn);
   }
@@ -1251,8 +1278,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     String baseName = FUGUE_PREFIX + getEnvironmentType();
     
-    createEnvironmentTypeAdminUser(baseName);
-    createEnvironmentTypeCicdUser(baseName);
+    try
+    (
+        PrintWriter   secret = new PrintWriter(new StringWriter());
+    )
+    {
+      createEnvironmentTypeAdminUser(baseName, secret);
+      createEnvironmentTypeCicdUser(baseName, secret);
+      
+      CredentialName  name = new CredentialName(getEnvironmentType(),
+          null, // environment
+          null, // realm
+          null, // tenant
+          "root");
+      
+      secretManager_.putSecret(name, secret.toString());
+    }
     
     for(String region : environmentTypeRegions_)
     {
@@ -1260,22 +1301,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
   }
 
-  private void createEnvironmentTypeAdminUser(String baseName)
+  private void createEnvironmentTypeAdminUser(String baseName, PrintWriter secret)
   {
     String name = baseName + ADMIN_SUFFIX;
     
     String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
     String groupName = createGroup(name, policyArn);
-    createUser(name, groupName, System.out);
+    createUser(name, groupName, secret);
   }
   
-  private void createEnvironmentTypeCicdUser(String baseName)
+  private void createEnvironmentTypeCicdUser(String baseName, PrintWriter secret)
   {
     String name = baseName + CICD_SUFFIX;
     
     String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
     String groupName = createGroup(name, policyArn);
-    createUser(name, groupName, System.out);
+    createUser(name, groupName, secret);
     
     createRole(name, policyArn);
   }
@@ -1292,7 +1333,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
 
-  private String createUser(String name, String groupName, PrintStream out)
+  private String createUser(String name, String groupName, PrintWriter secret)
   {
     String userName       = name + USER_SUFFIX;
     
@@ -1323,18 +1364,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       log_.debug("Created user " + userName);
       
-      if(out != null)
+      if(secret != null)
       {
         AccessKey accessKey = iam_.createAccessKey(new CreateAccessKeyRequest()
             .withUserName(userName)).getAccessKey();
         
-        out.println("#######################################################");
-        out.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
-        out.println("#######################################################");
-        out.format("[%s]%n", userName);
-        out.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
-        out.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
-        out.println("#######################################################");
+//        secret.println("#######################################################");
+//        secret.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
+//        secret.println("#######################################################");
+//        secret.format("[%s]%n", userName);
+//        secret.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
+//        secret.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
+//        secret.println("#######################################################");
+        
+
+          secret.println("{");
+          secret.println("  \"" + userName + "\": {");
+          secret.println("    \"accessKeyId\": \"" + accessKey.getAccessKeyId() + "\",");
+          secret.println("    \"secretAccessKey\": \"" + accessKey.getSecretAccessKey() + "\",");
+          secret.println("  }");
+          secret.println("}");
       }
     }
     
