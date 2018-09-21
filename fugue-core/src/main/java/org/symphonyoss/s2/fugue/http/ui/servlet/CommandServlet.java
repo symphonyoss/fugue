@@ -35,7 +35,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.dom.json.JsonDom;
+import org.symphonyoss.s2.common.dom.json.IJsonDom;
 
 public class CommandServlet extends HttpServlet
 {
@@ -71,7 +71,7 @@ public class CommandServlet extends HttpServlet
     doGet(req, resp);
   }
   
-  protected void  respondOK(HttpServletResponse resp, JsonDom<?>... results) throws IOException
+  protected void  respondOK(HttpServletResponse resp, IJsonDom<?>... results) throws IOException
   {
     if(results.length==0)
     {
@@ -81,7 +81,7 @@ public class CommandServlet extends HttpServlet
     {
       try(PrintWriter out = resp.getWriter())
       {
-        for(JsonDom<?> result : results)
+        for(IJsonDom<?> result : results)
         {
           out.println(result.toString());
         }

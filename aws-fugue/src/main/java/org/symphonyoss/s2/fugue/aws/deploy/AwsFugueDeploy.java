@@ -1269,12 +1269,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     String name = baseName + ADMIN_SUFFIX;
     
     String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
-    String groupName = createGroup(name, policyArn);
-    String result    = createUser(name, groupName);
+//    String groupName = createGroup(name, policyArn);
+//    String result    = createUser(name, groupName);
     
     createRole(name, policyArn);
 
-    return result;
+//    return result;
+    return null;
   }
 
   @Override
@@ -1338,12 +1339,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     String name = baseName + ADMIN_SUFFIX;
     
     String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
-    String groupName = createGroup(name, policyArn);
-    String result    = createUser(name, groupName);
+//    String groupName = createGroup(name, policyArn);
+//    String result    = createUser(name, groupName);
     
     createRole(name, policyArn);
     
-    return result;
+    // We don't need to create an access key for this: return result;
+    return null;
   }
   
   private String createEnvironmentTypeCicdUser(String baseName)
