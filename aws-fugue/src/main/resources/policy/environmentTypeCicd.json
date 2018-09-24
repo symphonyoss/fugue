@@ -20,7 +20,6 @@
                 "iam:GetPolicy",
                 "iam:PassRole",
                 "ecs:StartTask",
-                "ecs:DescribeClusters",
                 "s3:GetObject",
                 "ecs:SubmitContainerStateChange",
                 "ecs:ListContainerInstances",
@@ -35,6 +34,7 @@
                 "arn:aws:s3:::sym-build-secrets/*",
                 "arn:aws:iam::*:policy/${environmentType}-*",
                 "arn:aws:iam::*:role/fugue-${environmentType}-admin-role",
+                "arn:aws:iam::*:role/ecsTaskExecutionRole",
                 "arn:aws:iam::*:role/${environmentType}-*"
             ]
         },
@@ -51,6 +51,8 @@
                 "ecs:DescribeTaskDefinition",
                 "ecs:ListTaskDefinitions",
                 "ecs:ListClusters",
+                "ecs:DescribeClusters",
+                "ecs:CreateCluster",
                 "ecs:RegisterTaskDefinition",
                 "ecs:RunTask",
                 "ecs:ListTasks",
