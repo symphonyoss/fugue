@@ -32,7 +32,8 @@
             "Effect": "Allow",
             "Action": [
                 "elasticloadbalancing:CreateListener",
-                "elasticloadbalancing:CreateLoadBalancer"
+                "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:AddTags"
             ],
             "Resource": "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
         },
@@ -43,7 +44,8 @@
                 "elasticloadbalancing:CreateTargetGroup",
                 "elasticloadbalancing:ModifyRule",
                 "elasticloadbalancing:CreateRule",
-                "elasticloadbalancing:DeleteRule"
+                "elasticloadbalancing:DeleteRule",
+                "elasticloadbalancing:AddTags"
             ],
             "Resource": [
                 "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",

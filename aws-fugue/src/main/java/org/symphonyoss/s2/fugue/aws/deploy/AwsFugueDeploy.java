@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -42,10 +43,10 @@ import org.symphonyoss.s2.common.dom.IStringProvider;
 import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
-import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
-import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
+import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.aws.secret.AwsSecretManager;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
@@ -56,13 +57,8 @@ import org.symphonyoss.s2.fugue.naming.Name;
 
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
-import com.amazonaws.services.ecs.model.Cluster;
-import com.amazonaws.services.ecs.model.CreateClusterRequest;
-import com.amazonaws.services.ecs.model.CreateClusterResult;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
 import com.amazonaws.services.ecs.model.CreateServiceResult;
-import com.amazonaws.services.ecs.model.DescribeClustersRequest;
-import com.amazonaws.services.ecs.model.DescribeClustersResult;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
 import com.amazonaws.services.ecs.model.Service;
@@ -72,6 +68,7 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
+import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
@@ -98,6 +95,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
 import com.amazonaws.services.elasticloadbalancingv2.model.RuleCondition;
+import com.amazonaws.services.elasticloadbalancingv2.model.Tag;
 import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
 import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundException;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
@@ -174,6 +172,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            ACCOUNT_ID                    = "accountId";
   private static final String            REGION                        = "regionName";
   private static final String            REGIONS                       = "environmentTypeRegions";
+  private static final String            CLUSTER_NAME                  = "ecsCluster";
   private static final String            VPC_ID                        = "vpcId";
   private static final String            LOAD_BALANCER_CERTIFICATE_ARN = "loadBalancerCertificateArn";
   private static final String            LOAD_BALANCER_SECURITY_GROUPS = "loadBalancerSecurityGroups";
@@ -236,36 +235,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
   private List<String>                   environmentTypeRegions_       = new LinkedList<>();
   private Map<String, String>            environmentTypeConfigBuckets_ = new HashMap<>();
+  private String                         configBucket_;
   private String                         callerRefPrefix_              = UUID.randomUUID().toString() + "-";
 
   private AmazonElasticLoadBalancing     elbClient_;
   private AmazonRoute53                  r53Clinet_;
   private AmazonIdentityManagement       iamClient_;
 
-  private String baseZoneId_;
-//  private String s2ZoneId_;
-//  private String environmentTypeZoneId_;
-//  private String environmentZoneId_;
-//  private String regionZoneId_;
-//  private String regionalServiceZoneId_;
-//  private String serviceZoneId_;
-//  private String tenantZoneId_;
-//  private String regionalTenantZoneId_;
-  private LoadBalancer singleTenantLoadBalancer_;
-  private LoadBalancer multiTenantLoadBalancer_;
-
-  private String singleTenantDefaultTargetGroupArn_;
-  private String multiTenantDefaultTargetGroupArn_;
-
-  private String singleTenantListenerArn_;
-
-  private String multiTenantListenerArn_;
-
   private AmazonECS ecsClient_;
 
-  private Name clusterName_;
-
-  private String clusterArn_;
+  private String clusterName_;
+//
+//  private String clusterArn_;
 
   private AWSLogs logsClient_;
 
@@ -284,7 +265,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     super(AMAZON, provider, helpers);
   }
   
-  public String getAwsRegion()
+  @Override
+  protected DeploymentContext createContext(String tenantId)
+  {
+    return new AwsDeploymentContext(tenantId);
+  }
+
+  private String getAwsRegion()
   {
     return require("AWS Region", awsRegion_);
   }
@@ -303,65 +290,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     return String.format("arn:aws:%s::%s:%s/%s", service, awsAccountId_, type, name);
   }
-
-  @Override
-  public void saveConfig(String target, ImmutableJsonDom multiTenantConfig, ImmutableJsonDom singleTenantConfig)
-  {
-    saveConfig(target, multiTenantConfig, getConfigName(null));
-    
-    if(singleTenantConfig != null)
-      saveConfig(target, singleTenantConfig, getConfigName(getTenant()));
-  }
-
-  private void saveConfig(String target, ImmutableJsonDom dom, String name)
-  {
-    String bucketName = environmentTypeConfigBuckets_.get(getAwsRegion());
-    String key = CONFIG + "/" + name + DOT_JSON;
-    
-    log_.info("Saving config to region: " + getAwsRegion() + " bucket: " + bucketName + " key: " + key);
-    
-    AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
-        .withRegion(getAwsRegion())
-        .build();
-  
-    try
-    {
-      ObjectMetadata metaData = s3Client.getObjectMetadata(bucketName, key);
-      
-      if(APPLICATION_JSON.equals(metaData.getContentType()) && metaData.getContentLength() == dom.serialize().length())
-      {
-        S3Object existingContent = s3Client.getObject(bucketName, key);
-        int i;
-        
-        for(i=0 ; i<metaData.getContentLength() ; i++)
-          if(existingContent.getObjectContent().read() != dom.serialize().byteAt(i))
-            break;
-        
-        if(i == metaData.getContentLength())
-        {
-          log_.info("Configuration has not changed, no need to overwrite.");
-          return;
-        }
-      }
-      // else its not the right content so overwrite it.
-    }
-    catch(AmazonS3Exception e)
-    {
-      // Nothing here we will overwrite the object below...
-    }
-    catch (IOException e)
-    {
-      abort("Unexpected S3 error reading current value of config object " + bucketName + "/" + key, e);
-    }
-    
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setContentType(APPLICATION_JSON);
-    metadata.setContentLength(dom.serialize().length());
-    
-    PutObjectRequest request = new PutObjectRequest(bucketName, key, dom.serialize().getInputStream(), metadata);
-    
-    s3Client.putObject(request);
-  }
   
   private void abort(String message, Throwable cause)
   {
@@ -370,38 +298,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     throw new IllegalStateException(message, cause);
   }
   
-  @Override
-  protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, String tenantId)
-  {
-    try
-    {
-    Name targetGroupName = new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
-    
-    String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-    
-    String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
-    String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-    String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-    
-    configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath, tenantId);
-    
-    createR53RecordSet(hostName, regionalHostName, tenantId == null ? multiTenantLoadBalancer_ : singleTenantLoadBalancer_);
-    
-    getOrCreateCluster();
-    
-//    registerTaskDef(name, port, healthCheckPath, tenantId);
-    
-    createService(regionalHostName, targetGroupArn, name, port, tenantId);
-    
-    System.err.println("All done!");
-    }
-    catch(RuntimeException e)
-    {
-      e.printStackTrace();
-      
-      throw e;
-    }
-  }
+  
   
   // Need to figure out how to do templates for this...
 //  private void registerTaskDef(String name, int port, String healthCheckPath, String tenantId)
@@ -441,7 +338,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    log_.info("LogGroup " + logGroupName + " created.");
 //  }
 
-  public String getServiceHostName(String tenantId)
+  private String getServiceHostName(String tenantId)
   {
 //    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     if(tenantId == null)
@@ -452,55 +349,50 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
   private void getOrCreateCluster()
   {
-    clusterName_ = new Name(getEnvironmentType(), getEnvironment(),getRealm(), getRegion());
-    
-    DescribeClustersResult describeResult = ecsClient_.describeClusters(new DescribeClustersRequest()
-        .withClusters(clusterName_.toString())
-        );
-    
-    for(Cluster cluster : describeResult.getClusters())
-    {
-      if(clusterName_.toString().equals(cluster.getClusterName()))
-      {
-        clusterArn_ = cluster.getClusterArn();
-        
-        break;
-      }
-    }
-    
-    if(clusterArn_ == null)
-    {
-      log_.info("Cluster does not exist, creating...");
-      
-      CreateClusterResult createResult = ecsClient_.createCluster(new CreateClusterRequest()
-          .withClusterName(clusterName_.toString())
-          );
-      
-      clusterArn_ = createResult.getCluster().getClusterArn();
-      
-      log_.info("Cluster " + clusterArn_ + " created.");
-    }
-    else
-    {
-      log_.info("Cluster " + clusterArn_ + " aready exists.");
-    }
+    // We are using pre-created EC2 clusters for now...
+//    clusterName_ = new Name(getEnvironmentType(), getEnvironment(),getRealm(), getRegion());
+//    
+//    DescribeClustersResult describeResult = ecsClient_.describeClusters(new DescribeClustersRequest()
+//        .withClusters(clusterName_.toString())
+//        );
+//    
+//    for(Cluster cluster : describeResult.getClusters())
+//    {
+//      if(clusterName_.toString().equals(cluster.getClusterName()))
+//      {
+//        clusterArn_ = cluster.getClusterArn();
+//        
+//        break;
+//      }
+//    }
+//    
+//    if(clusterArn_ == null)
+//    {
+//      log_.info("Cluster does not exist, creating...");
+//      
+//      CreateClusterResult createResult = ecsClient_.createCluster(new CreateClusterRequest()
+//          .withClusterName(clusterName_.toString())
+//          );
+//      
+//      clusterArn_ = createResult.getCluster().getClusterArn();
+//      
+//      log_.info("Cluster " + clusterArn_ + " created.");
+//    }
+//    else
+//    {
+//      log_.info("Cluster " + clusterArn_ + " aready exists.");
+//    }
   }
 
   private void createService(String regionalHostName, String targetGroupArn, String name, int port, String tenantId)
   {
-    // TODO: FIXME:
-    String clusterName = "sym-ms-devb-ause1";
-    
-    if("qa".equals(getEnvironmentType()))
-        clusterName = "sym-ms-qa-ause1";
-    
-    log_.info("Cluster name is " + clusterName);
+    log_.info("Cluster name is " + clusterName_);
     
     Name    serviceName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
     boolean create      = true;
     
     DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
-        .withCluster(clusterName)
+        .withCluster(clusterName_)
         .withServices(serviceName.toString())
         );
     
@@ -528,7 +420,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.info("Creating service " + serviceName + "...");
       
       CreateServiceResult createServiceResult = ecsClient_.createService(new CreateServiceRequest()
-          .withCluster(clusterName)
+          .withCluster(clusterName_)
           .withServiceName(serviceName.toString())
           .withTaskDefinition(serviceName.toString())
           .withDesiredCount(1)
@@ -543,10 +435,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               )
           );
       
-      System.err.println(createServiceResult);
-      
-      System.err.println(createServiceResult.getService());
-      
       log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
     }
     else
@@ -554,252 +442,64 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.info("Updating service " + serviceName + "...");
       
       UpdateServiceResult updateResult = ecsClient_.updateService(new UpdateServiceRequest()
-          .withCluster(clusterName)
+          .withCluster(clusterName_)
           .withService(serviceName.toString())
           .withTaskDefinition(serviceName.toString())
           .withDesiredCount(1)
 //          .withForceNewDeployment(true)
           );
       
-      System.err.println(updateResult);
-      
       log_.info("Updated service " + serviceName + "as" + updateResult.getService().getServiceArn() + " with status " + updateResult.getService().getStatus() + ".");
     }
   }
 
-  @Override
-  protected void deployService(boolean hasSingleTenantContainer, boolean hasMultiTenantContainer)
-  {
-    createDnsZones();
-    
-    createLoadBalancer(hasSingleTenantContainer, hasMultiTenantContainer);
-  }
   
-  private void createLoadBalancer(boolean hasSingleTenantContainer, boolean hasMultiTenantContainer)
-  {
-    if(hasSingleTenantContainer && getTenant() != null)
-    {
-      singleTenantLoadBalancer_ = createLoadBalancer(getTenant());
-      
-      if(singleTenantDefaultTargetGroupArn_ == null)
-      {
-        Name name = new Name(getEnvironmentType(), getEnvironment(), getTenant(), getService(), DEFAULT);
-        
-        singleTenantDefaultTargetGroupArn_ = createTargetGroup(name, "/HealthCheck", 80);
-      }
-      
-      singleTenantListenerArn_ = createLoadBalancerListener(singleTenantLoadBalancer_, singleTenantDefaultTargetGroupArn_);
-    }
-    
-    if(hasMultiTenantContainer)
-    {
-      multiTenantLoadBalancer_ = createLoadBalancer(null);
-      
-      if(multiTenantDefaultTargetGroupArn_ == null){
-        Name name = new Name(getEnvironmentType(), getEnvironment(), getService(), DEFAULT);
 
-        multiTenantDefaultTargetGroupArn_ = createTargetGroup(name, "/HealthCheck", 80);
-      }
-
-      multiTenantListenerArn_ = createLoadBalancerListener(multiTenantLoadBalancer_, multiTenantDefaultTargetGroupArn_);
-    }
-  }
-
-  private String createLoadBalancerListener(LoadBalancer loadBalancer, String defaultTargetGroupArn)
-  {
-    DescribeListenersResult describeResponse = elbClient_.describeListeners(new DescribeListenersRequest()
-        .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-        );
-    
-    List<Listener> listeners = describeResponse.getListeners();
-    
-    if(!listeners.isEmpty())
-    {
-      String listenerArn = listeners.get(0).getListenerArn();
-      log_.info("Listener " + listenerArn + " already exists.");
-      return listenerArn;
-    }
-//    for(Listener listener : listeners)
-//    {
-//      if(ProtocolEnum.HTTPS.equals(listener.getProtocol()))
-//      {
-//        for(Certificate cert : listener.getCertificates())
-//        {
-//          cert.getCertificateArn()
-//        }
-//      }
-//    }
-    
-    
-    log_.info("Creating listener...");
-    
-//    elbClient_.Cer
-//    GetServerCertificateResult certificateResult = iamClient_.getServerCertificate(new GetServerCertificateRequest()
-//        .withServerCertificateName("NAME")
-//        );
+//  private void createDnsZones()
+//  {
+//    String name       = getDnsSuffix();
 //    
-//    Certificate certificate = certificateResult.getServerCertificate();
-    
-//    elbClient_.addListenerCertificates(new AddListenerCertificatesRequest()
-//        .withCertificates(certificates)
-//        );
-    
-    CreateListenerResult createResult = elbClient_.createListener(new CreateListenerRequest()
-        .withCertificates(new Certificate()
-          .withCertificateArn(awsLoadBalancerCertArn_)
-        )
-        .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-        .withProtocol(ProtocolEnum.HTTPS)
-        .withPort(443)
-        .withDefaultActions(new Action()
-            .withType(ActionTypeEnum.Forward)
-            .withTargetGroupArn(defaultTargetGroupArn)
-            )
-        );
-    
-    listeners = createResult.getListeners();
-    
-    String listenerArn = listeners.get(0).getListenerArn();
-    log_.info("Listener " + listenerArn + " created.");
-    return listenerArn;
-  }
-
-  private LoadBalancer createLoadBalancer(String tenant)
-  {
-    String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
-    
-    try
-    {
-      DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
-          .withNames(name)
-          );
-      
-      List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
-      
-      if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
-      {
-        LoadBalancer loadBalancer = loadBalancerList.get(0);
-  
-        log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
-        
-        boolean ok = true;
-        
-        // So the LB exists, check that ithas the correct security groups and subnets
-        int     cnt = awsLoadBalancerSecurityGroups_.size();
-        
-        for(String sg : loadBalancer.getSecurityGroups())
-        {
-          if(awsLoadBalancerSecurityGroups_.contains(sg))
-          {
-            cnt--;
-          }
-          else
-          {
-            ok = false;
-            break;
-          }
-        }
-        
-        if(cnt > 0)
-          ok = false;
-        
-        if(ok)
-        {
-          cnt = awsLoadBalancerSubnets_.size();
-          for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
-          {
-            if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
-            {
-              cnt--;
-            }
-            else
-            {
-              ok = false;
-              break;
-            }
-          }
-          
-          if(cnt > 0)
-            ok = false;
-        }
-        
-        if(ok)
-        {
-          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
-          return loadBalancer;
-        }
-        else
-        {
-          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
-          
-          // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
-          throw new IllegalStateException("Loadbalancer needs to be updated");
-        }
-      }
-    }
-    catch(LoadBalancerNotFoundException e)
-    {
-      log_.info("Load balancer " + name + " does not exist, creating...");
-    }
-
-    CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
-        .withName(name)
-        .withSecurityGroups(awsLoadBalancerSecurityGroups_)
-        .withSubnets(awsLoadBalancerSubnets_)
-        );
-    
-    LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
-    
-    log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
-    
-    return loadBalancer;
-  }
-
-  private void createDnsZones()
-  {
-    String name       = getDnsSuffix();
-    
-    if(baseZoneId_ == null)
-      baseZoneId_ = createOrGetHostedZone(name, false);
-    
-//    name = getEnvironmentType() + "." + name;
+//    if(baseZoneId_ == null)
+//      baseZoneId_ = createOrGetHostedZone(name, false);
 //    
-////    if(environmentTypeZoneId_ == null)
-////      environmentTypeZoneId_ = createOrGetHostedZone(name);
-//    
-//    name = getEnvironment() + "." + name;
-//    
-////    if(environmentZoneId_ == null)
-////      environmentZoneId_ = createOrGetHostedZone(name);
-//    
-//    String regionalName = getRegion() + "." + name;
-//    
-////    if(regionZoneId_ == null)
-////      regionZoneId_ = createOrGetHostedZone(regionalName);
-//    
-//    name = getService() + "." + name;
-//    
-//    if(serviceZoneId_ == null)
-//      serviceZoneId_ = createOrGetHostedZone(name);
-//    
-//    regionalName = getService() + "." + regionalName;
-//    
-//    if(regionalServiceZoneId_ == null)
-//      regionalServiceZoneId_ = createOrGetHostedZone(regionalName);
-//    
-////    if(getTenant() != null)
-////    {
-////      name = getTenant() + "." + name;
-////      
-////      if(tenantZoneId_ == null)
-////        tenantZoneId_ = createOrGetHostedZone(name);
-////      
-////      regionalName = getTenant() + "." + regionalName;
-////      
-////      if(regionalTenantZoneId_ == null)
-////        regionalTenantZoneId_ = createOrGetHostedZone(regionalName);
-////    }
-  }
+////    name = getEnvironmentType() + "." + name;
+////    
+//////    if(environmentTypeZoneId_ == null)
+//////      environmentTypeZoneId_ = createOrGetHostedZone(name);
+////    
+////    name = getEnvironment() + "." + name;
+////    
+//////    if(environmentZoneId_ == null)
+//////      environmentZoneId_ = createOrGetHostedZone(name);
+////    
+////    String regionalName = getRegion() + "." + name;
+////    
+//////    if(regionZoneId_ == null)
+//////      regionZoneId_ = createOrGetHostedZone(regionalName);
+////    
+////    name = getService() + "." + name;
+////    
+////    if(serviceZoneId_ == null)
+////      serviceZoneId_ = createOrGetHostedZone(name);
+////    
+////    regionalName = getService() + "." + regionalName;
+////    
+////    if(regionalServiceZoneId_ == null)
+////      regionalServiceZoneId_ = createOrGetHostedZone(regionalName);
+////    
+//////    if(getTenant() != null)
+//////    {
+//////      name = getTenant() + "." + name;
+//////      
+//////      if(tenantZoneId_ == null)
+//////        tenantZoneId_ = createOrGetHostedZone(name);
+//////      
+//////      regionalName = getTenant() + "." + regionalName;
+//////      
+//////      if(regionalTenantZoneId_ == null)
+//////        regionalTenantZoneId_ = createOrGetHostedZone(regionalName);
+//////    }
+//  }
   
   private String createOrGetHostedZone(String name, boolean create)
   {
@@ -918,8 +618,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   )
               )
           );
-        
-      System.out.println(rresult);
     }
     
 /*
@@ -946,173 +644,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     */
   }
 
-  private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath,
-      String tenantId)
-  {
-    
-    List<String> remainingPaths = new ArrayList<>();
-    
-    remainingPaths.addAll(paths);
-    
-    DescribeRulesResult ruleDescription = elbClient_.describeRules(new DescribeRulesRequest()
-        .withListenerArn(tenantId == null ? multiTenantListenerArn_ : singleTenantListenerArn_)
-        );
-    
-    List<Rule> ruleList = ruleDescription.getRules();
-    int        priority = 1000;
-    
-    for(Rule rule : ruleList)
-    {
-      String conditionHost = null;
-      String conditionPath = null;
-      
-      for(RuleCondition c : rule.getConditions())
-      {
-        if(c.getField().equals(HOST_HEADER))
-        {
-          if(c.getValues().size() > 0)
-            conditionHost = c.getValues().get(0);
-        }
-        else if(c.getField().equals(PATH_PATERN))
-        {
-          if(c.getValues().size() > 0)
-            conditionPath = c.getValues().get(0);
-        }
-      }
-      
-      String actionTargetArn = null;
-      
-      // since there is only one action I cant see how there will not always be exactly one of these but....
-      for(Action action : rule.getActions())
-      {
-        actionTargetArn = action.getTargetGroupArn();
-      }
-      
-      if(host.equals(conditionHost))
-      {
-        // remove old host rules
-        
-        log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
-        
-        elbClient_.deleteRule(new DeleteRuleRequest()
-            .withRuleArn(rule.getRuleArn())
-            );
-      }
-      
-      if(conditionHost == null)
-      {
-        if(remainingPaths.remove(conditionPath))
-        {
-          if(targetGroupArn.equals(actionTargetArn))
-          {
-            log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
-          }
-          else
-          {
-            log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
-            // the rule is there but it's wrong
-            elbClient_.modifyRule(new ModifyRuleRequest()
-                .withActions(new Action()
-                    .withTargetGroupArn(targetGroupArn)
-                    .withType(ActionTypeEnum.Forward)
-                    )
-                );
-          }
-        }
-        else
-        {
-          // this rule is for a path which we don't have, maybe it was removed from the service
-          
-          if(!"default".equals(rule.getPriority()))
-          {
-            log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
-            
-            elbClient_.deleteRule(new DeleteRuleRequest()
-                .withRuleArn(rule.getRuleArn())
-                );
-          }
-        }
-      }
-      
-      if(!"default".equals(rule.getPriority()))
-      {
-        try
-        {
-          int p = Integer.parseInt(rule.getPriority());
-          
-          if(p >= priority)
-            priority = p + 1;
-        }
-        catch(NumberFormatException e)
-        {
-          log_.warn("Rule has non-integer priority: " + rule);
-        }
-      }
-    }
-    
-    for(String path : remainingPaths)
-    {
-      log_.info("Creating rule for host " + host + " for non-existant path " + path + "...");
-      
-      CreateRuleResult createRuleResult = elbClient_.createRule(new CreateRuleRequest()
-          .withListenerArn(tenantId == null ? multiTenantListenerArn_ : singleTenantListenerArn_)
-          .withConditions(
-//              new RuleCondition()
-//                .withField(HOST_HEADER)
-//                .withValues(host),
-              new RuleCondition()
-                .withField(PATH_PATERN)
-                .withValues(path)
-              )
-          .withActions(new Action()
-              .withTargetGroupArn(targetGroupArn)
-              .withType(ActionTypeEnum.Forward)
-              )
-          .withPriority(priority)
-          );
-      
-      log_.info("Created rule " + createRuleResult.getRules().get(0).getRuleArn() + " for host " + host + " for non-existant path " + path);
-    }
-  }
-
-  private String createTargetGroup(Name name, String healthCheckPath, int port)
-  {
-    String shortName = name.getShortName(32);
-    
-    try
-    {
-      DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
-      
-      List<TargetGroup> groups = desc.getTargetGroups();
-      
-      if(groups.size() != 1)
-          throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
-      
-      log_.info("Target group " + name + " (" + shortName + ") already exists.");
-      return groups.get(0).getTargetGroupArn();
-    }
-    catch(TargetGroupNotFoundException e)
-    {
-      log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
-    }
-    
-    CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
-        .withName(shortName)
-        .withHealthCheckPath(healthCheckPath)
-        .withHealthCheckProtocol(ProtocolEnum.HTTP)
-        .withProtocol(ProtocolEnum.HTTP)
-        .withVpcId(awsVpcId_)
-        .withPort(port)
-        );
-    
-    System.out.println("result=" + result);
-    
-    return result.getTargetGroups().get(0).getTargetGroupArn();
-  }
-
+  
 
   @Override
-  protected void validateAccount(MutableJsonObject config)
+  protected void validateAccount(IJsonObject<?> config)
   {
     IJsonDomNode node = config.get(AMAZON);
     
@@ -1123,6 +658,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       awsAccountId_           = amazon.getRequiredString(ACCOUNT_ID);
       awsRegion_              = amazon.getString(REGION, null);
       awsVpcId_               = amazon.getRequiredString(VPC_ID);
+      clusterName_            = amazon.getRequiredString(CLUSTER_NAME);
       awsLoadBalancerCertArn_ = amazon.getRequiredString(LOAD_BALANCER_CERTIFICATE_ARN);
 
       if(awsRegion_ != null)
@@ -1170,7 +706,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           environmentTypeConfigBuckets_.put(name, bucketName);
           
           if(awsRegion_ != null && name.equals(awsRegion_))
-            getTemplateVariables().put(AWS_CONFIG_BUCKET, bucketName);
+          {
+            configBucket_ = bucketName;
+          }
         }
       }
       else
@@ -1238,128 +776,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
   }
 
-  @Override
-  protected void createEnvironment()
-  {
-    String baseName = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
-    
-    String key1   = createEnvironmentAdminUser(baseName);
-    
-    if(key1 == null)
-    {
-      log_.info("No key created, secret unchanged.");
-    }
-    else
-    {
-      String          secret  = "{\n" + key1 + "\n}";
-      CredentialName  name    = new CredentialName("fugue-" + getEnvironmentType(),
-        getEnvironment(), // environment
-        null, // realm
-        null, // tenant
-        "root");
-    
-      secretManager_.putSecret(name, secret);
-      
-      log_.info("Created secret " + name);
-    }
-  }
-  
-  private String createEnvironmentAdminUser(String baseName)
-  {
-    String name = baseName + ADMIN_SUFFIX;
-    
-    String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
-//    String groupName = createGroup(name, policyArn);
-//    String result    = createUser(name, groupName);
-    
-    createRole(name, policyArn);
-
-//    return result;
-    return null;
-  }
-
-  @Override
-  protected void createEnvironmentType()
-  {
-    String baseName = FUGUE_PREFIX + getEnvironmentType();
-    
-    
-    String secret;
-    String key1   = createEnvironmentTypeAdminUser(baseName);
-    String key2   = createEnvironmentTypeCicdUser(baseName);
-    
-    if(key1 == null)
-    {
-      if(key2 == null)
-      {
-        secret = null;
-      }
-      else
-      {
-        secret = "{\n" + key2 + "\n}";
-      }
-    }
-    else
-    {
-      if(key2 == null)
-      {
-        secret = "{\n" + key1 + "\n}";
-      }
-      else
-      {
-        secret = "{\n" + key1 + ",\n" + key2 + "\n}";
-      }
-    }
-    
-    if(secret == null)
-    {
-      log_.info("No key created, secret unchanged.");
-    }
-    else
-    {
-      CredentialName  name = new CredentialName("fugue-" + getEnvironmentType(),
-        null, // environment
-        null, // realm
-        null, // tenant
-        "root");
-    
-      secretManager_.putSecret(name, secret);
-      
-      log_.info("Created secret " + name);
-    }
-    
-    for(String region : environmentTypeRegions_)
-    {
-      createBucketIfNecessary(region, environmentTypeConfigBuckets_.get(region));
-    }
-  }
-
-  private String createEnvironmentTypeAdminUser(String baseName)
-  {
-    String name = baseName + ADMIN_SUFFIX;
-    
-    String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
-//    String groupName = createGroup(name, policyArn);
-//    String result    = createUser(name, groupName);
-    
-    createRole(name, policyArn);
-    
-    // We don't need to create an access key for this: return result;
-    return null;
-  }
-  
-  private String createEnvironmentTypeCicdUser(String baseName)
-  {
-    String name = baseName + CICD_SUFFIX;
-    
-    String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
-    String groupName = createGroup(name, policyArn);
-    String result    = createUser(name, groupName);
-    
-//    createRole(name, policyArn);
-    
-    return result;
-  }
   
   private void createBucketIfNecessary(String region, String name)
   {
@@ -1517,10 +933,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return roleName;
   }
   
-  private String createPolicyFromResource(String name, String fileName)
-  {
-    return createPolicy(name, loadTemplateFromResource(fileName));
-  }
+  
 
   private String createPolicy(String name, String templateOutput)
   {
@@ -1631,12 +1044,630 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
 
-  @Override
-  protected void processRole(String roleName, String roleSpec, String tenant)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  protected class AwsDeploymentContext extends DeploymentContext
   {
-    String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService(), roleName).toString();
+    private LoadBalancer loadBalancer_;
+  
+    private String defaultTargetGroupArn_;
+  
+    private String listenerArn_;
     
-    String policyArn = createPolicy(name, roleSpec);
-    createRole(name, policyArn);
+    protected AwsDeploymentContext(String tenantId)
+    {
+      super(tenantId);
+    }
+
+    @Override
+    protected void createEnvironment()
+    {
+      String baseName = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
+      
+      String key1   = createEnvironmentAdminUser(baseName);
+      
+      if(key1 == null)
+      {
+        log_.info("No key created, secret unchanged.");
+      }
+      else
+      {
+        String          secret  = "{\n" + key1 + "\n}";
+        CredentialName  name    = new CredentialName("fugue-" + getEnvironmentType(),
+          getEnvironment(), // environment
+          null, // realm
+          null, // tenant
+          "root");
+      
+        secretManager_.putSecret(name, secret);
+        
+        log_.info("Created secret " + name);
+      }
+    }
+    
+    private String createEnvironmentAdminUser(String baseName)
+    {
+      String name = baseName + ADMIN_SUFFIX;
+      
+      String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
+//      String groupName = createGroup(name, policyArn);
+//      String result    = createUser(name, groupName);
+      
+      createRole(name, policyArn);
+
+//      return result;
+      return null;
+    }
+
+    @Override
+    protected void createEnvironmentType()
+    {
+      String baseName = FUGUE_PREFIX + getEnvironmentType();
+      
+      
+      String secret;
+      String key1   = createEnvironmentTypeAdminUser(baseName);
+      String key2   = createEnvironmentTypeCicdUser(baseName);
+      
+      if(key1 == null)
+      {
+        if(key2 == null)
+        {
+          secret = null;
+        }
+        else
+        {
+          secret = "{\n" + key2 + "\n}";
+        }
+      }
+      else
+      {
+        if(key2 == null)
+        {
+          secret = "{\n" + key1 + "\n}";
+        }
+        else
+        {
+          secret = "{\n" + key1 + ",\n" + key2 + "\n}";
+        }
+      }
+      
+      if(secret == null)
+      {
+        log_.info("No key created, secret unchanged.");
+      }
+      else
+      {
+        CredentialName  name = new CredentialName("fugue-" + getEnvironmentType(),
+          null, // environment
+          null, // realm
+          null, // tenant
+          "root");
+      
+        secretManager_.putSecret(name, secret);
+        
+        log_.info("Created secret " + name);
+      }
+      
+      for(String region : environmentTypeRegions_)
+      {
+        createBucketIfNecessary(region, environmentTypeConfigBuckets_.get(region));
+      }
+    }
+
+    private String createEnvironmentTypeAdminUser(String baseName)
+    {
+      String name = baseName + ADMIN_SUFFIX;
+      
+      String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
+//      String groupName = createGroup(name, policyArn);
+//      String result    = createUser(name, groupName);
+      
+      createRole(name, policyArn);
+      
+      // We don't need to create an access key for this: return result;
+      return null;
+    }
+    
+    private String createEnvironmentTypeCicdUser(String baseName)
+    {
+      String name = baseName + CICD_SUFFIX;
+      
+      String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
+      String groupName = createGroup(name, policyArn);
+      String result    = createUser(name, groupName);
+      
+//      createRole(name, policyArn);
+      
+      return result;
+    }
+    @Override
+    protected void populateTemplateVariables(ImmutableJsonObject config, Map<String, String> templateVariables)
+    {
+      if(configBucket_ != null)
+      {
+        templateVariables.put(AWS_CONFIG_BUCKET, configBucket_);
+      }
+      super.populateTemplateVariables(config, templateVariables);
+    }
+    
+    @Override
+    protected void processRole(String roleName, String roleSpec)
+    {
+      String name = new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
+      
+      String policyArn = createPolicy(name, roleSpec);
+      createRole(name, policyArn);
+    }
+
+    @Override
+    protected void saveConfig()
+    {
+      String              name        = getConfigName(getTenantId());
+      String              bucketName  = environmentTypeConfigBuckets_.get(getAwsRegion());
+      String              key         = CONFIG + "/" + name + DOT_JSON;
+      ImmutableByteArray  dom         = getConfigDom().serialize();
+      
+      
+      log_.info("Saving config to region: " + getAwsRegion() + " bucket: " + bucketName + " key: " + key);
+      
+      AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+          .withRegion(getAwsRegion())
+          .build();
+    
+      try
+      {
+        ObjectMetadata      metaData  = s3Client.getObjectMetadata(bucketName, key);
+        
+        if(APPLICATION_JSON.equals(metaData.getContentType()) && metaData.getContentLength() == dom.length())
+        {
+          S3Object existingContent = s3Client.getObject(bucketName, key);
+          int i;
+          
+          for(i=0 ; i<metaData.getContentLength() ; i++)
+            if(existingContent.getObjectContent().read() != dom.byteAt(i))
+              break;
+          
+          if(i == metaData.getContentLength())
+          {
+            log_.info("Configuration has not changed, no need to overwrite.");
+            return;
+          }
+        }
+        // else its not the right content so overwrite it.
+      }
+      catch(AmazonS3Exception e)
+      {
+        // Nothing here we will overwrite the object below...
+      }
+      catch (IOException e)
+      {
+        abort("Unexpected S3 error reading current value of config object " + bucketName + "/" + key, e);
+      }
+      
+      ObjectMetadata metadata = new ObjectMetadata();
+      metadata.setContentType(APPLICATION_JSON);
+      metadata.setContentLength(dom.length());
+      
+      PutObjectRequest request = new PutObjectRequest(bucketName, key, dom.getInputStream(), metadata);
+      
+      s3Client.putObject(request);
+    }
+    
+    private String createPolicyFromResource(String name, String fileName)
+    {
+      return createPolicy(name, loadTemplateFromResource(fileName));
+    }
+
+    @Override
+    protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+      try
+      {
+        String  tenantId        = getTenantId();
+        Name    targetGroupName = new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+        
+        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+        
+        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+        String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+        String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+        
+        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+        
+        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+        
+        getOrCreateCluster();
+        
+  //      registerTaskDef(name, port, healthCheckPath, tenantId);
+        
+        createService(regionalHostName, targetGroupArn, name, port, tenantId);
+      }
+      catch(RuntimeException e)
+      {
+        e.printStackTrace();
+        
+        throw e;
+      }
+    }
+
+    private String createTargetGroup(Name name, String healthCheckPath, int port)
+    {
+      String shortName = name.getShortName(32);
+      
+      try
+      {
+        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
+        
+        List<TargetGroup> groups = desc.getTargetGroups();
+        
+        if(groups.size() != 1)
+            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
+        
+        log_.info("Target group " + name + " (" + shortName + ") already exists.");
+        return elbTag(groups.get(0).getTargetGroupArn());
+      }
+      catch(TargetGroupNotFoundException e)
+      {
+        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
+      }
+      
+      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
+          .withName(shortName)
+          .withHealthCheckPath(healthCheckPath)
+          .withHealthCheckProtocol(ProtocolEnum.HTTP)
+          .withProtocol(ProtocolEnum.HTTP)
+          .withVpcId(awsVpcId_)
+          .withPort(port)
+          );
+      
+      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
+    }
+
+
+    private String elbTag(String arn)
+    {
+      List<Tag> tags = new LinkedList<>();
+      
+      for(Entry<String, String> entry : getTags().entrySet())
+      {
+        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
+      }
+      
+      tagIfNotNull(tags, "FUGUE_TENANT", getTenantId());
+      
+      if(!tags.isEmpty())
+      {
+        elbClient_.addTags(new AddTagsRequest()
+            .withResourceArns(arn)
+            .withTags(tags)
+            );
+      }
+    
+      return arn;
+    }
+    
+    private void tagIfNotNull(List<Tag> tags, String name, String value)
+    {
+      if(value != null)
+      {
+        tags.add(new Tag().withKey(name).withValue(value));
+      }
+    }
+
+    private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+      
+      List<String> remainingPaths = new ArrayList<>();
+      
+      remainingPaths.addAll(paths);
+      
+      DescribeRulesResult ruleDescription = elbClient_.describeRules(new DescribeRulesRequest()
+          .withListenerArn(listenerArn_)
+          );
+      
+      List<Rule> ruleList = ruleDescription.getRules();
+      int        priority = 1000;
+      
+      for(Rule rule : ruleList)
+      {
+        String conditionHost = null;
+        String conditionPath = null;
+        
+        for(RuleCondition c : rule.getConditions())
+        {
+          if(c.getField().equals(HOST_HEADER))
+          {
+            if(c.getValues().size() > 0)
+              conditionHost = c.getValues().get(0);
+          }
+          else if(c.getField().equals(PATH_PATERN))
+          {
+            if(c.getValues().size() > 0)
+              conditionPath = c.getValues().get(0);
+          }
+        }
+        
+        String actionTargetArn = null;
+        
+        // since there is only one action I can't see how there will not always be exactly one of these but....
+        for(Action action : rule.getActions())
+        {
+          actionTargetArn = action.getTargetGroupArn();
+        }
+        
+        if(host.equals(conditionHost))
+        {
+          // remove old host rules
+          
+          log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
+          
+          elbClient_.deleteRule(new DeleteRuleRequest()
+              .withRuleArn(rule.getRuleArn())
+              );
+        }
+        
+        if(conditionHost == null)
+        {
+          if(remainingPaths.remove(conditionPath))
+          {
+            if(targetGroupArn.equals(actionTargetArn))
+            {
+              log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
+            }
+            else
+            {
+              log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
+              // the rule is there but it's wrong
+              elbClient_.modifyRule(new ModifyRuleRequest()
+                  .withActions(new Action()
+                      .withTargetGroupArn(targetGroupArn)
+                      .withType(ActionTypeEnum.Forward)
+                      )
+                  );
+            }
+          }
+          else
+          {
+            // this rule is for a path which we don't have, maybe it was removed from the service
+            
+            if(!"default".equals(rule.getPriority()))
+            {
+              log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
+              
+              elbClient_.deleteRule(new DeleteRuleRequest()
+                  .withRuleArn(rule.getRuleArn())
+                  );
+            }
+          }
+        }
+        
+        if(!"default".equals(rule.getPriority()))
+        {
+          try
+          {
+            int p = Integer.parseInt(rule.getPriority());
+            
+            if(p >= priority)
+              priority = p + 1;
+          }
+          catch(NumberFormatException e)
+          {
+            log_.warn("Rule has non-integer priority: " + rule);
+          }
+        }
+      }
+      
+      for(String path : remainingPaths)
+      {
+        log_.info("Creating rule for host " + host + " for non-existant path " + path + "...");
+        
+        CreateRuleResult createRuleResult = elbClient_.createRule(new CreateRuleRequest()
+            .withListenerArn(listenerArn_)
+            .withConditions(
+//                new RuleCondition()
+//                  .withField(HOST_HEADER)
+//                  .withValues(host),
+                new RuleCondition()
+                  .withField(PATH_PATERN)
+                  .withValues(path)
+                )
+            .withActions(new Action()
+                .withTargetGroupArn(targetGroupArn)
+                .withType(ActionTypeEnum.Forward)
+                )
+            .withPriority(priority)
+            );
+        
+        log_.info("Created rule " + createRuleResult.getRules().get(0).getRuleArn() + " for host " + host + " for non-existant path " + path);
+      }
+    }
+    
+    @Override
+    protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+      // TODO move from groovy land
+    }
+
+    @Override
+    protected void deployService()
+    {
+      // createDnsZones();
+      
+      if(!getServiceContainerMap().isEmpty())
+      {
+        loadBalancer_ = createLoadBalancer(getTenantId());
+        
+        Name targetGroupName = new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
+        
+        defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
+        
+        listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+      }
+    }
+    
+    private String createLoadBalancerListener(LoadBalancer loadBalancer, String defaultTargetGroupArn)
+    {
+      DescribeListenersResult describeResponse = elbClient_.describeListeners(new DescribeListenersRequest()
+          .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+          );
+      
+      List<Listener> listeners = describeResponse.getListeners();
+      
+      if(!listeners.isEmpty())
+      {
+        String listenerArn = listeners.get(0).getListenerArn();
+        log_.info("Listener " + listenerArn + " already exists.");
+        return listenerArn;
+      }
+//      for(Listener listener : listeners)
+//      {
+//        if(ProtocolEnum.HTTPS.equals(listener.getProtocol()))
+//        {
+//          for(Certificate cert : listener.getCertificates())
+//          {
+//            cert.getCertificateArn()
+//          }
+//        }
+//      }
+      
+      
+      log_.info("Creating listener...");
+      
+//      elbClient_.Cer
+//      GetServerCertificateResult certificateResult = iamClient_.getServerCertificate(new GetServerCertificateRequest()
+//          .withServerCertificateName("NAME")
+//          );
+//      
+//      Certificate certificate = certificateResult.getServerCertificate();
+      
+//      elbClient_.addListenerCertificates(new AddListenerCertificatesRequest()
+//          .withCertificates(certificates)
+//          );
+      
+      CreateListenerResult createResult = elbClient_.createListener(new CreateListenerRequest()
+          .withCertificates(new Certificate()
+            .withCertificateArn(awsLoadBalancerCertArn_)
+          )
+          .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+          .withProtocol(ProtocolEnum.HTTPS)
+          .withPort(443)
+          .withDefaultActions(new Action()
+              .withType(ActionTypeEnum.Forward)
+              .withTargetGroupArn(defaultTargetGroupArn)
+              )
+          );
+      
+      listeners = createResult.getListeners();
+      
+      String listenerArn = listeners.get(0).getListenerArn();
+      log_.info("Listener " + listenerArn + " created.");
+      return listenerArn;
+    }
+
+    private LoadBalancer createLoadBalancer(String tenant)
+    {
+      String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
+      
+      try
+      {
+        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
+            .withNames(name)
+            );
+        
+        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
+        
+        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
+        {
+          LoadBalancer loadBalancer = loadBalancerList.get(0);
+    
+          log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+          
+          boolean ok = true;
+          
+          // So the LB exists, check that it has the correct security groups and subnets
+          int     cnt = awsLoadBalancerSecurityGroups_.size();
+          
+          for(String sg : loadBalancer.getSecurityGroups())
+          {
+            if(awsLoadBalancerSecurityGroups_.contains(sg))
+            {
+              cnt--;
+            }
+            else
+            {
+              ok = false;
+              break;
+            }
+          }
+          
+          if(cnt > 0)
+            ok = false;
+          
+          if(ok)
+          {
+            cnt = awsLoadBalancerSubnets_.size();
+            for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
+            {
+              if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
+              {
+                cnt--;
+              }
+              else
+              {
+                ok = false;
+                break;
+              }
+            }
+            
+            if(cnt > 0)
+              ok = false;
+          }
+          
+          if(ok)
+          {
+            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
+            elbTag(loadBalancer.getLoadBalancerArn());
+            return loadBalancer;
+          }
+          else
+          {
+            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
+            
+            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
+            throw new IllegalStateException("Loadbalancer needs to be updated");
+          }
+        }
+      }
+      catch(LoadBalancerNotFoundException e)
+      {
+        log_.info("Load balancer " + name + " does not exist, creating...");
+      }
+
+      CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
+          .withName(name)
+          .withSecurityGroups(awsLoadBalancerSecurityGroups_)
+          .withSubnets(awsLoadBalancerSubnets_)
+          );
+      
+      LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
+      
+      log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
+      
+      elbTag(loadBalancer.getLoadBalancerArn());
+      
+      return loadBalancer;
+    }
   }
+
 }

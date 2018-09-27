@@ -24,13 +24,39 @@
 package org.symphonyoss.s2.fugue.deploy;
 
 /**
- * Actions for the FugueDeploy utility.
+ * A serial implementation of IBatch which just executes tasks in the submitting thread.
+ * 
+ * This is useful for debugging.
  * 
  * @author Bruce Skingle
  *
  */
-@SuppressWarnings("javadoc")
-public enum FugueDeployAction
+public class SerialBatch implements IBatch
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy, DeployStation;
+  /**
+   * Constructor.
+   * 
+   */
+  public SerialBatch()
+  {
+  }
+  
+  /**
+   * Submit the given task.
+   * 
+   * @param task Some task to be executed as part of the batch.
+   */
+  @Override
+  public void submit(Runnable task)
+  {
+    task.run();
+  }
+  
+  /**
+   * Block until all tasks have completed.
+   */
+  @Override
+  public void waitForAllTasks()
+  {
+  }
 }

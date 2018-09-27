@@ -25,7 +25,6 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.Map;
 
-import org.checkerframework.checker.units.qual.s;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -37,15 +36,14 @@ import org.symphonyoss.s2.fugue.pubsub.Subscription;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.GetSubscriptionAttributesResult;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
 import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
 import com.amazonaws.services.sns.util.Topics;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
-import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
+import com.amazonaws.services.sqs.model.TagQueueRequest;
 
 /**
  * The admin variant of SqsSubscriberManager.
@@ -61,6 +59,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   private final String        accountId_;
 
   private AmazonSQS           sqsClient_;
+  private Map<String, String> tags_;
   
   /**
    * Constructor.
@@ -69,14 +68,17 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
    * @param region        The AWS region in which to operate.
    * @param accountId     The AWS account ID 
    * @param traceFactory  A trace factory.
+   * @param tags          Tags to be applied to created queues.
    */
-  public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId, ITraceContextFactory traceFactory)
+  public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId,
+      ITraceContextFactory traceFactory, Map<String, String> tags)
   {
     super(SqsSubscriberAdmin.class);
     
     accountId_ = accountId;
     nameFactory_ = nameFactory;
     region_ = region;
+    tags_ = tags;
   }
   
   @Override
@@ -132,29 +134,37 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   
   private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
+    String queueUrl;
+    
     try
     {
-      String existingQueueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
+      queueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
       
-      log_.info("Subscription " + subscriptionName + " already exists as " + existingQueueUrl);
+      log_.info("Subscription " + subscriptionName + " already exists as " + queueUrl);
     }
     catch(QueueDoesNotExistException e)
     {
       if(dryRun)
       {
         log_.info("Subscription " + subscriptionName + " would be created (dry run)");
+        return;
       }
       else
       {
-        String myQueueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
+        queueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
         
-        String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, getTopicARN(topicName), myQueueUrl);
+        String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, getTopicARN(topicName), queueUrl);
         
         snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
         
-        log_.info("Created subscription " + subscriptionName + " as " + myQueueUrl);
+        log_.info("Created subscription " + subscriptionName + " as " + queueUrl);
       }
     }
+    
+    sqsClient_.tagQueue(new TagQueueRequest()
+        .withQueueUrl(queueUrl)
+        .withTags(tags_)
+        );
   }
 
   @Override

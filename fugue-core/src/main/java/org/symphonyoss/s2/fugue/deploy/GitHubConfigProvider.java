@@ -42,6 +42,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+/**
+ * GitHub implementation of ConfigProvider.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class GitHubConfigProvider extends ConfigProvider
 {
   private static final Logger log_ = LoggerFactory.getLogger(GitHubConfigProvider.class);
@@ -66,24 +72,25 @@ public class GitHubConfigProvider extends ConfigProvider
       .withFlag('B', "gitHubBranch",       "GITHUB_BRANCH", String.class, false, false, (v) -> branch_ = v)
       .withFlag('T', "gitHubToken",        "GITHUB_TOKEN",  String.class, false, true,  (v) -> accessToken_ = v);
   }
-
-//  public GitHubDeployConfig(GitHubDeployConfig master, String organization, String repo, String branch, String accessToken)
-//  {
-//    super(master);
-//    organization_ = organization;
-//    repo_ = repo;
-//    branch_ = branch;
-//    accessToken_ = accessToken;
-//  }
+  
+  private URL getUrl(String folderName, String fileName)
+  {
+    return getUrl(folderName, fileName, accessToken_);
+  }
+  
+  private URL getLogUrl(String folderName, String fileName)
+  {
+    return getUrl(folderName, fileName, "XXXXXXXXX");
+  }
 
   
-  public URL getUrl(String folderName, String fileName)
+  private URL getUrl(String folderName, String fileName, String accessToken)
   {
     try
     {
       return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s/%s?access_token=%s&ref=%s", 
           organization_, repo_, folderName, fileName,
-          accessToken_,
+          accessToken,
           branch_));
     }
     catch (MalformedURLException e)
@@ -92,13 +99,23 @@ public class GitHubConfigProvider extends ConfigProvider
     }
   }
   
-  public URL getUrl(String fileName)
+  private URL getDirUrl(String fileName)
+  {
+    return getDirUrl(fileName, accessToken_);
+  }
+  
+  private URL getLogDirUrl(String fileName)
+  {
+    return getDirUrl(fileName, "XXXXXXXXX");
+  }
+  
+  private URL getDirUrl(String fileName, String accessToken)
   {
     try
     {
       return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s?access_token=%s&ref=%s", 
           organization_, repo_, fileName,
-          accessToken_,
+          accessToken,
           branch_));
     }
     catch (MalformedURLException e)
@@ -110,14 +127,11 @@ public class GitHubConfigProvider extends ConfigProvider
   @Override
   public MutableJsonObject fetchConfig(String folderName, String fileName) throws IOException
   {
-//    if(!folderName.endsWith("/"))
-//      folderName = folderName + "/";
-    
-    URL configUrl = getUrl(folderName, fileName);
+    URL configUrl = getLogUrl(folderName, fileName);
     
     log_.debug("fetch " + configUrl);
     
-    try(InputStream in =configUrl.openStream())
+    try(InputStream in =getUrl(folderName, fileName).openStream())
     {
       ObjectMapper mapper = new ObjectMapper();
       
@@ -143,10 +157,6 @@ public class GitHubConfigProvider extends ConfigProvider
       }
       throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", this URL does not contain a JSON object");
     }
-//    catch (IOException e)
-//    {
-//      throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", this URL is not readable", e);
-//    }
   }
   
   @Override
@@ -164,9 +174,9 @@ public class GitHubConfigProvider extends ConfigProvider
   private List<String> fetchDirItems(String folderName, String requiredType)
   {
     List<String> result = new ArrayList<>();
-    URL configUrl = getUrl(folderName);
+    URL configUrl = getLogDirUrl(folderName);
     
-    try(InputStream in =configUrl.openStream())
+    try(InputStream in =getDirUrl(folderName).openStream())
     {
       ObjectMapper mapper = new ObjectMapper();
       
@@ -200,21 +210,4 @@ public class GitHubConfigProvider extends ConfigProvider
     
     return result;
   }
-
-//  @Override
-//  public DeployConfig getServiceConfig(URL serviceRepoUrl)
-//  {
-//    String host = serviceRepoUrl.getHost();
-//    
-//    switch(host)
-//    {
-//      case "github.com":
-//        String[] pathPart = serviceRepoUrl.getPath().split("/");
-//        
-//        return new GitHubDeployConfig(this, pathPart[1], pathPart[2], branch_, accessToken_);
-//        
-//      default:
-//        throw new IllegalArgumentException("Unknown url type " + serviceRepoUrl);
-//    }
-//  }
 }

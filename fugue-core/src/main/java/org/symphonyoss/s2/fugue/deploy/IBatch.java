@@ -24,13 +24,22 @@
 package org.symphonyoss.s2.fugue.deploy;
 
 /**
- * Actions for the FugueDeploy utility.
+ * A batch of tasks which can be executed in parallel.
  * 
  * @author Bruce Skingle
  *
  */
-@SuppressWarnings("javadoc")
-public enum FugueDeployAction
+public interface IBatch
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy, DeployStation;
+  /**
+   * Submit the given task.
+   * 
+   * @param task Some task to be executed as part of the batch.
+   */
+  public void submit(Runnable task);
+  
+  /**
+   * Block until all tasks have completed.
+   */
+  public void waitForAllTasks();
 }
