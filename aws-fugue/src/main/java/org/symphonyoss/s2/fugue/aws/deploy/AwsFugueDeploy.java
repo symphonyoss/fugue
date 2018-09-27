@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -42,9 +43,7 @@ import org.symphonyoss.s2.common.dom.IStringProvider;
 import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
-import org.symphonyoss.s2.common.dom.json.ImmutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
-import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -69,6 +68,7 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
+import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
@@ -95,6 +95,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
 import com.amazonaws.services.elasticloadbalancingv2.model.RuleCondition;
+import com.amazonaws.services.elasticloadbalancingv2.model.Tag;
 import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
 import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundException;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
@@ -241,26 +242,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private AmazonRoute53                  r53Clinet_;
   private AmazonIdentityManagement       iamClient_;
 
-//  private String baseZoneId_;
-//  private String s2ZoneId_;
-//  private String environmentTypeZoneId_;
-//  private String environmentZoneId_;
-//  private String regionZoneId_;
-//  private String regionalServiceZoneId_;
-//  private String serviceZoneId_;
-//  private String tenantZoneId_;
-//  private String regionalTenantZoneId_;
-
-  //  private LoadBalancer singleTenantLoadBalancer_;
-//  private LoadBalancer multiTenantLoadBalancer_;
-
-//  private String singleTenantDefaultTargetGroupArn_;
-//  private String multiTenantDefaultTargetGroupArn_;
-
-//  private String singleTenantListenerArn_;
-
-//  private String multiTenantListenerArn_;
-
   private AmazonECS ecsClient_;
 
   private String clusterName_;
@@ -290,7 +271,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return new AwsDeploymentContext(tenantId);
   }
 
-  public String getAwsRegion()
+  private String getAwsRegion()
   {
     return require("AWS Region", awsRegion_);
   }
@@ -309,19 +290,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     return String.format("arn:aws:%s::%s:%s/%s", service, awsAccountId_, type, name);
   }
-
-//  @Override
-//  public void saveConfig(ImmutableJsonDom multiTenantConfig, Map<String, ImmutableJsonDom> singleTenantConfigMap)
-//  {
-//    saveConfig(multiTenantConfig, getConfigName(null));
-//    
-//    for(Entry<String, ImmutableJsonDom> entry : singleTenantConfigMap.entrySet())
-//    {
-//      saveConfig(entry.getValue(), getConfigName(entry.getKey()));
-//    }
-//  }
-
-
   
   private void abort(String message, Throwable cause)
   {
@@ -370,7 +338,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    log_.info("LogGroup " + logGroupName + " created.");
 //  }
 
-  public String getServiceHostName(String tenantId)
+  private String getServiceHostName(String tenantId)
   {
 //    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     if(tenantId == null)
@@ -382,18 +350,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private void getOrCreateCluster()
   {
     // We are using pre-created EC2 clusters for now...
-    
-// // TODO: DELETEME:
-//    if("qa".equals(getEnvironmentType()))
-//      clusterName_ = new Name("sym-ms-qa-ause1");
-//    else
-//      clusterName_ = new Name("sym-ms-devb-ause1");
-          
-    
-    
-    
-    
-    
 //    clusterName_ = new Name(getEnvironmentType(), getEnvironment(),getRealm(), getRegion());
 //    
 //    DescribeClustersResult describeResult = ecsClient_.describeClusters(new DescribeClustersRequest()
@@ -479,10 +435,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               )
           );
       
-      System.err.println(createServiceResult);
-      
-      System.err.println(createServiceResult.getService());
-      
       log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
     }
     else
@@ -496,8 +448,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .withDesiredCount(1)
 //          .withForceNewDeployment(true)
           );
-      
-      System.err.println(updateResult);
       
       log_.info("Updated service " + serviceName + "as" + updateResult.getService().getServiceArn() + " with status " + updateResult.getService().getStatus() + ".");
     }
@@ -668,8 +618,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   )
               )
           );
-        
-      System.out.println(rresult);
     }
     
 /*
@@ -697,42 +645,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
   
-
-  private String createTargetGroup(Name name, String healthCheckPath, int port)
-  {
-    String shortName = name.getShortName(32);
-    
-    try
-    {
-      DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
-      
-      List<TargetGroup> groups = desc.getTargetGroups();
-      
-      if(groups.size() != 1)
-          throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
-      
-      log_.info("Target group " + name + " (" + shortName + ") already exists.");
-      return groups.get(0).getTargetGroupArn();
-    }
-    catch(TargetGroupNotFoundException e)
-    {
-      log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
-    }
-    
-    CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
-        .withName(shortName)
-        .withHealthCheckPath(healthCheckPath)
-        .withHealthCheckProtocol(ProtocolEnum.HTTP)
-        .withProtocol(ProtocolEnum.HTTP)
-        .withVpcId(awsVpcId_)
-        .withPort(port)
-        );
-    
-    System.out.println("result=" + result);
-    
-    return result.getTargetGroups().get(0).getTargetGroupArn();
-  }
-
 
   @Override
   protected void validateAccount(IJsonObject<?> config)
@@ -1380,8 +1292,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   //      registerTaskDef(name, port, healthCheckPath, tenantId);
         
         createService(regionalHostName, targetGroupArn, name, port, tenantId);
-        
-        System.err.println("All done!");
       }
       catch(RuntimeException e)
       {
@@ -1390,7 +1300,71 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         throw e;
       }
     }
+
+    private String createTargetGroup(Name name, String healthCheckPath, int port)
+    {
+      String shortName = name.getShortName(32);
+      
+      try
+      {
+        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
+        
+        List<TargetGroup> groups = desc.getTargetGroups();
+        
+        if(groups.size() != 1)
+            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
+        
+        log_.info("Target group " + name + " (" + shortName + ") already exists.");
+        return elbTag(groups.get(0).getTargetGroupArn());
+      }
+      catch(TargetGroupNotFoundException e)
+      {
+        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
+      }
+      
+      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
+          .withName(shortName)
+          .withHealthCheckPath(healthCheckPath)
+          .withHealthCheckProtocol(ProtocolEnum.HTTP)
+          .withProtocol(ProtocolEnum.HTTP)
+          .withVpcId(awsVpcId_)
+          .withPort(port)
+          );
+      
+      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
+    }
+
+
+    private String elbTag(String arn)
+    {
+      List<Tag> tags = new LinkedList<>();
+      
+      for(Entry<String, String> entry : getTags().entrySet())
+      {
+        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
+      }
+      
+      tagIfNotNull(tags, "FUGUE_TENANT", getTenantId());
+      
+      if(!tags.isEmpty())
+      {
+        elbClient_.addTags(new AddTagsRequest()
+            .withResourceArns(arn)
+            .withTags(tags)
+            );
+      }
     
+      return arn;
+    }
+    
+    private void tagIfNotNull(List<Tag> tags, String name, String value)
+    {
+      if(value != null)
+      {
+        tags.add(new Tag().withKey(name).withValue(value));
+      }
+    }
+
     private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath)
     {
       
@@ -1426,7 +1400,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         String actionTargetArn = null;
         
-        // since there is only one action I cant see how there will not always be exactly one of these but....
+        // since there is only one action I can't see how there will not always be exactly one of these but....
         for(Action action : rule.getActions())
         {
           actionTargetArn = action.getTargetGroupArn();
@@ -1663,6 +1637,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           if(ok)
           {
             log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
+            elbTag(loadBalancer.getLoadBalancerArn());
             return loadBalancer;
           }
           else
@@ -1688,6 +1663,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
       
       log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
+      
+      elbTag(loadBalancer.getLoadBalancerArn());
       
       return loadBalancer;
     }

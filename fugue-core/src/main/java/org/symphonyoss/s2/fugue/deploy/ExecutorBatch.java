@@ -23,21 +23,35 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * An implementation of IBatch based on an Executor.
+ * 
+ * If any task throws an exception this is propagated out as an IllegalStateException as soon
+ * as possible, so a call to submit may result in an exception originating from a previous task.
+ * 
+ * We assume that any exception from any task is program fatal.
  * 
  * @author Bruce Skingle
  *
  */
 public class ExecutorBatch implements IBatch
 {
-  private ExecutorService executor_;
-  private List<Future<?>> futures_ = new LinkedList<>();
+  private static Logger log_ = LoggerFactory.getLogger(ExecutorBatch.class);
+  
+//  private ExecutorService executor_;
+//  private List<Future<?>> futures_ = new LinkedList<>();
+  private CompletionService<Void> completionService_;
+  private boolean                 closed_;
+  private int                     taskCnt_;
   
   /**
    * Constructor.
@@ -46,7 +60,9 @@ public class ExecutorBatch implements IBatch
    */
   public ExecutorBatch(ExecutorService executor)
   {
-    executor_ = executor;
+//    executor_ = executor;
+    
+    completionService_ = new ExecutorCompletionService<Void>(executor);
   }
   
   /**
@@ -57,18 +73,65 @@ public class ExecutorBatch implements IBatch
   @Override
   public void submit(Runnable task)
   {
-    // TODO: implement me
-    // futures_.add(executor_.submit(task));
+    Future<Void> future;
     
-    task.run();
+    while((future = poll()) != null)
+    {
+      try
+      {
+        future.get();
+      }
+      catch (InterruptedException | ExecutionException e)
+      {
+        throw new IllegalStateException("Batch task failed", e);
+      }
+    }
+    
+    doSubmit(task);
   }
   
+  private synchronized Future<Void> poll()
+  {
+    Future<Void> future = completionService_.poll();
+    
+    if(future != null)
+      taskCnt_--;
+    
+    return future;
+  }
+  
+  private synchronized void doSubmit(Runnable task)
+  {
+    if(closed_)
+      throw new IllegalStateException("waitForAllTasks() has already been called");
+    
+    taskCnt_++;
+    completionService_.submit(task, null);
+  }
+
   /**
    * Block until all tasks have completed.
    */
   @Override
-  public void waitForAllTasks()
+  public synchronized void waitForAllTasks()
   {
-    // TODO: implement me
+    if(closed_)
+      throw new IllegalStateException("waitForAllTasks() has already been called");
+    
+    closed_ = true;
+
+    while(taskCnt_>0)
+    {
+      log_.info("Waiting for " + taskCnt_ + " tasks...");
+      try
+      {
+        completionService_.take().get();
+        taskCnt_--;
+      }
+      catch (InterruptedException | ExecutionException e)
+      {
+        throw new IllegalStateException("Batch task failed", e);
+      }
+    }
   }
 }

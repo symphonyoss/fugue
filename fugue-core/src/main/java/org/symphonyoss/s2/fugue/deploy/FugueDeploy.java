@@ -43,6 +43,7 @@ import javax.annotation.Nonnull;
 import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.dom.IStringProvider;
 import org.symphonyoss.s2.common.dom.TypeAdaptor;
 import org.symphonyoss.s2.common.dom.json.IJsonArray;
@@ -101,7 +102,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String              CONFIG_DIR                    = CONFIG + "/";
   private static final String              SERVICE_DIR                   = CONFIG_DIR + SERVICE;
   private static final String              DEFAULTS                      = "defaults";
-//  private static final String              ROLES                         = "roles";
   private static final String              FQ_SERVICE_NAME               = "fullyQualifiedServiceName";
   private static final String              FQ_INSTANCE_NAME              = "fullyQualifiedInstanceName";
 
@@ -134,18 +134,12 @@ public abstract class FugueDeploy extends CommandLineHandler
   private FugueDeployAction                action_;
   private String                           dnsSuffix_;
 
-  private ExecutorService                  executor_                    = Executors.newFixedThreadPool(20);
+  private ExecutorService                  executor_                    = Executors.newFixedThreadPool(20, new NamedThreadFactory("Batch", true));
   
   private List<DeploymentContext>          tenantContextList_           = new LinkedList<>();
   private DeploymentContext                multiTenantContext_;
   
-//  private List<String>                     tenantList_                   = new LinkedList<>();
-//  private Map<String, MutableJsonObject>   singleTenantConfigMap_        = new HashMap<>();
-//  private Map<String, MutableJsonDom>      singleTenantConfigDomMap_     = new HashMap<>();
-//  private MutableJsonObject                multiTenantConfig_;
-//  private MutableJsonDom                   multiTenantConfigDom_;
-//  private Map<String, Map<String, String>> templateVariableMap_          = new HashMap<>();
-//  private Map<String, String>              multiTenantTemplateVariables_ = new HashMap<>();
+  private Map<String, String>              tags_                        = new HashMap<>();
   
   protected abstract DeploymentContext  createContext(String tenantId);
   
@@ -291,40 +285,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     return primaryRegion_;
   }
-  
-//  protected MutableJsonObject getMultiTenantConfig()
-//  {
-//    return multiTenantConfig_;
-//  }
-//  
-//  protected @Nonnull FugueDeployAction getAction()
-//  {
-//    return require("action", action_);
-//  }
-//
-//  protected Map<String, Map<String, String>> getTemplateVariableMap()
-//  {
-//    return templateVariableMap_;
-//  }
-//
-//  protected Map<String, String> getMultiTenantTemplateVariables()
-//  {
-//    return multiTenantTemplateVariables_;
-//  }
-
-//  /**
-//   * If there is no tenantId (we are processing for a multi-tenant service) then return ""
-//   * otherwise return Name.SEPARATOR + tenantId_
-//   * 
-//   * @return The tenantId as a suffx for a hyphen separated composite name.
-//   */
-//  public String getTenantSuffix()
-//  {
-//    if(tenant_ == null)
-//      return "";
-//    
-//    return Name.SEPARATOR + tenant_;
-//  }
 
   /**
    * @return the environment type dns suffix.
@@ -334,6 +294,26 @@ public abstract class FugueDeploy extends CommandLineHandler
     return dnsSuffix_;
   }
   
+  protected void populateTags(Map<String, String> tags)
+  {
+    tagIfNotNull("FUGUE_ENVIRONMENT_TYPE",  environmentType_);
+    tagIfNotNull("FUGUE_ENVIRONMENT",       environment_);
+    tagIfNotNull("FUGUE_REALM",             realm_);
+    tagIfNotNull("FUGUE_REGION",            region_);
+    tagIfNotNull("FUGUE_SERVICE",           service_);
+  }
+  
+  protected void tagIfNotNull(String name, String value)
+  {
+    if(value != null)
+      tags_.put(name, value);
+  }
+
+  protected Map<String, String> getTags()
+  {
+    return tags_;
+  }
+
   /**
    * Perform the deployment.
    */
@@ -359,6 +339,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     for(int i=0 ; i<tenantContextList_.size() ; i++)
       log_.info(String.format("TENANT[%3d]      = %s", i, tenantContextList_.get(i).getTenantId()));
+    
+    populateTags(tags_);
     
     // All actions need multi-tenant config
     ImmutableJsonObject multiTenantIdConfig   = createIdConfig(null);
@@ -563,29 +545,13 @@ public abstract class FugueDeploy extends CommandLineHandler
         
         containerBatch.waitForAllTasks();
       }
-//      
-//      
-//      
-//  //      MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
-//  //      
-//  //      log_.info("Service=" + serviceJson.immutify());
-//  //      
-//  //      processService(serviceJson);
-//    
-//      
-//      Map<String, ImmutableJsonDom> singleTenantConfigMap = new HashMap<>();
-//      
-//      for(Entry<String, MutableJsonDom> entry : singleTenantConfigDomMap_.entrySet())
-//      {
-//        singleTenantConfigMap.put(entry.getKey(), entry.getValue().immutify());
-//      }
-//      
-//      saveConfig(multiTenantConfigDom_.immutify(), singleTenantConfigMap);
     }
   }
   
   
   
+
+
   private IBatch createBatch()
   {
     return new ExecutorBatch(executor_);
@@ -808,408 +774,6 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
   
-  
-//  private MutableJsonObject deployConfig()
-//  {
-//    MutableJsonObject serviceJson = null;
-//    
-//    if(service_ != null)
-//    {
-//      try
-//      {
-//        String dir = SERVICE_DIR + "/" + service_;
-//        
-//        serviceJson = provider_.fetchConfig(dir, SERVICE + ".json");
-//        
-//        log_.info("Service=" + serviceJson.immutify());
-//        
-//        dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
-//        
-//        
-//        for(String tenantId : tenantList_)
-//        {
-//          processPolicies(dir, SINGLE_TENANT, tenantId);
-//          
-//        }
-//        
-//        processPolicies(dir, MULTI_TENANT, null);
-//        
-////        MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
-////        
-////        log_.info("Service=" + serviceJson.immutify());
-////        
-////        processService(serviceJson);
-//      }
-//      catch(IOException e)
-//      {
-//        throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
-//      }
-//    }
-//    
-//    Map<String, ImmutableJsonDom> singleTenantConfigMap = new HashMap<>();
-//    
-//    for(Entry<String, MutableJsonDom> entry : singleTenantConfigDomMap_.entrySet())
-//    {
-//      singleTenantConfigMap.put(entry.getKey(), entry.getValue().immutify());
-//    }
-//    
-//    saveConfig(multiTenantConfigDom_.immutify(), singleTenantConfigMap);
-//    
-//    return serviceJson;
-//  }
-  
-//  private void deployContainers(MutableJsonObject serviceJson)
-//  {
-//    IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
-//    Iterator<String>                it                      = containerJson.getNameIterator();
-//    Map<String, MutableJsonObject>  singleTenantInitMap     = new HashMap<>();
-//    Map<String, MutableJsonObject>  multiTenantInitMap      = new HashMap<>();
-//    Map<String, MutableJsonObject>  singleTenantServiceMap  = new HashMap<>();
-//    Map<String, MutableJsonObject>  multiTenantServiceMap   = new HashMap<>();
-//    
-//    while(it.hasNext())
-//    {
-//      String name = it.next();
-//      IJsonDomNode c = containerJson.get(name);
-//      
-//      if(c instanceof MutableJsonObject)
-//      {
-//        MutableJsonObject container = (MutableJsonObject)c;
-//        
-//        String tenancy = container.getRequiredString("tenancy");
-//        
-//        boolean singleTenant = "SINGLE".equals(tenancy);
-//        
-//        if("INIT".equals(container.getString("containerType", "SERVICE")))
-//        {
-//          if(singleTenant)
-//            singleTenantInitMap.put(name, container);
-//          else
-//            multiTenantInitMap.put(name, container);
-//        }
-//        else
-//        {
-//          if(singleTenant)
-//            singleTenantServiceMap.put(name, container);
-//          else
-//            multiTenantServiceMap.put(name, container);
-//        }
-//      }
-//    }
-//    
-//    deployService(!singleTenantServiceMap.isEmpty(), !multiTenantServiceMap.isEmpty());
-//    
-//    deployInitContainers(multiTenantInitMap, null);
-//    
-//    if(tenant_ != null)
-//    {
-//      deployInitContainers(singleTenantInitMap, tenant_);
-//    }
-//    
-//    deployServiceContainers(multiTenantServiceMap, null);
-//    
-//    if(tenant_ != null)
-//    {
-//      deployServiceContainers(singleTenantServiceMap, tenant_);
-//    }
-//    
-//  }
-  
-  
-
-  
-  
-//  private void processPolicies(String parentDir, String subDir, String tenant) throws IOException
-//  {
-//    String              dir               = parentDir + "/" + subDir;
-//    List<String>        files             = provider_.fetchFiles(dir);
-//    Map<String, String> templateVariables = tenant == null ? multiTenantTemplateVariables_ : templateVariableMap_.get(tenant);
-//    StringSubstitutor   sub               = new StringSubstitutor(templateVariables);
-//    
-//    for(String file : files)
-//    {
-//      if(file.endsWith(DOT_JSON))
-//      {
-//        String name     = file.substring(0, file.length() - DOT_JSON.length());
-//        String template = provider_.fetchConfig(dir, file).immutify().toString();
-//        
-//        String roleSpec = sub.replace(template);
-//        
-//        processRole(name, roleSpec, tenant);
-//      }
-//      else
-//        throw new IllegalStateException("Unrecognized file type found in config: " + dir + "/" + file);
-//    }
-//  }
-  
-//  private void fetchConfig()
-//  {
-//    multiTenantConfigDom_ = new MutableJsonDom();
-//    multiTenantConfig_    = new MutableJsonObject();
-//    multiTenantConfigDom_.add(multiTenantConfig_);
-//    
-//    Map<String, MutableJsonObject> tenantConfigMap = new HashMap<>();
-//    
-//    for(String tenantId : tenantList_)
-//    {
-//      MutableJsonDom    dom     = new MutableJsonDom();
-//      MutableJsonObject config  = new MutableJsonObject();
-//      
-//      dom.add(config);
-//      
-//      singleTenantConfigDomMap_.put(tenantId, dom);
-//      singleTenantConfigMap_.put(tenantId, config);
-//      
-//      MutableJsonObject tenantConfig = new MutableJsonObject();
-//      tenantConfigMap.put(tenantId, tenantConfig);
-//      
-//      try
-//      {
-//        fetch(true, tenantConfig, CONFIG + "/" + TENANT, tenantId, "tenant", tenantId);
-//      }
-//      catch(IOException e)
-//      {
-//        throw new IllegalStateException("Unable to read tenant config", e);
-//      }
-//      
-//      config.addAll(tenantConfig);
-//    }
-//    
-//    fetchService();
-//    
-//    for(String tenantId : tenantList_)
-//    {
-//      // ensure that our stuff was not overwritten by consul.
-//      
-//      singleTenantConfigMap_.get(tenantId).addAll(tenantConfigMap.get(tenantId));
-//    }
-//    
-//    fetchOverrides();
-//    
-//    
-//  }
-
-
-//  private void fetchDefaults()
-//  {
-//    provider_.fetchDefaults(multiTenantConfig_, singleTenantConfigMap_, multiTenantTemplateVariables_, templateVariableMap_);
-//    
-//    for(ConfigHelper helper : helpers_)
-//      helper.fetchDefaults(multiTenantConfig_, singleTenantConfigMap_, multiTenantTemplateVariables_, templateVariableMap_);
-//  }
-//  
-//  private void fetchOverrides()
-//  {
-//    MutableJsonObject id  = (MutableJsonObject) multiTenantConfig_.get(ID);
-//    
-//    if(id == null)
-//    {
-//      id = new MutableJsonObject();
-//      multiTenantConfig_.add(ID, id);
-//    }
-//    
-//    populateId(id, multiTenantTemplateVariables_);
-//   
-//    
-//    for(Entry<String, MutableJsonObject> entry : singleTenantConfigMap_.entrySet())
-//    {
-//      String              tenantId            = entry.getKey();
-//      MutableJsonObject   singleTenantConfig  = entry.getValue();
-//      Map<String, String> templateVariables   = templateVariableMap_.get(tenantId);
-//      
-//      id  = (MutableJsonObject) singleTenantConfig.get(ID);
-//      
-//      if(id == null)
-//      {
-//        id = new MutableJsonObject();
-//        singleTenantConfig.add(ID, id);
-//        
-//        id.addIfNotNull(TENANT + ID_SUFFIX, tenantId);
-//        
-//        populateId(id, templateVariables);
-//        
-//        templateVariables.put(FQ_INSTANCE_NAME, new Name(environmentType_, environment_, realm_, region_, tenantId, service_).toString());
-//      }
-//    }
-//    
-//    for(ConfigHelper helper : helpers_)
-//      helper.fetchOverrides(multiTenantConfig_, singleTenantConfigMap_, multiTenantTemplateVariables_, templateVariableMap_);
-//    
-//    provider_.fetchOverrides(multiTenantConfig_, singleTenantConfigMap_, multiTenantTemplateVariables_, templateVariableMap_);
-//  }
-  
-//  private void populateId(MutableJsonObject id, Map<String, String> templateVariables)
-//  {
-//    id.addIfNotNull(ENVIRONMENT + ID_SUFFIX,  environment_);
-//    id.addIfNotNull(ENVIRONMENT_TYPE,         environmentType_);
-//    id.addIfNotNull(REALM + ID_SUFFIX,        realm_);
-//    id.addIfNotNull(REGION + ID_SUFFIX,       region_);
-//    id.addIfNotNull(SERVICE + ID_SUFFIX,      service_);
-//    
-//    Iterator<String> it = id.getNameIterator();
-//    
-//    while(it.hasNext())
-//    {
-//      String name = it.next();
-//      IJsonDomNode value = id.get(name);
-//      
-//      if(value instanceof IStringProvider)
-//      {
-//        templateVariables.put(name, ((IStringProvider)value).asString());
-//      }      
-//    }
-//    
-//    templateVariables.put(FQ_SERVICE_NAME, new Name(environmentType_, environment_, realm_, region_, service_).toString());
-//  }
-  
-//  private void fetchService()
-//  {
-//    fetchDefaults();
-//    
-////    if(service_ != null)
-////    {
-////      MutableJsonObject serviceJson = provider_.fetchConfig(SERVICE_DIR, service_ + ".json");
-////      
-////      
-////      System.out.println("Service=" + serviceJson.immutify());
-////      
-//// We have removed service config, these are really just default values which should be managed by the service in source code.      
-////      IJsonDomNode serviceRepoStr = serviceJson.get("repo");
-////      
-////      if(serviceRepoStr instanceof IStringProvider)
-////      {
-////        URL serviceRepoUrl = new URL(((IStringProvider)serviceRepoStr).asString());
-////        
-////        DeployConfig serviceDeployConfig = getServiceConfig(serviceRepoUrl);
-////        
-////        json.addAll(serviceDeployConfig.fetch(false), "#");
-////      }
-////    }
-//    
-//    try
-//    {
-//      MutableJsonObject config = fetch(true);
-//      
-//      multiTenantConfig_.addAll(config, "#");
-//      
-//      for(MutableJsonObject singleTenantConfig : singleTenantConfigMap_.values())
-//        singleTenantConfig.addAll(config, "#");
-//    }
-//    catch(IOException e)
-//    {
-//      throw new IllegalStateException("Unable to read config", e);
-//    }
-//  }
-  
-  
-  
-//  private void processService(MutableJsonObject serviceJson)
-//  {
-//    processServiceRoles(serviceJson);
-//  }
-//
-//  private void processServiceRoles(MutableJsonObject serviceJson)
-//  {
-//    IJsonDomNode roles = serviceJson.get(ROLES);
-//    
-//    if(roles instanceof IJsonObject)
-//    {
-//      IJsonObject<?> rolesObject = (IJsonObject<?>)roles;
-//      Iterator<String> it = rolesObject.getNameIterator();
-//      
-//      while(it.hasNext())
-//      {
-//        String name = it.next();
-//        IJsonDomNode roleNode = rolesObject.get(name);
-//        
-//        if(roleNode instanceof IJsonObject)
-//        {
-//          IJsonDomNode role = ((IJsonObject<?>)roleNode).get(cloudServiceProvider_);
-//          
-//          if(role == null)
-//          {
-//            throw new IllegalArgumentException("Role \"" + name + "\" has no definition for CSP " + cloudServiceProvider_);
-//          }
-//          
-//          String template = role.immutify().toString();
-//          StringSubstitutor sub = new StringSubstitutor(templateVariables_);
-//          String roleSpec = sub.replace(template);
-//          
-//          processRole(name, roleSpec);
-//        }
-//        else
-//        {
-//          throw new IllegalArgumentException("Role \"" + name + "\" must be an object");
-//        }
-//      }
-//    }
-//    else
-//    {
-//      throw new IllegalArgumentException("Roles must be an object");
-//    }
-//  }
-
-
-//  private MutableJsonObject fetch(boolean required) throws IOException
-//  {  
-//    MutableJsonObject json  = new MutableJsonObject();
-//    
-//    String dir = CONFIG;
-//    
-//    fetch(false, json, dir, DEFAULTS, "defaults", "");
-//    
-//    dir = dir + "/" + ENVIRONMENT + "/" + environmentType_;
-//    
-//    fetch(required, json, dir, ENVIRONMENT_TYPE, "environment type", environmentType_);  
-//    
-//    if(environment_ == null)
-//      return json;
-//    
-//    dir = dir + "/" + environment_;
-//    
-//    fetch(required, json, dir, ENVIRONMENT, "environment", environment_);
-//    
-//    if(realm_ == null)
-//      return json;
-//    
-//    dir = dir + "/" + realm_;
-//    
-//    fetch(required, json, dir, REALM, "realm", realm_);
-//    
-//    if(region_ == null)
-//      return json;
-//    
-//    dir = dir + "/" + region_;
-//    
-//    fetch(required, json, dir, REGION, "region", region_);
-//    
-////    for(String realmFile : fetchDirs(environment))
-////    {
-////      String realm = environment + "/" + realmFile;
-////      MutableJsonObject realmJson = json.newMutableCopy();
-////      
-////      mergeAllFiles(realmJson, realm);
-////
-////      for(String regionFile : fetchDirs(realm))
-////      {
-////        String region = realm + "/" + regionFile;
-////        MutableJsonObject regionJson = realmJson.newMutableCopy();
-////        
-////        mergeAllFiles(regionJson, region);
-////
-////        System.out.println("region = " + regionFile + regionJson.immutify());
-////      }
-////    }
-//    
-//    
-//    
-//    
-//    
-//    
-//    
-//    return json;
-//  }
-  
   private void fetch(boolean required, MutableJsonObject json, String dir, String fileName, String entityType, String entityName) throws IOException
   {
     try
@@ -1223,30 +787,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       log_.warn("No " + entityType + " config");
     }
-    
-//    try
-//    {
-//      json.addAll(provider_.fetchConfig(dir, action_ + DOT_JSON), "#");
-//      log_.info("Loaded " + entityType + " action config for " + action_);
-//    }
-//    catch(FileNotFoundException e)
-//    {
-//      log_.debug("No " + entityType + " action config for " + action_);
-//    }
   }
-
-//  private void mergeAllFiles(MutableJsonObject json, String folderName) throws IOException
-//  {
-//    for(String file : provider_.fetchFiles(folderName))
-//    {
-//      MutableJsonObject config = provider_.fetchConfig(folderName, file);
-//    
-//      log_.info("config from " + file + " = " + config);
-//      
-//      json.addAll(config, "#");
-//    }
-//  }
-//
   
   protected String getConfigName(String tenant)
   {
@@ -1282,29 +823,17 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     return policies;
   }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
   protected abstract class DeploymentContext
   {
-    private final String        tenantId_;
-
-    private Map<String, String> policies_;
-    private ImmutableJsonObject config_;
-    private ImmutableJsonDom    configDom_;
-    private Map<String, String> templateVariables_;
-    private StringSubstitutor   sub_;
-    private Map<String, JsonObject<?>>  initContainerMap_;
-    private Map<String, JsonObject<?>>  serviceContainerMap_;
+    private final String               tenantId_;
+    private Map<String, String>        policies_;
+    private ImmutableJsonObject        config_;
+    private ImmutableJsonDom           configDom_;
+    private Map<String, String>        templateVariables_;
+    private StringSubstitutor          sub_;
+    private Map<String, JsonObject<?>> initContainerMap_;
+    private Map<String, JsonObject<?>> serviceContainerMap_;
 
     protected DeploymentContext(String tenantId)
     {
@@ -1511,7 +1040,6 @@ public abstract class FugueDeploy extends CommandLineHandler
         // Deploy service level assets, load balancers, DNS zones etc
         
         deployService();
-        
         
         for(String name : initContainerMap_.keySet())
         {
