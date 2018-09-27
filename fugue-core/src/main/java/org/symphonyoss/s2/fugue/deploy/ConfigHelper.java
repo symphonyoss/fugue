@@ -25,50 +25,102 @@ package org.symphonyoss.s2.fugue.deploy;
 
 import java.util.Map;
 
+import javax.annotation.Nonnull;
+
+import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 
+/**
+ * Base class for config helpers and providers.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class ConfigHelper
 {
-  private FugueDeploy deployConfig_;
+  private FugueDeploy fugueDeploy_;
 
-  public void init(FugueDeploy deployConfig)
+  /**
+   * Init method, allows program parameters to be added.
+   * 
+   * @param fugueDeploy the main program to which parameters may be added.
+   */
+  public void init(FugueDeploy fugueDeploy)
   {
-    deployConfig_ = deployConfig;
+    fugueDeploy_ = fugueDeploy;
   }
   
-  public void fetchDefaults(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig, Map<String, String>  templateVariables)
-  {}
+  /**
+   * Get the multi-tenant default config.
+   * 
+   * @param config The JsonObject onto which the config should be overlaid.
+   */
+  public void overlayDefaults(@Nonnull MutableJsonObject config)
+  {
+  }
   
-  public void fetchOverrides(MutableJsonObject multiTenantConfig, MutableJsonObject singleTenantConfig, Map<String, String>  templateVariables)
-  {}
-
-  public String getService()
+  /**
+   * Get the multi-tenant override config.
+   * 
+   * @param config The JsonObject onto which the config should be overlaid.
+   */
+  public void overlayOverrides(@Nonnull MutableJsonObject config)
   {
-    return deployConfig_.getService();
+  }
+  
+  /**
+   * Get default config for the given tenant.
+   * 
+   * @param tenantId            The ID of the required tenant configuration.
+   * 
+   * @param config The JsonObject onto which the config should be overlaid.
+   */
+  public void overlayDefaults(@Nonnull String tenantId, @Nonnull MutableJsonObject config)
+  {
+  }
+  
+  /**
+   * Get override config for the given tenant.
+   * 
+   * @param tenantId The ID of the required tenant configuration.
+   * @param config The JsonObject onto which the config should be overlaid.
+   */
+  public void overlayOverrides(@Nonnull String tenantId, @Nonnull MutableJsonObject config)
+  {
+  }
+  
+  /**
+   * Populate any template variables needed from the given final config.
+   * 
+   * @param config              A final flattened config.
+   * @param templateVariables   A map of template variables.
+   */
+  public void populateTemplateVariables(ImmutableJsonObject config, Map<String, String> templateVariables)
+  {
+  }
+  
+  protected String getService()
+  {
+    return fugueDeploy_.getService();
   }
 
-  public String getEnvironment()
+  protected String getEnvironment()
   {
-    return deployConfig_.getEnvironment();
+    return fugueDeploy_.getEnvironment();
   }
 
-  public String getRealm()
+  protected String getRealm()
   {
-    return deployConfig_.getRealm();
+    return fugueDeploy_.getRealm();
   }
 
-  public String getRegion()
+  protected String getRegion()
   {
-    return deployConfig_.getRegion();
+    return fugueDeploy_.getRegion();
   }
 
-  public String getEnvironmentType()
+  protected String getEnvironmentType()
   {
-    return deployConfig_.getEnvironmentType();
-  }
-
-  public String getTenant()
-  {
-    return deployConfig_.getTenant();
+    return fugueDeploy_.getEnvironmentType();
   }
 }

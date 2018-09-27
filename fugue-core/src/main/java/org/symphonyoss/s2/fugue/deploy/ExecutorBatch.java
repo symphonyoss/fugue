@@ -23,14 +23,52 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
 /**
- * Actions for the FugueDeploy utility.
+ * An implementation of IBatch based on an Executor.
  * 
  * @author Bruce Skingle
  *
  */
-@SuppressWarnings("javadoc")
-public enum FugueDeployAction
+public class ExecutorBatch implements IBatch
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy, DeployStation;
+  private ExecutorService executor_;
+  private List<Future<?>> futures_ = new LinkedList<>();
+  
+  /**
+   * Constructor.
+   * 
+   * @param executor The executor to process tasks.
+   */
+  public ExecutorBatch(ExecutorService executor)
+  {
+    executor_ = executor;
+  }
+  
+  /**
+   * Submit the given task.
+   * 
+   * @param task Some task to be executed as part of the batch.
+   */
+  @Override
+  public void submit(Runnable task)
+  {
+    // TODO: implement me
+    // futures_.add(executor_.submit(task));
+    
+    task.run();
+  }
+  
+  /**
+   * Block until all tasks have completed.
+   */
+  @Override
+  public void waitForAllTasks()
+  {
+    // TODO: implement me
+  }
 }
