@@ -106,8 +106,15 @@ public class GoogleSubscriber implements MessageReceiver
       
       trace.finished();
     }
-    catch (RuntimeException e)
+    catch (Throwable e)
     {
+      /*
+       * This method is called from an executor so I am catching Throwable because otherwise Errors will
+       * cause the process to fail silently.
+       * 
+       * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
+       * I think it's worth trying.
+       */
       log_.error("Failed to handle message from " + subscriptionName_, e);
     }
   }
