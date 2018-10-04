@@ -184,6 +184,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            GROUP_SUFFIX                  = "-group";
   private static final String            ROLE_SUFFIX                   = "-role";
   private static final String            USER_SUFFIX                   = "-user";
+  private static final String            ROOT_SUFFIX                  = "-root";
   private static final String            ADMIN_SUFFIX                  = "-admin";
   private static final String            CICD_SUFFIX                   = "-cicd";
   private static final String            CONFIG_SUFFIX                 = "-config";
@@ -789,7 +790,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
   // returns an access key if one was created.
-  private String createUser(String name, String groupName)
+  private void createUser(String name, String groupName, List<String> keys)
   {
     String  userName      = name + USER_SUFFIX;
     String  accessKeyJson = null;
@@ -808,7 +809,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         if(group.getGroupName().equals(groupName))
         {
           log_.debug("User \"" + userName + "\" is already a member of group \"" + groupName + "\"");
-          return null;
+          return;
         }
       }
     }
@@ -838,6 +839,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         "    \"accessKeyId\": \"" + accessKey.getAccessKeyId() + "\",\n" +
         "    \"secretAccessKey\": \"" + accessKey.getSecretAccessKey() + "\"\n" +
         "  }";
+      
+      keys.add(accessKeyJson);
     }
     
     log_.debug("Adding user \"" + userName + "\" to group \"" + groupName + "\"");
@@ -845,8 +848,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     iam_.addUserToGroup(new AddUserToGroupRequest()
         .withUserName(userName)
         .withGroupName(groupName));
-    
-    return accessKeyJson;
   }
 
   private String createGroup(String name, String policyArn)
@@ -1072,91 +1073,83 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void createEnvironment()
     {
-      String baseName = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
+      List<String>  keys      = new LinkedList<>();
+      String        baseName  = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
       
-      String key1   = createEnvironmentAdminUser(baseName);
+      createEnvironmentAdminUser(baseName, keys);
       
-      if(key1 == null)
+      if(keys.isEmpty())
       {
         log_.info("No key created, secret unchanged.");
       }
       else
       {
-        String          secret  = "{\n" + key1 + "\n}";
         CredentialName  name    = new CredentialName("fugue-" + getEnvironmentType(),
-          getEnvironment(), // environment
-          null, // realm
-          null, // tenant
-          "root");
-      
-        secretManager_.putSecret(name, secret);
-        
-        log_.info("Created secret " + name);
+            getEnvironment(), // environment
+            null, // realm
+            null, // tenant
+            "root");
+
+        updateSecret(name, keys);
       }
     }
     
-    private String createEnvironmentAdminUser(String baseName)
+    private void updateSecret(CredentialName name, List<String> keys)
+    {
+      StringBuilder builder = new StringBuilder("{\n");
+      
+      for(int i=0 ; i<keys.size() ; i++)
+      {
+        builder.append(keys.get(i));
+        
+        if(i<keys.size()-1)
+          builder.append(",\n");
+        else
+          builder.append("\n}");
+      }
+      
+      String secret = builder.toString();
+    
+      secretManager_.putSecret(name, secret);
+      
+      log_.info("Created secret " + name);
+    }
+
+    private void createEnvironmentAdminUser(String baseName, List<String> keys)
     {
       String name = baseName + ADMIN_SUFFIX;
       
       String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
 //      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName);
+//      String result    = createUser(name, groupName, keys);
       
       createRole(name, policyArn);
-
-//      return result;
-      return null;
     }
 
     @Override
     protected void createEnvironmentType()
     {
       String baseName = FUGUE_PREFIX + getEnvironmentType();
-      
-      
-      String secret;
-      String key1   = createEnvironmentTypeAdminUser(baseName);
-      String key2   = createEnvironmentTypeCicdUser(baseName);
-      
-      if(key1 == null)
-      {
-        if(key2 == null)
-        {
-          secret = null;
-        }
-        else
-        {
-          secret = "{\n" + key2 + "\n}";
-        }
-      }
-      else
-      {
-        if(key2 == null)
-        {
-          secret = "{\n" + key1 + "\n}";
-        }
-        else
-        {
-          secret = "{\n" + key1 + ",\n" + key2 + "\n}";
-        }
-      }
-      
-      if(secret == null)
+      List<String>  keys = new LinkedList<>();
+
+      createEnvironmentTypeAdminUser(baseName, keys);
+      createEnvironmentTypeCicdUser(baseName, keys);
+
+      if(keys.isEmpty())
       {
         log_.info("No key created, secret unchanged.");
       }
       else
       {
+        // not a good idea keys.add(getActiveAccessKey(baseName + ROOT_SUFFIX));
+        
         CredentialName  name = new CredentialName("fugue-" + getEnvironmentType(),
           null, // environment
           null, // realm
           null, // tenant
           "root");
       
-        secretManager_.putSecret(name, secret);
-        
-        log_.info("Created secret " + name);
+        updateSecret(name, keys);
       }
       
       for(String region : environmentTypeRegions_)
@@ -1165,31 +1158,40 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private String createEnvironmentTypeAdminUser(String baseName)
+// Don't do this
+//    private String getActiveAccessKey(String name)
+//    {
+//      DefaultCredentialsProvider  dcp = DefaultCredentialsProvider.create();
+//      AwsCredentials accessKey = dcp.resolveCredentials();
+//      
+//      String accessKeyJson = "  \"" + name + "\": {\n" +
+//          "    \"accessKeyId\": \"" + accessKey.accessKeyId() + "\",\n" +
+//          "    \"secretAccessKey\": \"" + accessKey.secretAccessKey() + "\"\n" +
+//          "  }";
+//      
+//      return accessKeyJson;
+//    }
+
+    private void createEnvironmentTypeAdminUser(String baseName, List<String> keys)
     {
       String name = baseName + ADMIN_SUFFIX;
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
 //      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName);
+//      String result    = createUser(name, groupName, keys);
       
       createRole(name, policyArn);
-      
-      // We don't need to create an access key for this: return result;
-      return null;
     }
     
-    private String createEnvironmentTypeCicdUser(String baseName)
+    private void createEnvironmentTypeCicdUser(String baseName, List<String> keys)
     {
       String name = baseName + CICD_SUFFIX;
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
       String groupName = createGroup(name, policyArn);
-      String result    = createUser(name, groupName);
+      createUser(name, groupName, keys);
       
 //      createRole(name, policyArn);
-      
-      return result;
     }
     @Override
     protected void populateTemplateVariables(ImmutableJsonObject config, Map<String, String> templateVariables)
