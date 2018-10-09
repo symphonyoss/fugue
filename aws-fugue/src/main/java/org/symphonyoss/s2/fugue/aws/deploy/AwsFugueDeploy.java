@@ -30,11 +30,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -127,6 +129,7 @@ import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsRequest
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsResult;
 import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.identitymanagement.model.PolicyVersion;
+import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
 import com.amazonaws.services.route53.AmazonRoute53;
@@ -184,14 +187,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            GROUP_SUFFIX                  = "-group";
   private static final String            ROLE_SUFFIX                   = "-role";
   private static final String            USER_SUFFIX                   = "-user";
-  private static final String            ROOT_SUFFIX                  = "-root";
+  private static final String            ROOT_SUFFIX                   = "-root";
   private static final String            ADMIN_SUFFIX                  = "-admin";
+  private static final String            SUPPORT_SUFFIX                = "-support";
   private static final String            CICD_SUFFIX                   = "-cicd";
   private static final String            CONFIG_SUFFIX                 = "-config";
 
   private static final ObjectMapper      MAPPER                        = new ObjectMapper();
 
   private static final String AWS_CONFIG_BUCKET = "awsConfigBucket";
+  private static final String AWS_ACCOUNT_ID    = "awsAccountId";
 
   private static final String APPLICATION_JSON = "application/json";
   
@@ -891,7 +896,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return groupName;
   }
   
-  private String createRole(String name, String policyArn)
+  private String createRole(String name, String ...policyArnList)
   {
     String roleName       = name + ROLE_SUFFIX;
     
@@ -904,16 +909,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       List<AttachedPolicy> policies = iam_.listAttachedRolePolicies(new ListAttachedRolePoliciesRequest()
           .withRoleName(roleName)).getAttachedPolicies();
       
+      Set<String> attachedPolicyArns = new HashSet<>();
+      
       for(AttachedPolicy policy : policies)
       {
-        if(policy.getPolicyArn().equals(policyArn))
+        attachedPolicyArns.add(policy.getPolicyArn());
+      }
+      
+      for(String policyArn : policyArnList)
+      {
+        if(attachedPolicyArns.contains(policyArn))
         {
           log_.debug("Role " + roleName + " already has policy " + policyArn + " attached.");
-          return roleName;
+        }
+        else
+        {
+          log_.info("Attaching policy " + policyArn + " to existing role " + roleName + "...");
+          
+          iam_.attachRolePolicy(new AttachRolePolicyRequest()
+              .withPolicyArn(policyArn)
+              .withRoleName(roleName));
         }
       }
       
-      log_.info("Attaching policy " + policyArn + " to existing role " + roleName + "...");
+      return roleName;
     }
     catch(NoSuchEntityException e)
     {
@@ -926,10 +945,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       log_.debug("Created role " + roleName);
     }
-    
-    iam_.attachRolePolicy(new AttachRolePolicyRequest()
+   
+    for(String policyArn : policyArnList)
+    {
+      iam_.attachRolePolicy(new AttachRolePolicyRequest()
         .withPolicyArn(policyArn)
         .withRoleName(roleName));
+    }
     
     return roleName;
   }
@@ -1134,6 +1156,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       createEnvironmentTypeAdminUser(baseName, keys);
       createEnvironmentTypeCicdUser(baseName, keys);
+      createEnvironmentTypeSupportUser(baseName, keys);
 
       if(keys.isEmpty())
       {
@@ -1183,6 +1206,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, policyArn);
     }
     
+    private void createEnvironmentTypeSupportUser(String baseName, List<String> keys)
+    {
+      String name = baseName + SUPPORT_SUFFIX;
+      
+      String infraPolicyArn = createPolicyFromResource(baseName + "-infra-list-all", "policy/environmentTypeInfraListAll.json");
+      String appPolicyArn = createPolicyFromResource(baseName + "-app-list-all", "policy/environmentTypeAppListAll.json");
+      String fuguePolicyArn = createPolicyFromResource(name, "policy/environmentTypeSupport.json");
+//      String groupName = createGroup(name, policyArn);
+//      String result    = createUser(name, groupName, keys);
+      
+      createRole(name, infraPolicyArn, appPolicyArn, fuguePolicyArn);
+      
+      String assumeRolePolicy = loadTemplateFromResource("policy/environmentTypeSupportTrust.json");
+      
+      iam_.updateAssumeRolePolicy(new UpdateAssumeRolePolicyRequest()
+          .withPolicyDocument(assumeRolePolicy)
+          .withRoleName(name + ROLE_SUFFIX)
+          );
+    }
+    
     private void createEnvironmentTypeCicdUser(String baseName, List<String> keys)
     {
       String name = baseName + CICD_SUFFIX;
@@ -1200,6 +1243,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         templateVariables.put(AWS_CONFIG_BUCKET, configBucket_);
       }
+      
+      templateVariables.put(AWS_ACCOUNT_ID, awsAccountId_);
+      
       super.populateTemplateVariables(config, templateVariables);
     }
     

@@ -1,0 +1,75 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "FugueAdmin",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetRole",
+                "iam:GetPolicyVersion",
+                "iam:ListPolicyVersions",
+                "iam:GetPolicy",
+                "iam:ListAttachedRolePolicies",
+                "iam:AttachRolePolicy",
+                "iam:GetUser",
+                "iam:ListGroupsForUser",
+                "iam:ListAttachedGroupPolicies",
+                "iam:GetGroup",
+                "ecs:RunTask",
+                "iam:ListAccessKeys"
+            ],
+            "Resource": [
+                "arn:aws:ecs:*:*:task-definition/${environmentType}-*",
+                "arn:aws:iam::*:policy/${environmentType}-*",
+                "arn:aws:iam::*:role/${environmentType}-*",
+                "arn:aws:iam::*:user/${environmentType}-*",
+                "arn:aws:iam::*:group/${environmentType}-*"
+            ]
+        },
+    {
+      "Sid": "Config",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::${awsConfigBucket}/*",
+        "arn:aws:s3:::${environmentType}-*/*"
+      ]
+    },
+    {
+      "Sid": "DynamoTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:TagResource"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/${environmentType}-*"
+    },
+    {
+      "Sid": "SQS",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:GetQueueUrl",
+        "sqs:ListDeadLetterSourceQueues",
+        "sqs:ReceiveMessage",
+        "sqs:GetQueueAttributes",
+        "sqs:ListQueueTags"
+      ],
+      "Resource": [
+        "arn:aws:sqs:*:*:${environmentType}-*"
+      ]
+    },
+    {
+      "Sid": "SNS",
+      "Effect": "Allow",
+      "Action": "sns:*",
+      "Resource": "arn:aws:sns:*:*:${environmentType}-*"
+    }
+    ]
+}
