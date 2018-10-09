@@ -49,26 +49,25 @@ import com.amazonaws.services.sns.model.PublishRequest;
  */
 public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPublisherManager>
 {
-  private static final Logger          log_                = LoggerFactory.getLogger(SnsPublisherManager.class);
+  private static final Logger          log_              = LoggerFactory.getLogger(SnsPublisherManager.class);
 
-  static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256K
+  static final int                     MAX_MESSAGE_SIZE  = 256 * 1024;                                        // 256K
 
-  private final INameFactory              nameFactory_;
-  private final String                    region_;
-  private final String                    accountId_;
-  private final boolean                   initialize_;
+  private final String                 region_;
+  private final String                 accountId_;
+  private final boolean                initialize_;
 
-  /* package */ Map<String, SnsPublisher> publisherNameMap_   = new HashMap<>();
-  /* package */ List<SnsPublisher>        publishers_         = new ArrayList<>();
-  /* package */ List<TopicName>           topicNames_         = new ArrayList<>();
+  private Map<TopicName, SnsPublisher> publisherNameMap_ = new HashMap<>();
+  private List<SnsPublisher>           publishers_       = new ArrayList<>();
 
-  /* package */ AmazonSNS                 snsClient_;
+  /* package */ AmazonSNS              snsClient_;
 
   /**
    * Constructor.
    * 
    * @param nameFactory A name factory.
    * @param region      The AWS region to use.
+   * @param accountId   The AWS numeric account ID 
    */
   public SnsPublisherManager(INameFactory nameFactory, String region, String accountId)
   {
@@ -77,9 +76,8 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   
   protected SnsPublisherManager(INameFactory nameFactory, String region, String accountId, boolean initialize)
   {
-    super(SnsPublisherManager.class);
+    super(nameFactory, SnsPublisherManager.class);
     
-    nameFactory_ = nameFactory;
     region_ = region;
     accountId_ = accountId;
     initialize_ = initialize;
@@ -96,15 +94,6 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   @Override
   public void start()
   {
-    for(Entry<String, SnsPublisher> entry : publisherNameMap_.entrySet())
-    {
-      TopicName topicName = nameFactory_.getTopicName(entry.getKey());
-      topicNames_.add(topicName);
-      
-      entry.getValue().startByName(getTopicARN(topicName));
-      publishers_.add(entry.getValue());
-    }
-    
     if(!initialize_)
     {
       // TODO: check that our topics are valid
@@ -120,7 +109,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
    * 
    * @return The topic ARN
    */
-  private String getTopicARN(TopicName topicName)
+  public String getTopicARN(TopicName topicName)
   {
     return "arn:aws:sns:" + region_ + ":" + accountId_ + ":" + topicName;
   }
@@ -137,7 +126,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   }
 
   @Override
-  public synchronized IPublisher<String> getPublisherByName(String topicName)
+  protected synchronized IPublisher<String> getPublisherByName(TopicName topicName)
   {
     assertConfigurable();
     
@@ -145,7 +134,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     
     if(publisher == null)
     {
-      publisher = new SnsPublisher(this);
+      publisher = new SnsPublisher(getTopicARN(topicName), this);
       publisherNameMap_.put(topicName, publisher);
     }
     

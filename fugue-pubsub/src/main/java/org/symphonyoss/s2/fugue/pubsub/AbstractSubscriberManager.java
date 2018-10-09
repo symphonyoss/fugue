@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
@@ -63,33 +65,33 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
                                                                             .expireAfterAccess(30, TimeUnit.MINUTES)
                                                                             .build();
   
-  protected AbstractSubscriberManager(Class<T> type, 
+  protected AbstractSubscriberManager(INameFactory nameFactory, Class<T> type, 
       ITraceContextFactory traceFactory,
       IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
   {
-    super(type);
+    super(nameFactory, type);
     
     traceFactory_ = traceFactory;
     unprocessableMessageConsumer_ = unprocessableMessageConsumer;
   }
 
   @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String topicName,
-      String... additionalTopicNames)
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
+      String... additionalTopicIds)
   {
-    return super.withSubscription(consumer, subscriptionName, topicName, additionalTopicNames);
+    return super.withSubscription(consumer, subscriptionId, topicId, additionalTopicIds);
   }
 
   @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, List<String> topicNames)
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
   {
-    return super.withSubscription(consumer, subscriptionName, topicNames);
+    return super.withSubscription(consumer, subscriptionId, topicNames);
   }
   
   @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String[] topicNames)
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicNames)
   {
-    return super.withSubscription(consumer, subscriptionName, topicNames);
+    return super.withSubscription(consumer, subscriptionId, topicNames);
   }
 
   protected abstract void startSubscription(Subscription<P> subscription);

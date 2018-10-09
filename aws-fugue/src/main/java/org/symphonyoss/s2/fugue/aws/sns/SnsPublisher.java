@@ -23,45 +23,30 @@
 
 package org.symphonyoss.s2.fugue.aws.sns;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 
 class SnsPublisher implements IPublisher<String>
 {
-  private static final Logger          log_ = LoggerFactory.getLogger(SnsPublisher.class);
-
+  private final String              topicArn_;
   private final SnsPublisherManager manager_;
-  private String                       topicName_;
 
-  SnsPublisher(SnsPublisherManager manager)
+  SnsPublisher(String topicArn, SnsPublisherManager manager)
   {
+    topicArn_ = topicArn;
     manager_ = manager;
   }
 
   @Override
   public synchronized void consume(String item, ITraceContext trace)
   {
-    if(topicName_ == null)
-      throw new IllegalStateException("Publisher is not started");
-    
-    manager_.send(topicName_, item);
+    manager_.send(topicArn_, item);
   }
-
-  
 
   @Override
   public void close()
   {
-  }
-
-  void startByName(String topicName)
-  {
-    log_.info("Starting publisher for topic " + topicName + "...");
-    topicName_ = topicName;
   }
 
   @Override

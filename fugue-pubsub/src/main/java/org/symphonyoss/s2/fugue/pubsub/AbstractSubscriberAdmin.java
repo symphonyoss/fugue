@@ -23,10 +23,12 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.List;
+import java.util.Collection;
 
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 
 /**
  * Base class for subscriber managers.
@@ -38,28 +40,28 @@ import org.symphonyoss.s2.fugue.FugueLifecycleState;
  */
 public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IFluent<T>> extends AbstractSubscriberBase<P, T> implements ISubscriberAdmin
 {
-  protected AbstractSubscriberAdmin(Class<T> type)
+  protected AbstractSubscriberAdmin(INameFactory nameFactory, Class<T> type)
   {
-    super(type);
+    super(nameFactory, type);
   }
 
   @Override
-  public T withSubscription(String subscriptionName, String topicName,
-      String... additionalTopicNames)
+  public T withSubscription(String subscriptionId, String topicId,
+      String... additionalTopicIds)
   {
-    return super.withSubscription(null, subscriptionName, topicName, additionalTopicNames);
+    return super.withSubscription(null, subscriptionId, topicId, additionalTopicIds);
   }
 
   @Override
-  public T withSubscription(String subscriptionName, List<String> topicNames)
+  public T withSubscription(String subscriptionId, Collection<TopicName> topicNames)
   {
-    return super.withSubscription(null, subscriptionName, topicNames);
+    return super.withSubscription(null, subscriptionId, topicNames);
   }
   
   @Override
-  public T withSubscription(String subscriptionName, String[] topicNames)
+  public T withSubscription(String subscriptionId, String[] topicNames)
   {
-    return super.withSubscription(null, subscriptionName, topicNames);
+    return super.withSubscription(null, subscriptionId, topicNames);
   }
 
   @Override

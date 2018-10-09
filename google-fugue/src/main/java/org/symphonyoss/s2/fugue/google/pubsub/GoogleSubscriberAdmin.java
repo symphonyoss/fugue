@@ -36,7 +36,6 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberAdmin.class);
   
-  private final INameFactory           nameFactory_;
   private final String                 projectId_;
   
   /**
@@ -49,9 +48,8 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   public GoogleSubscriberAdmin(INameFactory nameFactory, String projectId,
       ITraceContextFactory traceFactory)
   {
-    super(GoogleSubscriberAdmin.class);
+    super(nameFactory, GoogleSubscriberAdmin.class);
     
-    nameFactory_ = nameFactory;
     projectId_ = projectId;
   }
 
@@ -60,11 +58,17 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   {
     for(Subscription<?> subscription : getSubscribers())
     {
-      for(String topic : subscription.getTopicNames())
+
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
+        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
         
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        deleteSubcription(topicName, subscriptionName, dryRun);
+      }
+      
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         createSubcription(topicName, subscriptionName, dryRun);
       }
@@ -115,11 +119,16 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   {
     for(Subscription<?> subscription : getSubscribers())
     {
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
+        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
         
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        deleteSubcription(topicName, subscriptionName, dryRun);
+      }
+      
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         deleteSubcription(topicName, subscriptionName, dryRun);
       }
@@ -147,7 +156,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
           log_.info("Subscription " + subscriptionName + " deleted.");
       }
     }
-    catch (AlreadyExistsException e)
+    catch (NotFoundException e)
     {
       log_.info("Subscription " + subscriptionName + " does not exist.");
     }

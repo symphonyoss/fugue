@@ -54,7 +54,6 @@ import com.amazonaws.services.sqs.model.TagQueueRequest;
 public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubscriberAdmin>
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
-  private final INameFactory  nameFactory_;
   private final String        region_;
   private final String        accountId_;
 
@@ -73,10 +72,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId,
       ITraceContextFactory traceFactory, Map<String, String> tags)
   {
-    super(SqsSubscriberAdmin.class);
+    super(nameFactory, SqsSubscriberAdmin.class);
     
     accountId_ = accountId;
-    nameFactory_ = nameFactory;
     region_ = region;
     tags_ = tags;
   }
@@ -102,11 +100,16 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
     
     for(Subscription<?> subscription : getSubscribers())
     {
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
+        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
         
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
+      }
+      
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         createSubcription(snsClient, topicName, subscriptionName, dryRun);
       }
@@ -176,11 +179,17 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
     
     for(Subscription<?> subscription : getSubscribers())
     {
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
+        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
         
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
+      }
+      
+
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
       }

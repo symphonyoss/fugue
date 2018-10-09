@@ -51,7 +51,6 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
   private final int                           threadPoolSize_ = 50;
-  private final INameFactory                  nameFactory_;
   private final String                        region_;
   private final boolean                       startSubscriptions_;
   private final LinkedBlockingQueue<Runnable> executorQueue_  = new LinkedBlockingQueue<Runnable>();
@@ -71,12 +70,11 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
       ITraceContextFactory traceFactory,
       IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
-    super(SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
+    super(nameFactory, SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
     
     if(unprocessableMessageConsumer==null)
       throw new NullPointerException("unprocessableMessageConsumer is required.");
     
-    nameFactory_ = nameFactory;
     region_ = region;
     startSubscriptions_ = true;
     
@@ -102,11 +100,9 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   {
     if(startSubscriptions_)
     {
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
 
         log_.info("Subscribing to queue " + subscriptionName + "...");
         

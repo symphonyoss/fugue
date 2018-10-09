@@ -23,7 +23,9 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.List;
+import java.util.Collection;
+
+import org.symphonyoss.s2.fugue.naming.TopicName;
 
 /**
  * A subscriber admin controller.
@@ -65,7 +67,7 @@ public interface ISubscriberAdmin
    * 
    * @throws IllegalArgumentException If the list of topics is empty.
    */
-  ISubscriberAdmin withSubscription(String subscriptionName, List<String> topicNames);
+  ISubscriberAdmin withSubscription(String subscriptionName, Collection<TopicName> topicNames);
 
   /**
    * Subscribe to the given subscription on the given topics.

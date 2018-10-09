@@ -24,16 +24,21 @@
 package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 
 public abstract class AbstractPublisherManager<P,T extends AbstractPublisherManager<P,T>>
   extends FugueLifecycleComponent<T>
   implements IPublisherManager<P>
 {
   private static final String TRACE_TOPIC_NAME = "trace";
+  
+  protected final INameFactory nameFactory_;
 
-  protected AbstractPublisherManager(Class<T> type)
+  protected AbstractPublisherManager(INameFactory nameFactory, Class<T> type)
   {
     super(type);
+    nameFactory_ = nameFactory;
   }
   
   @Override
@@ -41,4 +46,18 @@ public abstract class AbstractPublisherManager<P,T extends AbstractPublisherMana
   {
     return getPublisherByName(TRACE_TOPIC_NAME);
   }
+  
+  @Override
+  public IPublisher<P> getPublisherByName(String topicId)
+  {
+    return getPublisherByName(nameFactory_.getTopicName(topicId));
+  }
+
+  @Override
+  public IPublisher<P> getPublisherByName(String serviceId, String topicId)
+  {
+    return getPublisherByName(nameFactory_.getTopicName(serviceId, topicId));
+  }
+
+  protected abstract IPublisher<P> getPublisherByName(TopicName topicName);
 }
