@@ -67,6 +67,12 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   }
 
   @Override
+  public void deleteObsoleteTopic(String topicId)
+  {
+    obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
+  }
+
+  @Override
   public IPublisher<String> getPublisherByName(String topicId)
   {
     obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
@@ -159,9 +165,18 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
           if(dryRun)
           {
             if(subscriptions.isEmpty())
+            {
               log_.info("Topic " + topicName + " has no subscriptions and would be deleted (dry run).");
+            }
             else
+            {
               log_.warn("Topic " + topicName + " has " + subscriptions.size() + " subscriptions and cannot be deleted (dry run).");
+              
+              for(Subscription s : subscriptions)
+              {
+                log_.info("Topic " + topicName + " has subscription to " + s.getEndpoint() + " as " + s.getSubscriptionArn());
+              }
+            }
           }
           else
           {

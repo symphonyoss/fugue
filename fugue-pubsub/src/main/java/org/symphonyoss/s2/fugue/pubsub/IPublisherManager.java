@@ -51,12 +51,12 @@ public interface IPublisherManager<P>
    */
   IPublisher<P> getPublisherByName(String serviceId, String topicId);
 
-  /**
-   * Return the publisher for trace events.
-   * 
-   * @return the publisher for trace events.
-   */
-  IPublisher<P> getTracePublisher();
+//  /**
+//   * Return the publisher for trace events.
+//   * 
+//   * @return the publisher for trace events.
+//   */
+//  IPublisher<P> getTracePublisher();
   
   /**
    * Return the maximum allowed size of a message in bytes.

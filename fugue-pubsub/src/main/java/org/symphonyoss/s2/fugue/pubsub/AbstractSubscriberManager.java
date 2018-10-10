@@ -76,6 +76,12 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   }
 
   @Override
+  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
+  {
+    return super.withSubscription(consumer, subscription);
+  }
+
+  @Override
   public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
       String... additionalTopicIds)
   {
@@ -94,7 +100,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     return super.withSubscription(consumer, subscriptionId, topicNames);
   }
 
-  protected abstract void startSubscription(Subscription<P> subscription);
+  protected abstract void startSubscription(SubscriptionImpl<P> subscription);
 
   /**
    * Stop all subscribers.
@@ -111,7 +117,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
-    for(Subscription<P> s : getSubscribers())
+    for(SubscriptionImpl<P> s : getSubscribers())
     {
       startSubscription(s);
     }

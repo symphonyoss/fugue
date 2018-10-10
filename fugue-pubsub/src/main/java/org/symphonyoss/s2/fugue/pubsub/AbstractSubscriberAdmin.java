@@ -46,6 +46,12 @@ public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IF
   }
 
   @Override
+  public ISubscriberAdmin withSubscription(Subscription subscription)
+  {
+    return super.withSubscription(null, subscription);
+  }
+
+  @Override
   public T withSubscription(String subscriptionId, String topicId,
       String... additionalTopicIds)
   {

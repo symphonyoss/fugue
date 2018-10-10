@@ -33,6 +33,7 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
@@ -98,7 +99,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withRegion(region_)
         .build();
     
-    for(Subscription<?> subscription : getSubscribers())
+    for(SubscriptionImpl<?> subscription : getSubscribers())
     {
       for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
@@ -109,6 +110,15 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       
       for(TopicName topicName : subscription.getTopicNames())
       {
+        String obsoleteId = subscription.getObsoleteSubscriptionId();
+        
+        if(obsoleteId != null)
+        {
+          SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
+          
+          deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
+        }
+        
         SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         createSubcription(snsClient, topicName, subscriptionName, dryRun);
@@ -177,7 +187,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withRegion(region_)
         .build();
     
-    for(Subscription<?> subscription : getSubscribers())
+    for(SubscriptionImpl<?> subscription : getSubscribers())
     {
       for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
@@ -185,10 +195,18 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         
         deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
       }
-      
 
       for(TopicName topicName : subscription.getTopicNames())
       {
+        String obsoleteId = subscription.getObsoleteSubscriptionId();
+        
+        if(obsoleteId != null)
+        {
+          SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
+          
+          deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
+        }
+        
         SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         deleteSubcription(snsClient, topicName, subscriptionName, dryRun);

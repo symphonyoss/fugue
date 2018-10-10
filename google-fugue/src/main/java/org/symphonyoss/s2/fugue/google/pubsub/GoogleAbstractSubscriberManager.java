@@ -21,7 +21,7 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
@@ -76,7 +76,7 @@ import com.google.pubsub.v1.ProjectSubscriptionName;
 //  }
   
   @Override
-  protected void startSubscription(Subscription<ImmutableByteArray> subscription)
+  protected void startSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
   { 
     for(TopicName topicName : subscription.getTopicNames())
     {

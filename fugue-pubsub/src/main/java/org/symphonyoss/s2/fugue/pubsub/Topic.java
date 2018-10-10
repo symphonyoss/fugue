@@ -31,6 +31,14 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
 /**
  * A topic as represented in the Fugue API.
  * 
+ * This is simply a representation of the parameters of a Topic so that it can be passed through the API.
+ * 
+ * A Topic always has an id, it has a serviceId which defaults to the current service, in which case it
+ * is represented as null in this class. It may also have an obsolete ID, which may also be null in this
+ * class.
+ * 
+ * The eventual name for a Topic is ${environmentType}-${environmentId}-${serviceId}-${topicId}
+ * 
  * @author Bruce Skingle
  *
  */

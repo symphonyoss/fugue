@@ -35,7 +35,7 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
@@ -96,7 +96,7 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   }
 
   @Override
-  protected void startSubscription(Subscription<String> subscription)
+  protected void startSubscription(SubscriptionImpl<String> subscription)
   {
     if(startSubscriptions_)
     {

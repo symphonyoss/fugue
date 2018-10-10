@@ -38,7 +38,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  *
  * @param <P> The type of message produced by this subscription.
  */
-public class Subscription<P>
+public class SubscriptionImpl<P>
 {
   private final IThreadSafeRetryableConsumer<P> consumer_;
   private final Collection<TopicName>           topicNames_;
@@ -55,7 +55,7 @@ public class Subscription<P>
    * @param subscriptionName  The simple subscription name.
    * @param consumer          A consumer for received messages.
    */
-  public Subscription(Collection<TopicName> topicNames, String subscriptionName, @Nullable IThreadSafeRetryableConsumer<P> consumer)
+  public SubscriptionImpl(Collection<TopicName> topicNames, String subscriptionName, @Nullable IThreadSafeRetryableConsumer<P> consumer)
   {
     consumer_ = consumer;
     topicNames_ = topicNames;
@@ -65,7 +65,7 @@ public class Subscription<P>
   }
 
   @Deprecated
-  public Subscription(Collection<TopicName> topicNames, Collection<TopicName> obsoleteTopicNames,
+  public SubscriptionImpl(Collection<TopicName> topicNames, Collection<TopicName> obsoleteTopicNames,
       String subscriptionId, String obsoleteSubscriptionId, @Nullable IThreadSafeRetryableConsumer<P> consumer)
   {
     consumer_ = consumer;

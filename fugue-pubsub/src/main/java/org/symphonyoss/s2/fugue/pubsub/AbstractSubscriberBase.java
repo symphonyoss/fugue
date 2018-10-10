@@ -49,13 +49,26 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
 {
   protected final INameFactory    nameFactory_;
 
-  protected List<Subscription<P>> subscribers_ = new ArrayList<>();
+  protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
   
   protected AbstractSubscriberBase(INameFactory nameFactory, Class<T> type)
   {
     super(type);
     
     nameFactory_ = nameFactory;
+  }
+  
+  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
+  {
+    assertConfigurable();
+    
+    subscribers_.add(new SubscriptionImpl<P>(
+        subscription.createTopicNames(nameFactory_),
+        subscription.createObsoleteTopicNames(nameFactory_),
+        subscription.getId(),
+        subscription.getObsoleteId(), consumer));
+    
+    return self();
   }
 
   @Deprecated
@@ -64,7 +77,7 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
   {
     assertConfigurable();
     
-    subscribers_.add(new Subscription<P>(
+    subscribers_.add(new SubscriptionImpl<P>(
         nameFactory_.getTopicNameCollection(topicId, additionalTopicIds),
         nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
         null,
@@ -80,7 +93,7 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
     if(topicNames.isEmpty())
       throw new IllegalArgumentException("At least one topic name is required");
     
-    subscribers_.add(new Subscription<P>(topicNames, subscriptionId, consumer));
+    subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
     
     return self();
   }
@@ -101,12 +114,12 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
       obsoleteTopicNameList.add(nameFactory_.getObsoleteTopicName(id));
     }
     
-    subscribers_.add(new Subscription<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
+    subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
     
     return self();
   }
 
-  protected List<Subscription<P>> getSubscribers()
+  protected List<SubscriptionImpl<P>> getSubscribers()
   {
     return subscribers_;
   }

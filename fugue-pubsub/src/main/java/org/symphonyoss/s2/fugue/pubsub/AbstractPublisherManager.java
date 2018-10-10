@@ -31,20 +31,12 @@ public abstract class AbstractPublisherManager<P,T extends AbstractPublisherMana
   extends FugueLifecycleComponent<T>
   implements IPublisherManager<P>
 {
-  private static final String TRACE_TOPIC_NAME = "trace";
-  
   protected final INameFactory nameFactory_;
 
   protected AbstractPublisherManager(INameFactory nameFactory, Class<T> type)
   {
     super(type);
     nameFactory_ = nameFactory;
-  }
-  
-  @Override
-  public IPublisher<P> getTracePublisher()
-  {
-    return getPublisherByName(TRACE_TOPIC_NAME);
   }
   
   @Override

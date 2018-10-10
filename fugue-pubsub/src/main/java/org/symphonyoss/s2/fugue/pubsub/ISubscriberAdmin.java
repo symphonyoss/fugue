@@ -34,6 +34,8 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  */
 public interface ISubscriberAdmin
 {
+  ISubscriberAdmin withSubscription(Subscription subscription);
+  
   /**
    * Subscribe to the given subscription on the given topics.
    * 

@@ -39,6 +39,8 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  */
 public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends IFluent<T>
 {
+  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription);
+  
   /**
    * Subscribe to the given subscription on the given topics.
    * 

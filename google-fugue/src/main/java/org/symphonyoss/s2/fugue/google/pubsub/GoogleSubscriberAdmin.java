@@ -17,7 +17,7 @@ import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
@@ -56,7 +56,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   @Override
   public void createSubscriptions(boolean dryRun)
   {
-    for(Subscription<?> subscription : getSubscribers())
+    for(SubscriptionImpl<?> subscription : getSubscribers())
     {
 
       for(TopicName topicName : subscription.getObsoleteTopicNames())
@@ -68,6 +68,15 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
       
       for(TopicName topicName : subscription.getTopicNames())
       {
+        String obsoleteId = subscription.getObsoleteSubscriptionId();
+        
+        if(obsoleteId != null)
+        {
+          SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, obsoleteId);
+          
+          deleteSubcription(topicName, subscriptionName, dryRun);
+        }
+        
         SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         createSubcription(topicName, subscriptionName, dryRun);
@@ -117,7 +126,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   @Override
   public void deleteSubscriptions(boolean dryRun)
   {
-    for(Subscription<?> subscription : getSubscribers())
+    for(SubscriptionImpl<?> subscription : getSubscribers())
     {
       for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
@@ -128,6 +137,15 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
       
       for(TopicName topicName : subscription.getTopicNames())
       {
+        String obsoleteId = subscription.getObsoleteSubscriptionId();
+        
+        if(obsoleteId != null)
+        {
+          SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, obsoleteId);
+          
+          deleteSubcription(topicName, subscriptionName, dryRun);
+        }
+        
         SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
         
         deleteSubcription(topicName, subscriptionName, dryRun);
