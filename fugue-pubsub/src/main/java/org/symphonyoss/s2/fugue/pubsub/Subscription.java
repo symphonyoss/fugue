@@ -171,14 +171,17 @@ public class Subscription
     List<TopicName> names = new LinkedList<>();
     
     for(Topic t : topics_)
-    {
-      String id = t.getObsoleteId();
-      
-      if(id != null)
-      {
-        names.add(nameFactory.getObsoleteTopicName(id));
-      }
-    }
+      names.add(t.createObsoleteTopicName(nameFactory));
+    
+//    for(Topic t : topics_)
+//    {
+//      String id = t.getObsoleteId();
+//      
+//      if(id != null)
+//      {
+//        names.add(nameFactory.getObsoleteTopicName(id));
+//      }
+//    }
     
     return names;
   }

@@ -23,40 +23,46 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+import javax.annotation.Nonnull;
+
 public class TableName extends Name
 {
-  private final String environmentTypeId_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String table_;
+  private final String serviceId_;
+  private final String tableId_;
 
-  public TableName(String environmentTypeId, String environmentId, String realmId, String table)
+  /**
+   * Connstructor.
+   * 
+   * @param serviceId       The ID of the service which owns this table.
+   * @param tableId         The tableId (simple name).
+   * @param name            The first element of the actual name.
+   * @param additional      Zero or more optional suffix elements.
+   */
+  protected TableName(String serviceId, String tableId, @Nonnull String name, String ...additional)
   {
-    super(environmentTypeId, environmentId, realmId, table);
+    super(name, additional);
     
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    table_ = table;
+    serviceId_ = serviceId;
+    tableId_ = tableId;
   }
 
-  public String getEnvironmentTypeId()
+  /**
+   * 
+   * @return The id of the service which owns this table.
+   */
+  public String getServiceId()
   {
-    return environmentTypeId_;
+    return serviceId_;
   }
 
-  public String getEnvironmentId()
+  /**
+   * 
+   * @return The table ID (simple name)
+   */
+  public String getTableId()
   {
-    return environmentId_;
+    return tableId_;
   }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTable()
-  {
-    return table_;
-  }
+  
+  
 }

@@ -21,10 +21,10 @@
                 "iam:ListPolicyVersions"
             ],
             "Resource": [
-                "arn:aws:iam::*:group/${environmentType}-${environmentId}-*",
-                "arn:aws:iam::*:policy/${environmentType}-${environmentId}-*",
-                "arn:aws:iam::*:role/${environmentType}-${environmentId}-*",
-                "arn:aws:s3:::${awsConfigBucket}/config/${environmentType}-${environmentId}-*"
+                "arn:aws:iam::*:group/sym-s2-${environmentType}-${environmentId}-*",
+                "arn:aws:iam::*:policy/sym-s2-${environmentType}-${environmentId}-*",
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-${environmentId}-*",
+                "arn:aws:s3:::${awsConfigBucket}/config/sym-s2-${environmentType}-${environmentId}-*"
             ]
         },
         {
@@ -104,8 +104,8 @@
                 "ecs:RunTask"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/${environmentType}-${environmentId}-*:*",
-                "arn:aws:ecs:*:*:task/${environmentType}-${environmentId}-*"
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-${environmentId}-*:*",
+                "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-${environmentId}-*"
             ]
         }
     ]

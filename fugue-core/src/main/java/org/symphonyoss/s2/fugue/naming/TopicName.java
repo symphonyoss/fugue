@@ -49,7 +49,7 @@ public class TopicName extends Name
    * @param name        The first element of the full topic name.
    * @param additional  Zero or more additional name elements.
    */
-  public TopicName(String serviceId, boolean isLocal, String topicId, String name, String ...additional)
+  protected TopicName(String serviceId, boolean isLocal, String topicId, String name, String ...additional)
   {
     super(name, additional);
     

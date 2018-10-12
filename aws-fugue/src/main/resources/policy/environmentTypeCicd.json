@@ -8,7 +8,7 @@
                 "secretsmanager:GetSecretValue"
             ],
             "Resource": [
-                "arn:aws:secretsmanager:*:*:secret:fugue-${environmentType}-*"
+                "arn:aws:secretsmanager:*:*:secret:sym-s2-fugue-${environmentType}-*"
             ]
         },
         {
@@ -26,16 +26,16 @@
                 "ecs:DescribeContainerInstances"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/${environmentType}-*",
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
                 "arn:aws:ecs:*:*:container-instance/*",
-                "arn:aws:ecs:*:*:task/${environmentType}-*",
+                "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-*",
                 "arn:aws:ecs:*:*:cluster/*",
-                "arn:aws:s3:::fugue-*/config/${environmentType}-*",
+                "arn:aws:s3:::sym-s2-fugue-*/config/sym-s2-${environmentType}-*",
                 "arn:aws:s3:::sym-build-secrets/*",
-                "arn:aws:iam::*:policy/${environmentType}-*",
-                "arn:aws:iam::*:role/fugue-${environmentType}-admin-role",
+                "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-fugue-${environmentType}-admin-role",
                 "arn:aws:iam::*:role/ecsTaskExecutionRole",
-                "arn:aws:iam::*:role/${environmentType}-*"
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*"
             ]
         },
         {

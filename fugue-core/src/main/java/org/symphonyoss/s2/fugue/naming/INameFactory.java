@@ -88,4 +88,29 @@ public interface INameFactory
 
   CredentialName getCredentialName(String tenantId, String owner);
 
+  ServiceName getServiceName();
+
+  CredentialName getFugueCredentialName(String owner);
+
+  Name getServiceItemName(String name);
+
+  Name getConfigBucketName(String regionId);
+
+  Name getRegionalName(String name);
+
+  Name getRegionName();
+
+  Name getName();
+  Name getFugueName();
+
+  /**
+   * Create a new INameFactory with the given regionId and inheriting all other attributes from the current factory.
+   * 
+   * @param regionId  The regionId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given regionId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withRegionId(String regionId);
+
+
 }

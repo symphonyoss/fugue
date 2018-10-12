@@ -102,10 +102,8 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
     {
       for(TopicName topicName : subscription.getTopicNames())
       {
-        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
-        log_.info("Subscribing to queue " + subscriptionName + "...");
-        
         String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
             sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
         

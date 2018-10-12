@@ -28,6 +28,7 @@ import java.util.Collection;
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 
 /**
@@ -80,5 +81,47 @@ public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IF
   public synchronized void stop()
   {
     setLifeCycleState(FugueLifecycleState.Stopped);
+  }
+  
+  protected abstract void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun);
+  
+  protected abstract void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun);
+  
+  @Override
+  public void createSubscriptions(boolean dryRun)
+  {
+    for(SubscriptionImpl<?> subscription : getSubscribers())
+    {
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
+      {
+        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
+      }
+      
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
+        
+        createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+      }
+    }
+  }
+  
+  @Override
+  public void deleteSubscriptions(boolean dryRun)
+  {
+    for(SubscriptionImpl<?> subscription : getSubscribers())
+    {
+      for(TopicName topicName : subscription.getObsoleteTopicNames())
+      {
+        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
+      }
+      
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
+        
+        deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+      }
+    }
   }
 }

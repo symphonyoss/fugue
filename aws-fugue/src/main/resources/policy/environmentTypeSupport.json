@@ -19,11 +19,11 @@
                 "iam:ListAccessKeys"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/${environmentType}-*",
-                "arn:aws:iam::*:policy/${environmentType}-*",
-                "arn:aws:iam::*:role/${environmentType}-*",
-                "arn:aws:iam::*:user/${environmentType}-*",
-                "arn:aws:iam::*:group/${environmentType}-*"
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:user/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:group/sym-s2-${environmentType}-*"
             ]
         },
     {
@@ -34,7 +34,7 @@
       ],
       "Resource": [
         "arn:aws:s3:::${awsConfigBucket}/*",
-        "arn:aws:s3:::${environmentType}-*/*"
+        "arn:aws:s3:::sym-s2-${environmentType}-*/*"
       ]
     },
     {
@@ -49,7 +49,7 @@
         "dynamodb:GetItem",
         "dynamodb:TagResource"
       ],
-      "Resource": "arn:aws:dynamodb:*:*:table/${environmentType}-*"
+      "Resource": "arn:aws:dynamodb:*:*:table/sym-s2-${environmentType}-*"
     },
     {
       "Sid": "SQS",
@@ -62,14 +62,14 @@
         "sqs:ListQueueTags"
       ],
       "Resource": [
-        "arn:aws:sqs:*:*:${environmentType}-*"
+        "arn:aws:sqs:*:*:sym-s2-${environmentType}-*"
       ]
     },
     {
       "Sid": "SNS",
       "Effect": "Allow",
       "Action": "sns:*",
-      "Resource": "arn:aws:sns:*:*:${environmentType}-*"
+      "Resource": "arn:aws:sns:*:*:sym-s2-${environmentType}-*"
     }
     ]
 }

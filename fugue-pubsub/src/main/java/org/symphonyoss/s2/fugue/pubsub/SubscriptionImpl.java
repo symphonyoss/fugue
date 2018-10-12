@@ -102,7 +102,7 @@ public class SubscriptionImpl<P>
   @Deprecated
   public String getObsoleteSubscriptionId()
   {
-    return obsoleteSubscriptionId_;
+    return obsoleteSubscriptionId_ == null ? subscriptionId_ : obsoleteSubscriptionId_;
   }
 
   /**

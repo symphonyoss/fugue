@@ -59,6 +59,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   private final String        accountId_;
 
   private AmazonSQS           sqsClient_;
+  private AmazonSNS           snsClient_;
   private Map<String, String> tags_;
   
   /**
@@ -87,43 +88,13 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withRegion(region_)
         .build();
     
-    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
-    
-    super.start();
-  }
-
-  @Override
-  public void createSubscriptions(boolean dryRun)
-  {
-    AmazonSNS snsClient = AmazonSNSClientBuilder.standard()
+    snsClient_ = AmazonSNSClientBuilder.standard()
         .withRegion(region_)
         .build();
     
-    for(SubscriptionImpl<?> subscription : getSubscribers())
-    {
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-        
-        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-      
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        String obsoleteId = subscription.getObsoleteSubscriptionId();
-        
-        if(obsoleteId != null)
-        {
-          SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-          
-          deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-        }
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-        
-        createSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-    }
+    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    
+    super.start();
   }
   
   /**
@@ -145,7 +116,8 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
     return "arn:aws:sqs:" + region_ + ":" + accountId_ + ":" + subscriptionName;
   }
   
-  private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  @Override
+  protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
     String queueUrl;
     
@@ -166,9 +138,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       {
         queueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
         
-        String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, getTopicARN(topicName), queueUrl);
+        String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(topicName), queueUrl);
         
-        snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
+        snsClient_.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
         
         log_.info("Created subscription " + subscriptionName + " as " + queueUrl);
       }
@@ -179,42 +151,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withTags(tags_)
         );
   }
-
-  @Override
-  public void deleteSubscriptions(boolean dryRun)
-  {
-    AmazonSNS snsClient = AmazonSNSClientBuilder.standard()
-        .withRegion(region_)
-        .build();
-    
-    for(SubscriptionImpl<?> subscription : getSubscribers())
-    {
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-        
-        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        String obsoleteId = subscription.getObsoleteSubscriptionId();
-        
-        if(obsoleteId != null)
-        {
-          SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-          
-          deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-        }
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-        
-        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-    }
-  }
   
-  private void deleteSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  @Override
+  protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
     try
     {
@@ -226,9 +165,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       }
       else
       {
-        //GetSubscriptionAttributesResult sa = snsClient.getSubscriptionAttributes(getQueueARN(subscriptionName));
+        //GetSubscriptionAttributesResult sa = snsClient_.getSubscriptionAttributes(getQueueARN(subscriptionName));
         
-        ListSubscriptionsByTopicResult subscriptionResult = snsClient.listSubscriptionsByTopic(getTopicARN(topicName));
+        ListSubscriptionsByTopicResult subscriptionResult = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
         
         if(subscriptionResult != null)
         {
@@ -238,7 +177,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
           {
             if(queueArn.equals(subscription.getEndpoint()))
             {
-              snsClient.unsubscribe(subscription.getSubscriptionArn());
+              snsClient_.unsubscribe(subscription.getSubscriptionArn());
               
               log_.info("Deleted subscription " + subscription.getSubscriptionArn());
             }

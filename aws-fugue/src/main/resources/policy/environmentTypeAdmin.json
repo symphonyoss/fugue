@@ -41,10 +41,10 @@
                 "iam:DetachRolePolicy"
             ],
             "Resource": [
-                "arn:aws:iam::*:group/${environmentType}-*",
-                "arn:aws:iam::*:policy/${environmentType}-*",
-                "arn:aws:iam::*:user/${environmentType}-*",
-                "arn:aws:iam::*:role/${environmentType}-*"
+                "arn:aws:iam::*:group/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:user/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*"
             ]
         },
         {
@@ -79,12 +79,12 @@
                 "secretsmanager:PutSecretValue"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/${environmentType}-*",
-                "arn:aws:iam::*:policy/${environmentType}-*",
-                "arn:aws:iam::*:role/${environmentType}-*",
-                "arn:aws:iam::*:user/${environmentType}-*",
-                "arn:aws:iam::*:group/${environmentType}-*",
-                "arn:aws:secretsmanager:*:*:secret:fugue-${environmentType}-*"
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:user/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:group/sym-s2-${environmentType}-*",
+                "arn:aws:secretsmanager:*:*:secret:sym-s2-fugue-${environmentType}-*"
             ]
         }
     ]

@@ -197,6 +197,11 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
             else
             {
               log_.warn("Topic " + topicName + " has " + subscriptions.size() + " subscriptions and cannot be deleted (dry run).");
+              
+              for(Subscription s : subscriptions)
+              {
+                log_.info("Topic " + topicName + " has subscription to " + s.getEndpoint() + " as " + s.getSubscriptionArn());
+              }
             }
           }
         }

@@ -40,7 +40,7 @@ public class S3Helper
 {
   private static final Logger            log_                          = LoggerFactory.getLogger(S3Helper.class);
 
-  public static void createBucketIfNecessary(AmazonS3 s3, String name)
+  public static void createBucketIfNecessary(AmazonS3 s3, String name, boolean dryRun)
   {
     try
     {
@@ -53,13 +53,20 @@ public class S3Helper
       switch(e.getErrorCode())
       {
         case "NoSuchBucket":
-          log_.info("Config bucket " + name + " does not exist, creating...");
-          
-          createBucket(s3, name);
+          if(dryRun)
+          {
+            log_.info("Bucket " + name + " does not exist, and would be created (dry run).");
+          }
+          else
+          {
+            log_.info("Bucket " + name + " does not exist, creating...");
+            
+            createBucket(s3, name);
+          }
           break;
           
         case "AuthorizationHeaderMalformed":
-          abort("Config bucket " + name + ", appears to be in the wrong region.", e);
+          abort("Bucket " + name + ", appears to be in the wrong region.", e);
           break;
         
         case "AccessDenied":
@@ -69,7 +76,7 @@ public class S3Helper
             denied = bucketAccessDenied(s3, name);
           }
           
-          String message = "Cannot access config bucket " + name;
+          String message = "Cannot access bucket " + name;
           
           if(denied)
             abort(message + ", could not access 5 random bucket names either, check your policy permissions.");
@@ -80,31 +87,9 @@ public class S3Helper
           break;
           
         default:
-          abort("Unexpected S3 error looking for config bucket " + name, e);
+          abort("Unexpected S3 error looking for bucket " + name, e);
       }
-      
     }
-    
-    
-//    try
-//    {
-//      ListObjectsV2Result list = s3.listObjectsV2(name, CONFIG);
-//      
-//      
-//      log_.info("Got " + list.getKeyCount() + " keys");
-//    }
-//    catch(AmazonS3Exception e)
-//    {
-//      switch(e.getErrorCode())
-//      {
-//        case "Not Found":
-//          log_.info("Config folder not found, creating it...");
-//          s3.
-//        
-//        default:
-//          abort("Unexpected S3 error looking for config folder " + name + "/" + CONFIG, e);
-//      }
-//    }
   }
 
   private static void createBucket(AmazonS3 s3, String name)

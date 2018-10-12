@@ -10,14 +10,12 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
@@ -37,6 +35,8 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberAdmin.class);
   
   private final String                 projectId_;
+
+  private SubscriptionAdminClient subscriptionAdminClient_;
   
   /**
    * Normal constructor.
@@ -54,46 +54,39 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   }
 
   @Override
-  public void createSubscriptions(boolean dryRun)
+  public synchronized void start()
   {
-    for(SubscriptionImpl<?> subscription : getSubscribers())
+    super.start();
+    
+    try
     {
-
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-        
-        deleteSubcription(topicName, subscriptionName, dryRun);
-      }
-      
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        String obsoleteId = subscription.getObsoleteSubscriptionId();
-        
-        if(obsoleteId != null)
-        {
-          SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, obsoleteId);
-          
-          deleteSubcription(topicName, subscriptionName, dryRun);
-        }
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-        
-        createSubcription(topicName, subscriptionName, dryRun);
-      }
+      subscriptionAdminClient_ = SubscriptionAdminClient.create();
+    }
+    catch (IOException e)
+    {
+      throw new IllegalStateException("Unable to create SubscriptionAdminClient", e);
     }
   }
 
-  private void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  @Override
+  public synchronized void stop()
   {
-    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
+    subscriptionAdminClient_.close();
+    
+    super.stop();
+  }
+
+  @Override
+  protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  {
+    try
     {
       ProjectTopicName projectTopicName = ProjectTopicName.of(projectId_, topicName.toString());
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
       
       try
       {
-        com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
+        subscriptionAdminClient_.getSubscription(projectSubscriptionName);
         
         log_.info("Subscription " + subscriptionName + " on topic " + topicName + " already exists.");
       }
@@ -106,7 +99,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
         else
         {
           // create a pull subscription with default acknowledgement deadline
-          subscriptionAdminClient.createSubscription(projectSubscriptionName, projectTopicName,
+          subscriptionAdminClient_.createSubscription(projectSubscriptionName, projectTopicName,
               PushConfig.getDefaultInstance(), 0);
           
           log_.info("Subscription " + subscriptionName + " on topic " + topicName + " created.");
@@ -117,51 +110,18 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
     {
       log_.info("Subscription " + subscriptionName + " on topic " + topicName + " already exists.");
     }
-    catch (IOException e)
-    {
-      throw new TransactionFault(e);
-    }
   }
 
   @Override
-  public void deleteSubscriptions(boolean dryRun)
+  protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
-    for(SubscriptionImpl<?> subscription : getSubscribers())
+    log_.debug("About to delete subscription " + subscriptionName + " on topic " + topicName);
+    
+    try
     {
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        SubscriptionName subscriptionName = nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId());
-        
-        deleteSubcription(topicName, subscriptionName, dryRun);
-      }
-      
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        String obsoleteId = subscription.getObsoleteSubscriptionId();
-        
-        if(obsoleteId != null)
-        {
-          SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, obsoleteId);
-          
-          deleteSubcription(topicName, subscriptionName, dryRun);
-        }
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-        
-        deleteSubcription(topicName, subscriptionName, dryRun);
-      }
-    }
-  }
-
-  private void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
-  {
-    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
-    {
-      ProjectTopicName projectTopicName = ProjectTopicName.of(projectId_, topicName.toString());
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
       
-   // TODO: implement this
-      com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
+      subscriptionAdminClient_.getSubscription(projectSubscriptionName);
       
       if(dryRun)
       {
@@ -169,7 +129,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
       }
       else
       {
-          subscriptionAdminClient.deleteSubscription(projectSubscriptionName);
+          subscriptionAdminClient_.deleteSubscription(projectSubscriptionName);
           
           log_.info("Subscription " + subscriptionName + " deleted.");
       }
@@ -177,10 +137,6 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
     catch (NotFoundException e)
     {
       log_.info("Subscription " + subscriptionName + " does not exist.");
-    }
-    catch (IOException e)
-    {
-      throw new TransactionFault(e);
     }
   }
 }

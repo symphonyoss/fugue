@@ -132,4 +132,16 @@ public class Topic
     
     return nameFactory.getTopicName(serviceId_, id_);
   }
+
+  /**
+   * Create a TopicName for this topic using the given NameFactory.
+   * 
+   * @param nameFactory The name factory to use (which knows the current environment, service etc)
+   * 
+   * @return The fully qualified name for the topic.
+   */
+  public TopicName createObsoleteTopicName(INameFactory nameFactory)
+  {
+    return nameFactory.getObsoleteTopicName(obsoleteId_ == null ? id_ : obsoleteId_);
+  }
 }
