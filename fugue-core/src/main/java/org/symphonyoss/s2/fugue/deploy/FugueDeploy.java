@@ -563,8 +563,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   private IBatch createBatch()
   {
-    //return new ExecutorBatch(executor_);
-    return new SerialBatch();
+    return new ExecutorBatch(executor_);
+//    return new SerialBatch();
   }
 
   private ImmutableJsonObject fetchTenantConfig(String tenantId)
