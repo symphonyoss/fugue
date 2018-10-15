@@ -23,7 +23,8 @@
                 "s3:GetObject",
                 "ecs:SubmitContainerStateChange",
                 "ecs:ListContainerInstances",
-                "ecs:DescribeContainerInstances"
+                "ecs:DescribeContainerInstances",
+                "ecs:DeregisterTaskDefinition"
             ],
             "Resource": [
                 "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
