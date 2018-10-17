@@ -12,24 +12,15 @@
             ]
         },
         {
-            "Sid": "VisualEditor0",
+            "Sid": "IAMandS3",
             "Effect": "Allow",
             "Action": [
-                "ecs:SubmitTaskStateChange",
                 "iam:GetRole",
                 "iam:GetPolicy",
                 "iam:PassRole",
-                "ecs:StartTask",
-                "s3:GetObject",
-                "ecs:SubmitContainerStateChange",
-                "ecs:ListContainerInstances",
-                "ecs:DescribeContainerInstances"
+                "s3:GetObject"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
-                "arn:aws:ecs:*:*:container-instance/*",
-                "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-*",
-                "arn:aws:ecs:*:*:cluster/*",
                 "arn:aws:s3:::sym-s2-fugue-*/config/sym-s2-${environmentType}-*",
                 "arn:aws:s3:::sym-build-secrets/*",
                 "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
@@ -39,34 +30,91 @@
             ]
         },
         {
-            "Sid": "VisualEditor1",
+            "Sid": "ECSS2",
             "Effect": "Allow",
             "Action": [
+                "ecs:ListTasks",
+                "ecs:StartTask",
+                "ecs:DescribeClusters",
+                "ecs:RunTask"
+            ],
+            "Resource": [
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-*",
+                "arn:aws:ecs:*:*:task-definition/sym-s2-fugue-*",
+                "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-*",
+                "arn:aws:ecs:*:*:task/sym-s2-fugue-*",
+                "arn:aws:ecs:*:*:container-instance/*",
+                "arn:aws:ecs:*:*:cluster/*"
+            ]
+        },
+        {
+            "Sid": "ECSAll",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:DeregisterTaskDefinition",
                 "ecs:ListServices",
                 "ecs:UpdateService",
                 "ecs:CreateService",
                 "ecs:ListTaskDefinitionFamilies",
-                "ecs:DeleteService",
-                "ecs:DescribeServices",
-                "ecs:DescribeTaskDefinition",
-                "ecs:ListTaskDefinitions",
-                "ecs:ListClusters",
-                "ecs:DescribeClusters",
                 "ecs:CreateCluster",
                 "ecs:RegisterTaskDefinition",
-                "ecs:DeregisterTaskDefinition",
-                "ecs:RunTask",
-                "ecs:ListTasks",
+                "ecs:DeleteService",
+                "ecs:DescribeServices",
+                "ecs:ListTaskDefinitions",
+                "ecs:DescribeTaskDefinition",
+                "ecs:ListClusters",
                 "ecs:StopTask",
                 "ecs:DescribeTasks"
             ],
             "Resource": "*"
         },
         {
+            "Sid": "ContainerRegistryS2",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchDeleteImage",
+                "ecr:UploadLayerPart",
+                "ecr:ListImages",
+                "ecr:DeleteRepository",
+                "ecr:PutImage",
+                "ecr:SetRepositoryPolicy",
+                "ecr:BatchGetImage",
+                "ecr:CompleteLayerUpload",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories",
+                "ecr:DeleteRepositoryPolicy",
+                "ecr:InitiateLayerUpload",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetRepositoryPolicy"
+            ],
+            "Resource": "arn:aws:ecr:*:*:repository/sym-s2-*"
+        },
+        {
+            "Sid": "ContainerRegistryES",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:ListImages",
+                "ecr:BatchGetImage",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetRepositoryPolicy"
+            ],
+            "Resource": [
+              "arn:aws:ecr:*:*:repository/symphony-es",
+              "arn:aws:ecr:*:*:repository/symphony-es/*",
+              "arn:aws:ecr:*:*:repository/symbase",
+              "arn:aws:ecr:*:*:repository/symbase/*"
+              ]
+        },
+        {
             "Sid": "ContainerRegistryAll",
             "Effect": "Allow",
             "Action": [
-                "ecr:*"
+                "ecr:CreateRepository",
+                "ecr:GetAuthorizationToken"
             ],
             "Resource": "*"
         },
