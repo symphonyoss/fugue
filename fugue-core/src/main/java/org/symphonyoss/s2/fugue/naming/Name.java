@@ -31,6 +31,12 @@ import javax.annotation.Nonnull;
 
 import org.symphonyoss.s2.common.fault.CodingFault;
 
+/**
+ * Base class for names.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class Name
 {
   public static final String SEPARATOR = "-";
@@ -42,25 +48,30 @@ public class Name
   /**
    * Base class for Names.
    * 
+   * Construct via a NameFactory.
+   * 
    * The name may not be <code>null</code>. Any optional additional non-null suffix components will be
    * appended to the final name each with the standard separator.
    * 
    * @param name        The name
    * @param additional  Zero or more optional suffix elements.
    */
-  public Name(@Nonnull String name, String ...additional)
+  protected Name(@Nonnull String name, String ...additional)
   {
     if(name == null)
       throw new NullPointerException("name may not be null");
     
     StringBuilder b = new StringBuilder(name);
     
-    for(String s : additional)
+    if(additional != null)
     {
-      if(s != null)
+      for(String s : additional)
       {
-        b.append(SEPARATOR);
-        b.append(s);
+        if(s != null)
+        {
+          b.append(SEPARATOR);
+          b.append(s);
+        }
       }
     }
     
@@ -80,6 +91,18 @@ public class Name
     {
       throw new CodingFault(e); // "Can't happen"
     }
+  }
+  
+  /**
+   * Return a new name based on the current name with the given elements appended.
+   * 
+   * @param name        An element to append to the current Name.
+   * 
+   * @return a new name based on the current name with the given elements appended.
+   */
+  public Name append(@Nonnull String name)
+  {
+    return new Name(name_, name);
   }
 
   @Override

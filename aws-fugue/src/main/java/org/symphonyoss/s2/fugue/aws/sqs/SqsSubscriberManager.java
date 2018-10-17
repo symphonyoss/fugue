@@ -35,7 +35,7 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
@@ -51,7 +51,6 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
   private final int                           threadPoolSize_ = 50;
-  private final INameFactory                  nameFactory_;
   private final String                        region_;
   private final boolean                       startSubscriptions_;
   private final LinkedBlockingQueue<Runnable> executorQueue_  = new LinkedBlockingQueue<Runnable>();
@@ -71,12 +70,11 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
       ITraceContextFactory traceFactory,
       IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
-    super(SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
+    super(nameFactory, SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
     
     if(unprocessableMessageConsumer==null)
       throw new NullPointerException("unprocessableMessageConsumer is required.");
     
-    nameFactory_ = nameFactory;
     region_ = region;
     startSubscriptions_ = true;
     
@@ -98,18 +96,14 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   }
 
   @Override
-  protected void startSubscription(Subscription<String> subscription)
+  protected void startSubscription(SubscriptionImpl<String> subscription)
   {
     if(startSubscriptions_)
     {
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getTopicNames())
       {
-        TopicName topicName = nameFactory_.getTopicName(topic);
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
-        log_.info("Subscribing to queue " + subscriptionName + "...");
-        
         String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
             sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
         

@@ -23,54 +23,50 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
-public class CredentialName extends Name
+import javax.annotation.Nonnull;
+
+/**
+ * A service name.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public class ServiceName extends Name
 {
-  public static final String SUFFIX = "cred";
-
-  private final String environmentTypeId_;
-  private final String environmentId_;
+  private final String serviceId_;
   private final String tenantId_;
-  private final String owner_;
 
-//  public CredentialName(String environmentId, String owner)
-//  {
-//    this(environmentId, null, null, owner);
-//  }
-//  
-//  public CredentialName(String realmId, String environmentId, String owner)
-//  {
-//    this(realmId, environmentId, null, owner);
-//  }
-  
-  protected CredentialName(String prefix, String environmentTypeId, String environmentId, String tenantId, String owner, String suffix)
+  /**
+   * Constructor.
+   * 
+   * @param serviceId       The ID of the service.
+   * @param tenantId        The tenantId (simple name).
+   * @param name            The first element of the actual name.
+   * @param additional      Zero or more optional suffix elements.
+   */
+  protected ServiceName(String serviceId, String tenantId, @Nonnull String name, String ...additional)
   {
-    super(prefix, environmentTypeId, environmentId, tenantId, owner, suffix);
-
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
+    super(name, additional);
+    
+    serviceId_ = serviceId;
     tenantId_ = tenantId;
-    owner_ = owner;
   }
 
-  public String getEnvironmentTypeId()
+  /**
+   * 
+   * @return The id (simple name) of the service.
+   */
+  public String getServiceId()
   {
-    return environmentTypeId_;
+    return serviceId_;
   }
-
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
+  
+  /**
+   * 
+   * @return The tenant ID (simple name)
+   */
   public String getTenantId()
   {
     return tenantId_;
   }
-
-  public String getOwner()
-  {
-    return owner_;
-  }
-
-  
 }

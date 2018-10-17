@@ -21,7 +21,7 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
@@ -33,7 +33,6 @@ import com.google.pubsub.v1.ProjectSubscriptionName;
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleAbstractSubscriberManager.class);
 
-  /* package */ final INameFactory           nameFactory_;
   /* package */ final String                 projectId_;
   /* package */ final boolean                startSubscriptions_;
 
@@ -52,42 +51,38 @@ import com.google.pubsub.v1.ProjectSubscriptionName;
       ITraceContextFactory traceFactory,
       IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
-    super(type, traceFactory, unprocessableMessageConsumer);
+    super(nameFactory, type, traceFactory, unprocessableMessageConsumer);
     
-    nameFactory_ = nameFactory;
     projectId_ = projectId;
     startSubscriptions_ = true;
   }
   
-  /**
-   * Construct a subscriber manager without and subscription processing.
-   * 
-   * @param nameFactory                     A NameFactory.
-   * @param projectId                       The Google project ID for the pubsub service.
-   * @param traceFactory                    A trace context factory.
-   */
-  /* package */ GoogleAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String projectId,
-      ITraceContextFactory traceFactory)
-  {
-    super(type, traceFactory, null);
-    
-    nameFactory_ = nameFactory;
-    projectId_ = projectId;
-    startSubscriptions_ = false;
-
-    log_.info("Starting GoogleSubscriberManager in project " + projectId_ + "...");
-  }
+//  /**
+//   * Construct a subscriber manager without and subscription processing.
+//   * 
+//   * @param nameFactory                     A NameFactory.
+//   * @param projectId                       The Google project ID for the pubsub service.
+//   * @param traceFactory                    A trace context factory.
+//   */
+//  /* package */ GoogleAbstractSubscriberManager(Class<T> type, INameFactory nameFactory, String projectId,
+//      ITraceContextFactory traceFactory)
+//  {
+//    super(nameFactory, type, traceFactory, null);
+//    
+//    projectId_ = projectId;
+//    startSubscriptions_ = false;
+//
+//    log_.info("Starting GoogleSubscriberManager in project " + projectId_ + "...");
+//  }
   
   @Override
-  protected void startSubscription(Subscription<ImmutableByteArray> subscription)
+  protected void startSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
   { 
-    for(String topic : subscription.getTopicNames())
+    for(TopicName topicName : subscription.getTopicNames())
     {
-      log_.info("Validating topic " + topic + "...");
+      log_.info("Validating topic " + topicName + "...");
       
-      TopicName               topicName = nameFactory_.getTopicName(topic);
-      
-      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
       validateSubcription(topicName, subscriptionName);
       
@@ -100,13 +95,11 @@ import com.google.pubsub.v1.ProjectSubscriptionName;
         throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
       }
       
-      for(String topic : subscription.getTopicNames())
+      for(TopicName topicName : subscription.getTopicNames())
       {
-        log_.info("Subscribing to topic " + topic + "...");
+        log_.info("Subscribing to topic " + topicName + "...");
         
-        TopicName               topicName = nameFactory_.getTopicName(topic);
-        
-        SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
+        SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
         validateSubcription(topicName, subscriptionName);
         

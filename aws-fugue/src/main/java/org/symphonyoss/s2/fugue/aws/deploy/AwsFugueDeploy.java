@@ -55,6 +55,7 @@ import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
 
 import com.amazonaws.services.ecs.AmazonECS;
@@ -183,15 +184,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //  private static final String            IALB_ARN                      = "ialbArn";
 //  private static final String            IALB_DNS                      = "ialbDns";
 //  private static final String            R53_ZONE                      = "r53Zone";
-  private static final String            POLICY_SUFFIX                 = "-policy";
-  private static final String            GROUP_SUFFIX                  = "-group";
-  private static final String            ROLE_SUFFIX                   = "-role";
-  private static final String            USER_SUFFIX                   = "-user";
-  private static final String            ROOT_SUFFIX                   = "-root";
-  private static final String            ADMIN_SUFFIX                  = "-admin";
-  private static final String            SUPPORT_SUFFIX                = "-support";
-  private static final String            CICD_SUFFIX                   = "-cicd";
-  private static final String            CONFIG_SUFFIX                 = "-config";
+  
+  private static final String            POLICY                         = "policy";
+  private static final String            GROUP                          = "group";
+  private static final String            ROLE                           = "role";
+  private static final String            USER                           = "user";
+  private static final String            ROOT                           = "root";
+  private static final String            ADMIN                          = "admin";
+  private static final String            SUPPORT                        = "support";
+  private static final String            CICD                           = "cicd";
+  private static final String            CONFIG                         = "config";
 
   private static final ObjectMapper      MAPPER                        = new ObjectMapper();
 
@@ -270,11 +272,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     super(AMAZON, provider, helpers);
   }
-  
+
   @Override
-  protected DeploymentContext createContext(String tenantId)
+  protected DeploymentContext createContext(String tenantId, INameFactory nameFactory)
   {
-    return new AwsDeploymentContext(tenantId);
+    return new AwsDeploymentContext(tenantId, nameFactory);
   }
 
   private String getAwsRegion()
@@ -348,9 +350,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
 //    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
     if(tenantId == null)
-      return new Name(getService()).toString().toLowerCase() + "." + getDnsSuffix();
+      return getService().toLowerCase() + "." + getDnsSuffix();
     else
-      return new Name(tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+      return (tenantId + "-" + getService()).toString().toLowerCase() + "." + getDnsSuffix();
   }
 
   private void getOrCreateCluster()
@@ -388,75 +390,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    {
 //      log_.info("Cluster " + clusterArn_ + " aready exists.");
 //    }
-  }
-
-  private void createService(String regionalHostName, String targetGroupArn, String name, int port, String tenantId)
-  {
-    log_.info("Cluster name is " + clusterName_);
-    
-    Name    serviceName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
-    boolean create      = true;
-    
-    DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
-        .withCluster(clusterName_)
-        .withServices(serviceName.toString())
-        );
-    
-    for(Service service : describeResult.getServices())
-    {
-      if(serviceName.toString().equals(service.getServiceName()))
-      {
-        log_.info("Service " + serviceName + " exists with status " + service.getStatus());
-        
-        switch(service.getStatus())
-        {
-          case "INACTIVE":
-          case "DRAINING":
-            create = true;
-            break;
-            
-          default:
-            create = false;
-        }
-      }
-    }
-    
-    if(create)
-    {
-      log_.info("Creating service " + serviceName + "...");
-      
-      CreateServiceResult createServiceResult = ecsClient_.createService(new CreateServiceRequest()
-          .withCluster(clusterName_)
-          .withServiceName(serviceName.toString())
-          .withTaskDefinition(serviceName.toString())
-          .withDesiredCount(1)
-  //        .withDeploymentConfiguration(new DeploymentConfiguration()
-  //            .withMaximumPercent(maximumPercent)
-  //            .withMinimumHealthyPercent(minimumHealthyPercent)
-  //            )
-          .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
-              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
-              .withContainerPort(port)
-              .withTargetGroupArn(targetGroupArn)
-              )
-          );
-      
-      log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
-    }
-    else
-    {
-      log_.info("Updating service " + serviceName + "...");
-      
-      UpdateServiceResult updateResult = ecsClient_.updateService(new UpdateServiceRequest()
-          .withCluster(clusterName_)
-          .withService(serviceName.toString())
-          .withTaskDefinition(serviceName.toString())
-          .withDesiredCount(1)
-//          .withForceNewDeployment(true)
-          );
-      
-      log_.info("Updated service " + serviceName + "as" + updateResult.getService().getServiceArn() + " with status " + updateResult.getService().getStatus() + ".");
-    }
   }
 
   
@@ -545,109 +478,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         throw new IllegalStateException("Zone " + dnsName + " not found.");
       }
     }
-}
-  
-  private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
-  {
-    if(host != null)
-      createR53RecordSet(host, regionalHost, true);
-    
-    createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
-  }
-  
-  private void createR53RecordSet(String source, String target, boolean multiValue)
-  {
-    String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
-    
-    String sourceDomain = source + ".";
-    
-    ListResourceRecordSetsResult result = r53Clinet_.listResourceRecordSets(new ListResourceRecordSetsRequest()
-        .withHostedZoneId(zoneId)
-        .withStartRecordName(source)
-        );
-    
-    List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
-    boolean                 ok            = false;
-    
-    for(ResourceRecordSet recordSet : recordSetList)
-    {
-      if(sourceDomain.equals(recordSet.getName()))
-      {
-        log_.info("R53 record set exists for " + source);
-        
-        for(ResourceRecord record : recordSet.getResourceRecords())
-        {
-          if(target.equals(record.getValue()))
-          {
-              ok = true;
-              break;
-          }
-        }
-      }
-      else
-      {
-        // records come back in order...
-        break;
-      }
-    }
-    if(ok)
-    {
-      log_.info("R53 record set for " + source + " to " + target + " exists, nothing to do here.");
-    }
-    else
-    {
-      log_.info("Creating R53 record set for " + source + " to " + target + "...");
-      
-      ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
-          .withName(source)
-          .withType(RRType.CNAME)
-          .withTTL(300L)
-          .withResourceRecords(new ResourceRecord()
-              .withValue(target)
-              )
-          ;
-      
-      if(multiValue)
-      {
-        resourceRecordSet
-          .withWeight(1L)
-          .withSetIdentifier(new Name(getEnvironmentType(), getEnvironment(), getRegion()).toString().toLowerCase())
-          ;
-      }
-      
-      ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
-          .withHostedZoneId(zoneId)
-          .withChangeBatch(new ChangeBatch()
-              .withChanges(new Change()
-                  .withAction(ChangeAction.CREATE)
-                  .withResourceRecordSet(resourceRecordSet)
-                  )
-              )
-          );
-    }
-    
-/*
-
-    
-    
-    
-    
-    if(!R53RecordSetExist(environmentType, environment, tenant)) {
-        def rs_template_args = ['SERVICE_NAME':servicename,
-                                'TENANT_ID':tenant,
-                                'DNS_SUFFIX':ECSClusterMaps.env_cluster[environment]['dns_suffix'],
-                                'ALB_DNS':ECSClusterMaps.env_cluster[environment]['ialb_dns']
-        ]
-        def rs_def = (new org.apache.commons.lang3.text.StrSubstitutor(rs_template_args)).replace(record_set_template)
-        def rs_def_file = 'r53-rs-'+environment+'-'+tenant+'-'+servicename+'.json'
-        steps.writeFile file:rs_def_file, text:rs_def
-        //steps.sh 'ls -alh'
-        steps.withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'sym-aws-'+environmentType, secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-            steps.sh 'aws --region us-east-1 route53 change-resource-record-sets --hosted-zone-id '+ECSClusterMaps.env_cluster[environment]['r53_zone']+' --change-batch file://'+rs_def_file+' > r53-rs-create-out-'+environment+'-'+tenant+'-'+servicename+'.json'
-        
-        }
-    }
-    */
   }
 
   
@@ -694,6 +524,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       IJsonDomNode regionsNode = amazon.get(REGIONS);
       if(regionsNode instanceof IJsonObject)
       {
+        INameFactory nameFactory = createNameFactory(getEnvironmentType(), null, null, null, null, null);
         IJsonObject<?> regionsObject = (IJsonObject<?>)regionsNode;
         
         Iterator<String> it = regionsObject.getNameIterator();
@@ -707,8 +538,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           IJsonObject<?> regionObject = regionsObject.getRequiredObject(name);
           
           String bucketName = regionObject.getString(AWS_CONFIG_BUCKET,
-              FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
-          
+              nameFactory.getConfigBucketName(name).toString());
+              //FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
+//              getGlobalNamePrefix() + FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
           environmentTypeConfigBuckets_.put(name, bucketName);
           
           if(awsRegion_ != null && name.equals(awsRegion_))
@@ -790,14 +622,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .withRegion(region)
         .build();
 
-    S3Helper.createBucketIfNecessary(s3, name);
+    S3Helper.createBucketIfNecessary(s3, name, false);
   }
   
   
   // returns an access key if one was created.
-  private void createUser(String name, String groupName, List<String> keys)
+  private void createUser(Name name, String groupName, List<String> keys)
   {
-    String  userName      = name + USER_SUFFIX;
+    String  userName      = name.append(USER).toString();
     String  accessKeyJson = null;
     
     try
@@ -855,9 +687,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .withGroupName(groupName));
   }
 
-  private String createGroup(String name, String policyArn)
+  private String createGroup(Name name, String policyArn)
   {
-    String groupName       = name + GROUP_SUFFIX;
+    String groupName       = name.append(GROUP).toString();
     
     try
     {
@@ -896,9 +728,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return groupName;
   }
   
-  private String createRole(String name, String ...policyArnList)
+  private String createRole(Name name, String ...policyArnList)
   {
-    String roleName       = name + ROLE_SUFFIX;
+    String roleName       = name.append(ROLE).toString();
     
     try
     {
@@ -958,9 +790,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
 
-  private String createPolicy(String name, String templateOutput)
+  private String createPolicy(Name name, String templateOutput)
   {
-    String policyName       = name + POLICY_SUFFIX;
+    String policyName       = name.append(POLICY).toString();
     String policyArn        = getPolicyArn(policyName);
     String policyDocument;
     
@@ -1087,16 +919,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
     private String listenerArn_;
     
-    protected AwsDeploymentContext(String tenantId)
+    protected AwsDeploymentContext(String tenantId, INameFactory nameFactory)
     {
-      super(tenantId);
+      super(tenantId, nameFactory);
     }
 
     @Override
     protected void createEnvironment()
     {
       List<String>  keys      = new LinkedList<>();
-      String        baseName  = getEnvironmentType() + Name.SEPARATOR + getEnvironment();
+      Name          baseName  = getNameFactory().getName();
+      //getEnvironmentType() + Name.SEPARATOR + getEnvironment();
       
       createEnvironmentAdminUser(baseName, keys);
       
@@ -1106,11 +939,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
-        CredentialName  name    = new CredentialName("fugue-" + getEnvironmentType(),
-            getEnvironment(), // environment
-            null, // realm
-            null, // tenant
-            "root");
+        CredentialName  name    = getNameFactory().getFugueCredentialName("root");
 
         updateSecret(name, keys);
       }
@@ -1137,9 +966,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.info("Created secret " + name);
     }
 
-    private void createEnvironmentAdminUser(String baseName, List<String> keys)
+    private void createEnvironmentAdminUser(Name baseName, List<String> keys)
     {
-      String name = baseName + ADMIN_SUFFIX;
+      Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
 //      String groupName = createGroup(name, policyArn);
@@ -1151,7 +980,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void createEnvironmentType()
     {
-      String baseName = FUGUE_PREFIX + getEnvironmentType();
+      
+      Name baseName = getNameFactory().getFugueName(); 
+          
+          //FUGUE_PREFIX + getEnvironmentType();
       List<String>  keys = new LinkedList<>();
 
       createEnvironmentTypeAdminUser(baseName, keys);
@@ -1164,13 +996,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
-        // not a good idea keys.add(getActiveAccessKey(baseName + ROOT_SUFFIX));
+//        CredentialName  name = 
+//            getNameFactory().getCredentialName(tenantId, owner)
+//            new CredentialName("fugue-" + getEnvironmentType(),
+//          null, // environment
+//          null, // realm
+//          null, // tenant
+//          "root");
         
-        CredentialName  name = new CredentialName("fugue-" + getEnvironmentType(),
-          null, // environment
-          null, // realm
-          null, // tenant
-          "root");
+        CredentialName  name    = getNameFactory().getFugueCredentialName("root");
       
         updateSecret(name, keys);
       }
@@ -1181,23 +1015,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-// Don't do this
-//    private String getActiveAccessKey(String name)
-//    {
-//      DefaultCredentialsProvider  dcp = DefaultCredentialsProvider.create();
-//      AwsCredentials accessKey = dcp.resolveCredentials();
-//      
-//      String accessKeyJson = "  \"" + name + "\": {\n" +
-//          "    \"accessKeyId\": \"" + accessKey.accessKeyId() + "\",\n" +
-//          "    \"secretAccessKey\": \"" + accessKey.secretAccessKey() + "\"\n" +
-//          "  }";
-//      
-//      return accessKeyJson;
-//    }
-
-    private void createEnvironmentTypeAdminUser(String baseName, List<String> keys)
+    private void createEnvironmentTypeAdminUser(Name baseName, List<String> keys)
     {
-      String name = baseName + ADMIN_SUFFIX;
+      Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
 //      String groupName = createGroup(name, policyArn);
@@ -1206,12 +1026,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, policyArn);
     }
     
-    private void createEnvironmentTypeSupportUser(String baseName, List<String> keys)
+    private void createEnvironmentTypeSupportUser(Name baseName, List<String> keys)
     {
-      String name = baseName + SUPPORT_SUFFIX;
+      Name name = baseName.append(SUPPORT);
       
-      String infraPolicyArn = createPolicyFromResource(baseName + "-infra-list-all", "policy/environmentTypeInfraListAll.json");
-      String appPolicyArn = createPolicyFromResource(baseName + "-app-list-all", "policy/environmentTypeAppListAll.json");
+      String infraPolicyArn = createPolicyFromResource(baseName.append("infra-list-all"), "policy/environmentTypeInfraListAll.json");
+      String appPolicyArn = createPolicyFromResource(baseName.append("app-list-all"), "policy/environmentTypeAppListAll.json");
       String fuguePolicyArn = createPolicyFromResource(name, "policy/environmentTypeSupport.json");
 //      String groupName = createGroup(name, policyArn);
 //      String result    = createUser(name, groupName, keys);
@@ -1222,13 +1042,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       iam_.updateAssumeRolePolicy(new UpdateAssumeRolePolicyRequest()
           .withPolicyDocument(assumeRolePolicy)
-          .withRoleName(name + ROLE_SUFFIX)
+          .withRoleName(name.append(ROLE).toString())
           );
     }
     
-    private void createEnvironmentTypeCicdUser(String baseName, List<String> keys)
+    private void createEnvironmentTypeCicdUser(Name baseName, List<String> keys)
     {
-      String name = baseName + CICD_SUFFIX;
+      Name name = baseName.append(CICD);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
       String groupName = createGroup(name, policyArn);
@@ -1252,7 +1072,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void processRole(String roleName, String roleSpec)
     {
-      String name = new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
+      Name name = getNameFactory().getServiceItemName(roleName);
+//          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
       createRole(name, policyArn);
@@ -1261,7 +1082,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void saveConfig()
     {
-      String              name        = getConfigName(getTenantId());
+      String              name        = getNameFactory().getServiceName().toString();
       String              bucketName  = environmentTypeConfigBuckets_.get(getAwsRegion());
       String              key         = CONFIG + "/" + name + DOT_JSON;
       ImmutableByteArray  dom         = getConfigDom().serialize();
@@ -1312,7 +1133,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       s3Client.putObject(request);
     }
     
-    private String createPolicyFromResource(String name, String fileName)
+    private String createPolicyFromResource(Name name, String fileName)
     {
       return createPolicy(name, loadTemplateFromResource(fileName));
     }
@@ -1323,13 +1144,21 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       try
       {
         String  tenantId        = getTenantId();
-        Name    targetGroupName = new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+        Name    targetGroupName = getNameFactory().getServiceItemName(name);
+        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
         
         String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
         
         String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
-        String regionalHostName = new Name(getEnvironmentType(), getEnvironment(), getRegion(), tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-        String wildCardHostName = new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+        
+        String regionalHostName = getNameFactory()
+            .getServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+        
+        String wildCardHostName = getNameFactory()
+            .withRegionId("*")
+            .getServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+        
+        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
         
         configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
         
@@ -1339,13 +1168,93 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
   //      registerTaskDef(name, port, healthCheckPath, tenantId);
         
-        createService(regionalHostName, targetGroupArn, name, port, tenantId);
+        createService(regionalHostName, targetGroupArn, name, port);
       }
       catch(RuntimeException e)
       {
         e.printStackTrace();
         
         throw e;
+      }
+    }
+    
+    private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
+    {
+      if(host != null)
+        createR53RecordSet(host, regionalHost, true);
+      
+      createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
+    }
+    
+    private void createR53RecordSet(String source, String target, boolean multiValue)
+    {
+      String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
+      
+      String sourceDomain = source + ".";
+      
+      ListResourceRecordSetsResult result = r53Clinet_.listResourceRecordSets(new ListResourceRecordSetsRequest()
+          .withHostedZoneId(zoneId)
+          .withStartRecordName(source)
+          );
+      
+      List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
+      boolean                 ok            = false;
+      
+      for(ResourceRecordSet recordSet : recordSetList)
+      {
+        if(sourceDomain.equals(recordSet.getName()))
+        {
+          log_.info("R53 record set exists for " + source);
+          
+          for(ResourceRecord record : recordSet.getResourceRecords())
+          {
+            if(target.equals(record.getValue()))
+            {
+                ok = true;
+                break;
+            }
+          }
+        }
+        else
+        {
+          // records come back in order...
+          break;
+        }
+      }
+      if(ok)
+      {
+        log_.info("R53 record set for " + source + " to " + target + " exists, nothing to do here.");
+      }
+      else
+      {
+        log_.info("Creating R53 record set for " + source + " to " + target + "...");
+        
+        ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
+            .withName(source)
+            .withType(RRType.CNAME)
+            .withTTL(300L)
+            .withResourceRecords(new ResourceRecord()
+                .withValue(target)
+                )
+            ;
+        
+        if(multiValue)
+        {
+          resourceRecordSet
+            .withWeight(1L)
+            .withSetIdentifier(getNameFactory().getRegionName().toString().toLowerCase())
+            ;
+        }
+        
+        ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
+            .withHostedZoneId(zoneId)
+            .withChangeBatch(new ChangeBatch()
+                .withChanges(new Change()
+                    .withAction(ChangeAction.CREATE)
+                    .withResourceRecordSet(resourceRecordSet)
+                    )
+                )
+            );
       }
     }
 
@@ -1554,9 +1463,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(!getServiceContainerMap().isEmpty())
       {
-        loadBalancer_ = createLoadBalancer(getTenantId());
+        loadBalancer_ = createLoadBalancer();
         
-        Name targetGroupName = new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
+        Name targetGroupName = getNameFactory().getServiceItemName(DEFAULT);
+            //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
         
         defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
         
@@ -1622,10 +1532,82 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.info("Listener " + listenerArn + " created.");
       return listenerArn;
     }
+    
 
-    private LoadBalancer createLoadBalancer(String tenant)
+
+    private void createService(String regionalHostName, String targetGroupArn, String name, int port)
     {
-      String name = new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
+      log_.info("Cluster name is " + clusterName_);
+      
+      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
+      boolean create      = true;
+      
+      DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
+          .withCluster(clusterName_)
+          .withServices(serviceName.toString())
+          );
+      
+      for(Service service : describeResult.getServices())
+      {
+        if(serviceName.toString().equals(service.getServiceName()))
+        {
+          log_.info("Service " + serviceName + " exists with status " + service.getStatus());
+          
+          switch(service.getStatus())
+          {
+            case "INACTIVE":
+            case "DRAINING":
+              create = true;
+              break;
+              
+            default:
+              create = false;
+          }
+        }
+      }
+      
+      if(create)
+      {
+        log_.info("Creating service " + serviceName + "...");
+        
+        CreateServiceResult createServiceResult = ecsClient_.createService(new CreateServiceRequest()
+            .withCluster(clusterName_)
+            .withServiceName(serviceName.toString())
+            .withTaskDefinition(serviceName.toString())
+            .withDesiredCount(1)
+    //        .withDeploymentConfiguration(new DeploymentConfiguration()
+    //            .withMaximumPercent(maximumPercent)
+    //            .withMinimumHealthyPercent(minimumHealthyPercent)
+    //            )
+            .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
+                .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
+                .withContainerPort(port)
+                .withTargetGroupArn(targetGroupArn)
+                )
+            );
+        
+        log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
+      }
+      else
+      {
+        log_.info("Updating service " + serviceName + "...");
+        
+        UpdateServiceResult updateResult = ecsClient_.updateService(new UpdateServiceRequest()
+            .withCluster(clusterName_)
+            .withService(serviceName.toString())
+            .withTaskDefinition(serviceName.toString())
+            .withDesiredCount(1)
+//            .withForceNewDeployment(true)
+            );
+        
+        log_.info("Updated service " + serviceName + "as" + updateResult.getService().getServiceArn() + " with status " + updateResult.getService().getStatus() + ".");
+      }
+    }
+
+    private LoadBalancer createLoadBalancer()
+    {
+      String name = getNameFactory().getServiceName().getShortName(32);
+//          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
       
       try
       {

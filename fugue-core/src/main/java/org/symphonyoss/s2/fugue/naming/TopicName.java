@@ -23,56 +23,80 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+/**
+ * The name of a topic.
+ * 
+ * All topics are owned by some service which is responsible for creating and deleting the topic.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class TopicName extends Name
 {
-  private final String environmentTypeId_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String topic_;
+  private final String serviceId_;
+  private final String topicId_;
+  private final boolean isLocal_;
 
-  public TopicName(String environmentTypeId, String environmentId, String realmId, String topic)
+  /**
+   * Constructor.
+   * 
+   * It is intended that names are constructed by a name factory, if you are calling this from application code
+   * you should probably be using a name factory instead.
+   * 
+   * @param serviceId   ID of service which owns this topic.
+   * @param isLocal     True if the topic is owned by the current service. Controls creation and deletion.
+   * @param topicId     The topic ID (simple name)
+   * @param name        The first element of the full topic name.
+   * @param additional  Zero or more additional name elements.
+   */
+  protected TopicName(String serviceId, boolean isLocal, String topicId, String name, String ...additional)
   {
-    super(environmentTypeId, environmentId, realmId, topic);
+    super(name, additional);
     
-    environmentTypeId_ = environmentTypeId;
-    environmentId_ = environmentId;
-    realmId_ = realmId;
-    topic_ = topic;
+    serviceId_ = serviceId;
+    isLocal_ = isLocal;
+    topicId_ = topicId;
+  }
+
+//  /**
+//   * Constructor for SBE topics.
+//   * 
+//   * @param tenantId  Actually a pod name.
+//   * @param topicId   Topic ID (SBE name).
+//   */
+//  public TopicName(String tenantId, String topicId)
+//  {
+//    super(tenantId, topicId);
+//    
+//    serviceId_ = "sbe";
+//    isLocal_ = false;
+//    topicId_ = topicId;
+//  }
+
+  /**
+   * 
+   * @return The topicId (simple name).
+   */
+  public String getTopicId()
+  {
+    return topicId_;
   }
 
   /**
-   * Constructor for SBE topics.
    * 
-   * @param tenantId  Actually a pod name.
-   * @param topic     Topic name.
+   * @return The ID of the service which owns the topic.
    */
-  public TopicName(String tenantId, String topic)
+  public String getServiceId()
   {
-    super(tenantId, topic);
-    
-    environmentTypeId_ = null;
-    environmentId_ = null;
-    realmId_ = null;
-    topic_ = topic;
+    return serviceId_;
   }
 
-  public String getEnvironmentTypeId()
+  /**
+   * 
+   * @return True iff the topic is owned by the current service.
+   */
+  public boolean isLocal()
   {
-    return environmentTypeId_;
-  }
-
-  public String getEnvironmentId()
-  {
-    return environmentId_;
-  }
-
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-
-  public String getTopic()
-  {
-    return topic_;
+    return isLocal_;
   }
 }

@@ -24,12 +24,17 @@
 package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 /**
@@ -42,67 +47,79 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  */
 public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends FugueLifecycleComponent<T>
 {
-  private List<Subscription<P>>             subscribers_                  = new ArrayList<>();
+  protected final INameFactory    nameFactory_;
+
+  protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
   
-  protected AbstractSubscriberBase(Class<T> type)
+  protected AbstractSubscriberBase(INameFactory nameFactory, Class<T> type)
   {
     super(type);
+    
+    nameFactory_ = nameFactory;
   }
-
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String topicName,
-      String... additionalTopicNames)
+  
+  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
   {
     assertConfigurable();
     
-    List<String> topicNames = new ArrayList<>();
-
-    topicNames.add(topicName);
-    
-    if(additionalTopicNames != null)
-    {
-      for(String name : additionalTopicNames)
-      {
-        topicNames.add(name);
-      }
-    }
-    
-    subscribers_.add(new Subscription<P>(topicNames, subscriptionName, consumer));
+    subscribers_.add(new SubscriptionImpl<P>(
+        subscription.createTopicNames(nameFactory_),
+        subscription.createObsoleteTopicNames(nameFactory_),
+        subscription.getId(),
+        subscription.getObsoleteId(), consumer));
     
     return self();
   }
 
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, List<String> topicNames)
+  @Deprecated
+  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
+      String... additionalTopicIds)
+  {
+    assertConfigurable();
+    
+    subscribers_.add(new SubscriptionImpl<P>(
+        nameFactory_.getTopicNameCollection(topicId, additionalTopicIds),
+        nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
+        null,
+        subscriptionId, consumer));
+    
+    return self();
+  }
+
+  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
   {
     assertConfigurable();
     
     if(topicNames.isEmpty())
       throw new IllegalArgumentException("At least one topic name is required");
     
-    subscribers_.add(new Subscription<P>(topicNames, subscriptionName, consumer));
+    subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
     
     return self();
   }
   
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String[] topicNames)
+  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicIds)
   {
     assertConfigurable();
     
-    if(topicNames==null || topicNames.length==0)
+    if(topicIds==null || topicIds.length==0)
       throw new IllegalArgumentException("At least one topic name is required");
     
-    List<String> topicNameList = new ArrayList<>();
+    List<TopicName> topicNameList = new ArrayList<>(topicIds.length);
+    List<TopicName> obsoleteTopicNameList = new ArrayList<>(topicIds.length);
 
-    for(String name : topicNames)
+    for(String id : topicIds)
     {
-      topicNameList.add(name);
+      topicNameList.add(nameFactory_.getTopicName(id));
+      obsoleteTopicNameList.add(nameFactory_.getObsoleteTopicName(id));
     }
     
-    subscribers_.add(new Subscription<P>(topicNameList, subscriptionName, consumer));
+    subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
     
     return self();
   }
 
-  protected List<Subscription<P>> getSubscribers()
+  protected List<SubscriptionImpl<P>> getSubscribers()
   {
     return subscribers_;
   }

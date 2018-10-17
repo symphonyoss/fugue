@@ -33,6 +33,7 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 import org.symphonyoss.s2.fugue.pubsub.Subscription;
+import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
@@ -54,11 +55,11 @@ import com.amazonaws.services.sqs.model.TagQueueRequest;
 public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubscriberAdmin>
 {
   private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
-  private final INameFactory  nameFactory_;
   private final String        region_;
   private final String        accountId_;
 
   private AmazonSQS           sqsClient_;
+  private AmazonSNS           snsClient_;
   private Map<String, String> tags_;
   
   /**
@@ -73,10 +74,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId,
       ITraceContextFactory traceFactory, Map<String, String> tags)
   {
-    super(SqsSubscriberAdmin.class);
+    super(nameFactory, SqsSubscriberAdmin.class);
     
     accountId_ = accountId;
-    nameFactory_ = nameFactory;
     region_ = region;
     tags_ = tags;
   }
@@ -88,29 +88,13 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withRegion(region_)
         .build();
     
-    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
-    
-    super.start();
-  }
-
-  @Override
-  public void createSubscriptions(boolean dryRun)
-  {
-    AmazonSNS snsClient = AmazonSNSClientBuilder.standard()
+    snsClient_ = AmazonSNSClientBuilder.standard()
         .withRegion(region_)
         .build();
     
-    for(Subscription<?> subscription : getSubscribers())
-    {
-      for(String topic : subscription.getTopicNames())
-      {
-        TopicName topicName = nameFactory_.getTopicName(topic);
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
-        
-        createSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-    }
+    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    
+    super.start();
   }
   
   /**
@@ -132,7 +116,8 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
     return "arn:aws:sqs:" + region_ + ":" + accountId_ + ":" + subscriptionName;
   }
   
-  private void createSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  @Override
+  protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
     String queueUrl;
     
@@ -153,9 +138,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       {
         queueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
         
-        String subscriptionArn = Topics.subscribeQueue(snsClient, sqsClient_, getTopicARN(topicName), queueUrl);
+        String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(topicName), queueUrl);
         
-        snsClient.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
+        snsClient_.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
         
         log_.info("Created subscription " + subscriptionName + " as " + queueUrl);
       }
@@ -166,28 +151,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
         .withTags(tags_)
         );
   }
-
-  @Override
-  public void deleteSubscriptions(boolean dryRun)
-  {
-    AmazonSNS snsClient = AmazonSNSClientBuilder.standard()
-        .withRegion(region_)
-        .build();
-    
-    for(Subscription<?> subscription : getSubscribers())
-    {
-      for(String topic : subscription.getTopicNames())
-      {
-        TopicName topicName = nameFactory_.getTopicName(topic);
-        
-        SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionName());
-        
-        deleteSubcription(snsClient, topicName, subscriptionName, dryRun);
-      }
-    }
-  }
   
-  private void deleteSubcription(AmazonSNS snsClient, TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  @Override
+  protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
     try
     {
@@ -199,9 +165,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       }
       else
       {
-        //GetSubscriptionAttributesResult sa = snsClient.getSubscriptionAttributes(getQueueARN(subscriptionName));
+        //GetSubscriptionAttributesResult sa = snsClient_.getSubscriptionAttributes(getQueueARN(subscriptionName));
         
-        ListSubscriptionsByTopicResult subscriptionResult = snsClient.listSubscriptionsByTopic(getTopicARN(topicName));
+        ListSubscriptionsByTopicResult subscriptionResult = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
         
         if(subscriptionResult != null)
         {
@@ -211,7 +177,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
           {
             if(queueArn.equals(subscription.getEndpoint()))
             {
-              snsClient.unsubscribe(subscription.getSubscriptionArn());
+              snsClient_.unsubscribe(subscription.getSubscriptionArn());
               
               log_.info("Deleted subscription " + subscription.getSubscriptionArn());
             }

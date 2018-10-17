@@ -23,6 +23,10 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+import java.util.Collection;
+
+import javax.annotation.Nullable;
+
 public interface INameFactory
 {
 
@@ -30,10 +34,92 @@ public interface INameFactory
 
   CredentialName getEnvironmentCredentialName(String owner);
 
-  TopicName getTopicName(String topic);
+  @Deprecated
+  TopicName getObsoleteTopicName(String topicId);
   
-  SubscriptionName  getSubscriptionName(TopicName topicName, String subscription);
+  @Deprecated
+  Collection<TopicName> getObsoleteTopicNameCollection(String topicId, String ...additionalTopicIds);
+  
+  /**
+   * Return a TopicName for the given topic owned by the current service.
+   * 
+   * @param topicId     The topic ID.
+   * 
+   * @return A TopicName.
+   */
+  TopicName getTopicName(String topicId);
+  
+  /**
+   * Return a TopicName for the given topic owned by the current service.
+   * 
+   * @param topicId               A topic ID 
+   * @param additionalTopicIds    Zero or more additional topic IDs
+   * 
+   * @param topicIdCollection     A collection of topic IDs.
+   * 
+   * @return A collection of TopicNames.
+   */
+  Collection<TopicName> getTopicNameCollection(String topicId, String ...additionalTopicIds);
+  
+  /**
+   * Return a TopicName for the given topic owned by the given service.
+   * 
+   * @param serviceId   The service which owns the topic.
+   * @param topicId     The topic ID.
+   * 
+   * @return A TopicName.
+   */
+  TopicName getTopicName(String serviceId, String topicId);
+  
+  @Deprecated
+  SubscriptionName  getObsoleteSubscriptionName(TopicName topicName, String subscriptionId);
+  
+  /**
+   * Return a Subscription Name for the given topic and optional subscriptionId.
+   * 
+   * SubscriptionIds are only needed where a service needs more than one subscription to the same topic.
+   * 
+   * @param topicName
+   * @param subscriptionId
+   * 
+   * @return A SubscriptionName
+   */
+  SubscriptionName  getSubscriptionName(TopicName topicName, @Nullable String subscriptionId);
 
   CredentialName getCredentialName(String tenantId, String owner);
 
+  ServiceName getServiceName();
+
+  CredentialName getFugueCredentialName(String owner);
+
+  Name getServiceItemName(String name);
+
+  Name getConfigBucketName(String regionId);
+
+  Name getRegionalName(String name);
+
+  Name getRegionName();
+
+  Name getName();
+  Name getFugueName();
+
+  /**
+   * Create a new INameFactory with the given regionId and inheriting all other attributes from the current factory.
+   * 
+   * @param regionId  The regionId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given regionId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withRegionId(String regionId);
+
+
+
+  /**
+   * Create a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
+   * 
+   * @param tenantId  The tenantId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withTenantId(String tenantId);
 }

@@ -23,9 +23,10 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.List;
+import java.util.Collection;
 
 import org.symphonyoss.s2.common.fluent.IFluent;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 /**
@@ -38,6 +39,8 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  */
 public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends IFluent<T>
 {
+  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription);
+  
   /**
    * Subscribe to the given subscription on the given topics.
    * 
@@ -73,7 +76,7 @@ public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends
    * 
    * @throws IllegalArgumentException If the list of topics is empty.
    */
-  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, List<String> topicNames);
+  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, Collection<TopicName> topicNames);
 
   /**
    * Subscribe to the given subscription on the given topics.

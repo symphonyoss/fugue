@@ -35,18 +35,28 @@ public interface IPublisherManager<P>
   /**
    * Get the IPublisher for the given named topic.
    * 
-   * @param topicName The actual name of a topic.
+   * @param topicId The actual name of a topic.
    * 
    * @return The publisher for the required topic.
    */
-  IPublisher<P> getPublisherByName(String topicName);
+  IPublisher<P> getPublisherByName(String topicId);
 
   /**
-   * Return the publisher for trace events.
+   * Get the IPublisher for the given named topic.
    * 
-   * @return the publisher for trace events.
+   * @param serviceId The ID of the service which owns the topic.
+   * @param topicId   The actual name of a topic.
+   * 
+   * @return The publisher for the required topic.
    */
-  IPublisher<P> getTracePublisher();
+  IPublisher<P> getPublisherByName(String serviceId, String topicId);
+
+//  /**
+//   * Return the publisher for trace events.
+//   * 
+//   * @return the publisher for trace events.
+//   */
+//  IPublisher<P> getTracePublisher();
   
   /**
    * Return the maximum allowed size of a message in bytes.

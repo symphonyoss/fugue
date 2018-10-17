@@ -45,4 +45,8 @@ public interface IPublisherAdmin<P> extends IPublisherManager<P>
    * @param dryRun If true then don't change anything
    */
   void deleteTopics(boolean dryRun);
+  
+
+  
+  void deleteObsoleteTopic(String topicId);
 }

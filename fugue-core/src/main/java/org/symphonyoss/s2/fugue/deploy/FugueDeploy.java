@@ -56,7 +56,7 @@ import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.exception.InvalidValueException;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
-import org.symphonyoss.s2.fugue.naming.Name;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 
 /**
  * Abstract base class for deployment utility implementations, to be subclassed for each cloud service provider.
@@ -99,49 +99,49 @@ public abstract class FugueDeploy extends CommandLineHandler
   /** The prefix for the names of fugue entities in the CSP */
   public static final String FUGUE_PREFIX = "fugue-";
 
-  private static final String              CONFIG_DIR                    = CONFIG + "/";
-  private static final String              SERVICE_DIR                   = CONFIG_DIR + SERVICE;
-  private static final String              DEFAULTS                      = "defaults";
-  private static final String              FQ_SERVICE_NAME               = "fullyQualifiedServiceName";
-  private static final String              FQ_INSTANCE_NAME              = "fullyQualifiedInstanceName";
+  private static final String     CONFIG_DIR          = CONFIG + "/";
+  private static final String     SERVICE_DIR         = CONFIG_DIR + SERVICE;
+  private static final String     DEFAULTS            = "defaults";
+  private static final String     FQ_SERVICE_NAME     = "fullyQualifiedServiceName";
 
-  private static final Logger              log_                          = LoggerFactory.getLogger(FugueDeploy.class);
-  private static final String              SINGLE_TENANT                 = "singleTenant";
-  private static final String              MULTI_TENANT                  = "multiTenant";
-  private static final String              PORT                          = "port";
-  private static final String              PATHS                         = "paths";
-  private static final String              HEALTH_CHECK_PATH             = "healthCheckPath";
-  private static final String              CONTAINERS                    = "containers";
+  private static final Logger     log_                = LoggerFactory.getLogger(FugueDeploy.class);
+  private static final String     SINGLE_TENANT       = "singleTenant";
+  private static final String     MULTI_TENANT        = "multiTenant";
+  private static final String     PORT                = "port";
+  private static final String     PATHS               = "paths";
+  private static final String     HEALTH_CHECK_PATH   = "healthCheckPath";
+  private static final String     CONTAINERS          = "containers";
 
-  private static final String              DNS_SUFFIX                    = "dnsSuffix";
+  private static final String     DNS_SUFFIX          = "dnsSuffix";
 
-  private final String                     cloudServiceProvider_;
-  private final ConfigProvider             provider_;
-  private final ConfigHelper[]             helpers_;
+  private final String            cloudServiceProvider_;
+  private final ConfigProvider    provider_;
+  private final ConfigHelper[]    helpers_;
 
-  private String                           track_;
-  private String                           station_;
-  private String                           service_;
-  private String                           environment_;
-  private String                           environmentType_;
-  private String                           realm_;
-  private String                           region_;
-  private String                           tenant_;
+  private String                  track_;
+  private String                  station_;
+  private String                  service_;
+  private String                  environment_;
+  private String                  environmentType_;
+  private String                  realm_;
+  private String                  region_;
+  private String                  tenant_;
 
-  private boolean                          primaryEnvironment_           = false;
-  private boolean                          primaryRegion_                = false;
+  private boolean                 primaryEnvironment_ = false;
+  private boolean                 primaryRegion_      = false;
 
-  private FugueDeployAction                action_;
-  private String                           dnsSuffix_;
+  private FugueDeployAction       action_;
+  private String                  dnsSuffix_;
 
-  private ExecutorService                  executor_                    = Executors.newFixedThreadPool(20, new NamedThreadFactory("Batch", true));
+  private ExecutorService         executor_           = Executors.newFixedThreadPool(20,
+      new NamedThreadFactory("Batch", true));
+
+  private List<DeploymentContext> tenantContextList_  = new LinkedList<>();
+  private DeploymentContext       multiTenantContext_;
+
+  private Map<String, String>     tags_               = new HashMap<>();
   
-  private List<DeploymentContext>          tenantContextList_           = new LinkedList<>();
-  private DeploymentContext                multiTenantContext_;
-  
-  private Map<String, String>              tags_                        = new HashMap<>();
-  
-  protected abstract DeploymentContext  createContext(String tenantId);
+  protected abstract DeploymentContext  createContext(String tenantId, INameFactory nameFactory);
   
   protected abstract void validateAccount(IJsonObject<?> config);
   
@@ -175,9 +175,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     for(ConfigHelper helper : helpers_)
       helper.init(this);
-    
-    multiTenantContext_ = createContext(null);
   }
+  
+  protected abstract INameFactory createNameFactory(String environmentType, String environmentId, String realmId, String regionId,
+      String tenantId, String serviceId);
 
   private void setAction(String v)
   {
@@ -318,9 +319,7 @@ public abstract class FugueDeploy extends CommandLineHandler
    * Perform the deployment.
    */
   public void deploy()
-  {
-    
-    
+  {    
     if(action_ == FugueDeployAction.DeployStation)
     {
       getStationConfig();
@@ -328,7 +327,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     else
     {
       if(tenant_ != null)
-        tenantContextList_.add(createContext(tenant_));
+        tenantContextList_.add(createContext(tenant_, createNameFactory(environmentType_, environment_, realm_, region_, tenant_, service_)));
     }
 
     log_.info("ACTION           = " + action_);
@@ -356,8 +355,6 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     validateAccount(multiTenantConfig);
     
-    multiTenantContext_.setConfig(multiTenantConfig);
-    
     dnsSuffix_   = multiTenantConfig.getRequiredString(DNS_SUFFIX);
     
     final boolean deployConfig;
@@ -369,6 +366,9 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployConfig = false;
         deployContainers = false;
         log_.info("Creating environment type \"" + environmentType_ + "\"");
+        
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null, null));
+        multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironmentType();
         break;
 
@@ -376,6 +376,9 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployConfig = false;
         deployContainers = false;
         log_.info("Creating environment \"" + environment_ + "\"");
+        
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null, null));
+        multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironment();
         break;
 
@@ -402,7 +405,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     
 
     if(deployConfig)
-    {
+    {    
+      multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, realm_, region_, null, service_));
+      multiTenantContext_.setConfig(multiTenantConfig);
+      
       ImmutableJsonObject serviceJson;
       String dir = SERVICE_DIR + "/" + getService();
       
@@ -423,6 +429,9 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       // deploy multi-tenant containers first
       
+
+      
+
       multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
       
       multiTenantContext_.processConfigAndPolicies();
@@ -747,7 +756,10 @@ public abstract class FugueDeploy extends CommandLineHandler
                 {
                   if(tenantNode instanceof IStringProvider)
                   {
-                    tenantContextList_.add(createContext(((IStringProvider)tenantNode).asString()));
+                    String tenantId = ((IStringProvider)tenantNode).asString();
+                    
+                    tenantContextList_.add(createContext(tenantId,
+                        createNameFactory(environmentType_, environment_, realm_, region_, tenantId, service_)));
                   }
                   else
                   {
@@ -789,11 +801,6 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
   
-  protected String getConfigName(String tenant)
-  {
-    return new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenant, getService()).toString();
-  }
-  
   protected Map<String, String> fetchPolicies(String parentDir, String subDir)
   {
     Map<String, String> policies = new HashMap<>();
@@ -827,6 +834,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   protected abstract class DeploymentContext
   {
     private final String               tenantId_;
+    private final INameFactory         nameFactory_;
+    
     private Map<String, String>        policies_;
     private ImmutableJsonObject        config_;
     private ImmutableJsonDom           configDom_;
@@ -835,9 +844,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     private Map<String, JsonObject<?>> initContainerMap_;
     private Map<String, JsonObject<?>> serviceContainerMap_;
 
-    protected DeploymentContext(String tenantId)
+    protected DeploymentContext(String tenantId, INameFactory nameFactory)
     {
       tenantId_ = tenantId;
+      nameFactory_ = nameFactory;
     }
 
     protected abstract void createEnvironmentType();
@@ -854,6 +864,11 @@ public abstract class FugueDeploy extends CommandLineHandler
    
     protected abstract void deployService();
     
+    protected INameFactory getNameFactory()
+    {
+      return nameFactory_;
+    }
+
     protected String getTenantId()
     {
       return tenantId_;
@@ -943,11 +958,13 @@ public abstract class FugueDeploy extends CommandLineHandler
         }      
       }
       
-      templateVariables.put(FQ_SERVICE_NAME, new Name(environmentType_, environment_, realm_, region_, service_).toString());
-      
-      if(tenantId_ != null)
+      try
       {
-        templateVariables.put(FQ_INSTANCE_NAME, new Name(environmentType_, environment_, realm_, region_, tenantId_, service_).toString());
+        templateVariables.put(FQ_SERVICE_NAME, nameFactory_.getServiceName().toString());
+      }
+      catch(IllegalStateException e)
+      {
+        // This is actually OK.
       }
     }
     
