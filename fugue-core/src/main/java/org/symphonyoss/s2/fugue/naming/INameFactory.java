@@ -113,4 +113,13 @@ public interface INameFactory
   INameFactory withRegionId(String regionId);
 
 
+
+  /**
+   * Create a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
+   * 
+   * @param tenantId  The tenantId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withTenantId(String tenantId);
 }
