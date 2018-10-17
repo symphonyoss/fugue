@@ -55,8 +55,6 @@ public interface INameFactory
    * @param topicId               A topic ID 
    * @param additionalTopicIds    Zero or more additional topic IDs
    * 
-   * @param topicIdCollection     A collection of topic IDs.
-   * 
    * @return A collection of TopicNames.
    */
   Collection<TopicName> getTopicNameCollection(String topicId, String ...additionalTopicIds);
@@ -79,8 +77,8 @@ public interface INameFactory
    * 
    * SubscriptionIds are only needed where a service needs more than one subscription to the same topic.
    * 
-   * @param topicName
-   * @param subscriptionId
+   * @param topicName       The name of the topic
+   * @param subscriptionId  The subscriptionId (simple name) to distinguish this subscription from others on the same topic.
    * 
    * @return A SubscriptionName
    */

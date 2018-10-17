@@ -53,7 +53,7 @@ public class CreateUserForPolicy
    * Main.
    * 
    * @param args  Command line args.
-   * @throws IOException 
+   * @throws IOException If there is an exceptional condition with the IO. 
    */
   public static void main(String[] args) throws IOException
   {
@@ -84,6 +84,8 @@ public class CreateUserForPolicy
     
     if(baseName_.endsWith("-policy"))
       baseName_ = baseName_.substring(0, baseName_.length()-7);
+    else if(baseName_.endsWith("-user"))
+      baseName_ = baseName_.substring(0, baseName_.length()-5);
     else while(baseName_.endsWith("-"))
       baseName_ = baseName_.substring(0, baseName_.length()-1);
     

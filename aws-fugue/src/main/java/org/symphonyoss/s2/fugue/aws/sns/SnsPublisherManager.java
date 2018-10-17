@@ -103,7 +103,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   /**
    * Topic-arns can be constructed if the region, accountId, and topic name is known.
    * 
-   * $topicArn = 'arn:aws:sns:<REGION></>:<ACCOUNT-ID>:<TOPIC-NAME>'
+   * $topicArn = 'arn:aws:sns:REGION:ACCOUNT-ID:TOPIC-NAME'
    *
    * @param topicName - name of topic
    * 

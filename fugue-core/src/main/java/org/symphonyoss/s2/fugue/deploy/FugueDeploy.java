@@ -193,6 +193,7 @@ public abstract class FugueDeploy extends CommandLineHandler
    * 
    * @param name  Name of the value for exception message
    * @param value A Value
+   * @param <T>   The type of the value
    * 
    * @return      The given value, which is guaranteed to be non-null
    * 
