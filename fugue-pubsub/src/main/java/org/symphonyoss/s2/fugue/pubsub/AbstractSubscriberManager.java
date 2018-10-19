@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.TransientTransactionFault;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
@@ -152,21 +153,23 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     {
       consumer.consume(payload, trace);
     }
+    catch (TransientTransactionFault e)
+    {
+      log_.warn("TransientTransactionFault, will retry (forever)", e);
+      return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, true);
+    }
     catch (RetryableConsumerException e)
     {
-      
       log_.warn("Unprocessable message, will retry", e);
       
-      // TODO: how do we break an infinite loop?
-      
       if(e.getRetryTime() == null || e.getRetryTimeUnit() == null)
-        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME);
+        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
       
-      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()));
+      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()), false);
     }
     catch (RuntimeException  e)
     {
-      return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME);
+      return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
     }
     catch (FatalConsumerException e)
     {
@@ -180,26 +183,29 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     return MESSAGE_PROCESSED_OK;
   }
 
-  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId, long retryTime)
+  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId, long retryTime, boolean retryForever)
   {
-    Integer cnt = failureCache_.getIfPresent(messageId);
-    
-    if(cnt == null)
+    if(!retryForever)
     {
-      cnt = 1;
-      failureCache_.put(messageId, cnt);
-    }
-    else
-    {
-      if(cnt >= FAILURE_CNT_LIMIT)
+      Integer cnt = failureCache_.getIfPresent(messageId);
+      
+      if(cnt == null)
       {
-        trace.trace("MESSAGE_RETRIES_EXCEEDED");
-        
-        return abortMessage(payload, trace, cause);
+        cnt = 1;
+        failureCache_.put(messageId, cnt);
       }
-      failureCache_.put(messageId, ++cnt);
+      else
+      {
+        if(cnt >= FAILURE_CNT_LIMIT)
+        {
+          trace.trace("MESSAGE_RETRIES_EXCEEDED");
+          failureCache_.invalidate(messageId);
+          return abortMessage(payload, trace, cause);
+        }
+        failureCache_.put(messageId, ++cnt);
+      }
+      log_.warn("Message processing failed " + cnt + " times, will retry", cause);
     }
-    log_.warn("Message processing failed " + cnt + " times, will retry", cause);
     
     return retryTime;
   }
