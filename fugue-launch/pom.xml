@@ -20,7 +20,7 @@
 	<parent>
 		<groupId>org.symphonyoss.s2.fugue</groupId>
 		<artifactId>fugue</artifactId>
-		<version>0.0.36-SNAPSHOT</version>
+		<version>0.0.36</version>
 	</parent>
 	<artifactId>fugue-launch</artifactId>
 
