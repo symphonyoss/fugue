@@ -30,11 +30,43 @@
       "Sid": "Config",
       "Effect": "Allow",
       "Action": [
-        "s3:GetObject"
+        "s3:ListBucketByTags",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetBucketTagging",
+        "s3:GetInventoryConfiguration",
+        "s3:GetObjectVersionTagging",
+        "s3:ListBucketVersions",
+        "s3:GetBucketLogging",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketPolicy",
+        "s3:GetObjectVersionTorrent",
+        "s3:GetObjectAcl",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetBucketRequestPayment",
+        "s3:GetObjectVersionAcl",
+        "s3:GetObjectTagging",
+        "s3:GetMetricsConfiguration",
+        "s3:GetIpConfiguration",
+        "s3:ListBucketMultipartUploads",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketVersioning",
+        "s3:GetBucketAcl",
+        "s3:GetBucketNotification",
+        "s3:GetReplicationConfiguration",
+        "s3:ListMultipartUploadParts",
+        "s3:GetObject",
+        "s3:GetObjectTorrent",
+        "s3:GetBucketCORS",
+        "s3:GetAnalyticsConfiguration",
+        "s3:GetObjectVersionForReplication",
+        "s3:GetBucketLocation",
+        "s3:GetObjectVersion"
       ],
       "Resource": [
-        "arn:aws:s3:::${awsConfigBucket}/*",
-        "arn:aws:s3:::sym-s2-${environmentType}-*/*"
+        "arn:aws:s3:::sym-s2-${environmentType}-*",
+        "arn:aws:s3:::sym-s2-${environmentType}-*/*",
+        "arn:aws:s3:::sym-s2-fugue-${environmentType}-*",
+        "arn:aws:s3:::sym-s2-fugue-${environmentType}-*/*"
       ]
     },
     {
@@ -68,8 +100,21 @@
     {
       "Sid": "SNS",
       "Effect": "Allow",
-      "Action": "sns:*",
+      "Action": [
+        "sns:ListEndpointsByPlatformApplication",
+        "sns:ListPhoneNumbersOptedOut",
+        "sns:GetEndpointAttributes",
+        "sns:ListSubscriptionsByTopic",
+        "sns:GetTopicAttributes",
+        "sns:ListTopics",
+        "sns:GetPlatformApplicationAttributes",
+        "sns:ListSubscriptions",
+        "sns:GetSubscriptionAttributes",
+        "sns:ListPlatformApplications",
+        "sns:GetSMSAttributes",
+        "sns:CheckIfPhoneNumberIsOptedOut"
+      ],
       "Resource": "arn:aws:sns:*:*:sym-s2-${environmentType}-*"
     }
-    ]
+  ]
 }

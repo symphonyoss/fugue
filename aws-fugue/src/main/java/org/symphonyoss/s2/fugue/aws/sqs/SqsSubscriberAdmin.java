@@ -32,8 +32,6 @@ import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
-import org.symphonyoss.s2.fugue.pubsub.Subscription;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
@@ -119,13 +117,30 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
   @Override
   protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
-    String queueUrl;
+    boolean subscriptionOk = false;
+    String  queueUrl;
     
     try
     {
       queueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
       
-      log_.info("Subscription " + subscriptionName + " already exists as " + queueUrl);
+      String queueArn = getQueueARN(subscriptionName);
+      
+      ListSubscriptionsByTopicResult subscriptionList = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
+            
+      for(com.amazonaws.services.sns.model.Subscription s : subscriptionList.getSubscriptions())
+      {
+        if(queueArn.equals(s.getEndpoint()))
+        {
+          subscriptionOk = true;
+          break;
+        }
+      }
+      
+      if(subscriptionOk)
+        log_.info("Subscription " + subscriptionName + " already exists as " + queueUrl);
+      else
+        log_.info("Subscription " + subscriptionName + " already exists as " + queueUrl + " but the SNS subscription is missing.");
     }
     catch(QueueDoesNotExistException e)
     {
@@ -136,13 +151,26 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
       }
       else
       {
-        queueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();
+        queueUrl = sqsClient_.createQueue(new CreateQueueRequest(subscriptionName.toString())).getQueueUrl();        
         
+        log_.info("Created subscription " + subscriptionName + " as " + queueUrl);
+      }
+    }
+    
+    if(!subscriptionOk)
+    {
+      if(dryRun)
+      {
+        log_.info("Subscription " + subscriptionName + " would be created (dry run)");
+        return;
+      }
+      else
+      {
         String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(topicName), queueUrl);
         
         snsClient_.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
         
-        log_.info("Created subscription " + subscriptionName + " as " + queueUrl);
+        log_.info("Created subscription " + subscriptionName + " as " + queueUrl + " with subscriptionArn " + subscriptionArn);
       }
     }
     
