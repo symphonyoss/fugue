@@ -26,7 +26,8 @@
                 "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
                 "arn:aws:iam::*:role/sym-s2-fugue-${environmentType}-admin-role",
                 "arn:aws:iam::*:role/ecsTaskExecutionRole",
-                "arn:aws:iam::*:role/sym-s2-${environmentType}-*"
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-fugue-ecs-execution-role"
             ]
         },
         {
