@@ -862,6 +862,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
     protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath);
+    
+    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String healthCheckPath);
    
     protected abstract void deployService();
     
@@ -1094,8 +1096,12 @@ public abstract class FugueDeploy extends CommandLineHandler
             int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
             Collection<String>  paths = container.getListOf(String.class, PATHS);
             String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+            boolean             scheduled = "SCHEDULED".equals(container.getString("containerType", "SERVICE"));
             
-            deployServiceContainer(name, port, paths, healthCheckPath);
+            if(scheduled)
+              deployScheduledTaskContainer(name, port, paths, healthCheckPath);
+            else
+              deployServiceContainer(name, port, paths, healthCheckPath);
           }
           catch(InvalidValueException e)
           {

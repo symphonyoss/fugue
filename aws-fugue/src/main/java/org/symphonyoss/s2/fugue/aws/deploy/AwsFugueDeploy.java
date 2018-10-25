@@ -58,6 +58,17 @@ import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
 
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
+import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEvents;
+import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEventsClientBuilder;
+import com.amazonaws.services.cloudwatchevents.model.EcsParameters;
+import com.amazonaws.services.cloudwatchevents.model.PutRuleRequest;
+import com.amazonaws.services.cloudwatchevents.model.PutRuleResult;
+import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
+import com.amazonaws.services.cloudwatchevents.model.PutTargetsResult;
+import com.amazonaws.services.cloudwatchevents.model.RuleState;
+import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
@@ -130,6 +141,7 @@ import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsRequest
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsResult;
 import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.identitymanagement.model.PolicyVersion;
+import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
@@ -215,6 +227,20 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       "    }\n" + 
       "  ]\n" + 
       "}";
+  
+  private static final String TRUST_EVENTS_DOCUMENT = "{\n" + 
+      "  \"Version\": \"2012-10-17\",\n" + 
+      "  \"Statement\": [\n" + 
+      "    {\n" + 
+      "      \"Sid\": \"\",\n" + 
+      "      \"Effect\": \"Allow\",\n" + 
+      "      \"Principal\": {\n" + 
+      "        \"Service\": \"events.amazonaws.com\"\n" + 
+      "      },\n" + 
+      "      \"Action\": \"sts:AssumeRole\"\n" + 
+      "    }\n" + 
+      "  ]\n" + 
+      "}";
 
   private static final String HOST_HEADER = "host-header";
 
@@ -249,6 +275,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private AmazonElasticLoadBalancing     elbClient_;
   private AmazonRoute53                  r53Clinet_;
   private AmazonIdentityManagement       iamClient_;
+  private AmazonCloudWatch               cwClient_;
+  private AmazonCloudWatchEvents         cweClient_;
 
   private AmazonECS ecsClient_;
 
@@ -576,6 +604,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       logsClient_ = AWSLogsClientBuilder.standard()
           .withRegion(awsClientRegion_)
           .build();
+      
+      cwClient_ =
+          AmazonCloudWatchClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      cweClient_ =
+          AmazonCloudWatchEventsClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
     }
     else
     {
@@ -728,13 +766,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return groupName;
   }
   
-  private String createRole(Name name, String ...policyArnList)
+  private String createRole(Name name, String trustDocument, String ...policyArnList)
   {
     String roleName       = name.append(ROLE).toString();
+    Role role;
     
     try
     {
-      iam_.getRole(new GetRoleRequest()
+      role = iam_.getRole(new GetRoleRequest()
         .withRoleName(roleName))
         .getRole();
       
@@ -764,15 +803,19 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         }
       }
       
-      return roleName;
+      return role.getArn();
     }
     catch(NoSuchEntityException e)
     {
       log_.info("Role " + roleName + " does not exist, creating...");
       
-      iam_.createRole(new CreateRoleRequest()
-          .withRoleName(roleName)
-          .withAssumeRolePolicyDocument(TRUST_ECS_DOCUMENT)
+      CreateRoleRequest request = new CreateRoleRequest()
+          .withRoleName(roleName);
+      
+      if(trustDocument != null)
+        request.withAssumeRolePolicyDocument(trustDocument);
+      
+      role = iam_.createRole(request
           ).getRole();
       
       log_.debug("Created role " + roleName);
@@ -785,7 +828,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .withRoleName(roleName));
     }
     
-    return roleName;
+    return role.getArn();
   }
   
   
@@ -974,7 +1017,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //      String groupName = createGroup(name, policyArn);
 //      String result    = createUser(name, groupName, keys);
       
-      createRole(name, policyArn);
+      createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
 
     @Override
@@ -1023,7 +1066,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //      String groupName = createGroup(name, policyArn);
 //      String result    = createUser(name, groupName, keys);
       
-      createRole(name, policyArn);
+      createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
     
     private void createEnvironmentTypeSupportUser(Name baseName, List<String> keys)
@@ -1036,7 +1079,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //      String groupName = createGroup(name, policyArn);
 //      String result    = createUser(name, groupName, keys);
       
-      createRole(name, infraPolicyArn, appPolicyArn, fuguePolicyArn);
+      createRole(name, null, infraPolicyArn, appPolicyArn, fuguePolicyArn);
       
       String assumeRolePolicy = loadTemplateFromResource("policy/environmentTypeSupportTrust.json");
       
@@ -1076,7 +1119,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
-      createRole(name, policyArn);
+      createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
 
     @Override
@@ -1178,6 +1221,57 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
     
+    
+    @Override
+    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+      System.out.println("HERE");
+      
+      Name baseName   = getNameFactory().getServiceItemName(name).append("schedule");
+//      Name policyName = baseName.append("policy");
+//      Name roleName   = baseName.append("role");
+      Name ruleName   = baseName.append("rule");
+      
+      String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
+      String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
+      
+      PutRuleResult ruleResponse = cweClient_.putRule(new PutRuleRequest()
+          .withName(ruleName.toString())
+          //.withScheduleExpression("cron(0 6 * * ? *)")
+          .withScheduleExpression("cron(40 10 * * ? *)")
+          .withState(RuleState.ENABLED)
+//          .withRoleArn(roleArn)
+          );
+      
+
+      PutTargetsRequest request = new PutTargetsRequest()
+          .withTargets(new Target()
+              .withArn(getClusterArn())
+              .withRoleArn(roleArn)
+              .withEcsParameters(new EcsParameters()
+                  .withTaskCount(1)
+                  .withTaskDefinitionArn(getTaskDefinitionArn(name))
+                  )
+              .withId(name)
+              )
+          .withRule(ruleName.toString()
+          );
+
+      PutTargetsResult response = cweClient_.putTargets(request);
+      
+      System.err.print(response);
+    }
+
+    private String getClusterArn()
+    {
+      return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":cluster/" + clusterName_;
+    }
+
+    private String getTaskDefinitionArn(String name)
+    {
+      return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":task-definition/" + name;
+    }
+
     private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
     {
       if(host != null)
