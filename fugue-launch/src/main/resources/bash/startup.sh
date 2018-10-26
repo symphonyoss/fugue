@@ -18,7 +18,7 @@ function start() {
     echo pwd
     pwd
     
-    echo java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml $1
+    echo java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml -Xms512m -Xmx512m $1
     
     #java -cp "/maven/lib/*" "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" -Dlog4j.configurationFile=/maven/log4j2.xml $1
     java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml -Xms512m -Xmx512m $1

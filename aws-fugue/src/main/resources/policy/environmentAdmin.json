@@ -80,10 +80,35 @@
                 "ecs:DescribeClusters",
                 "ecs:CreateCluster",
                 "logs:DescribeLogGroups",
-                "logs:CreateLogGroup"
+                "logs:CreateLogGroup",
+                "events:PutTargets",
+                "events:PutRule"
             ],
             "Resource": [
                 "*"
+            ]
+        },
+        {
+            "Sid": "Events",
+            "Effect": "Allow",
+            "Action": [
+                "events:DescribeRule",
+                "events:DeleteRule",
+                "events:EnableRule",
+                "events:RemoveTargets",
+                "events:DisableRule",
+                "events:ListTargetsByRule"
+            ],
+            "Resource": "arn:aws:events:*:*:rule/sym-s2-${environmentType}-${environmentId}-*"
+        },
+        {
+            "Sid": "IAM",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/sym-s2-${environmentType}-*"
             ]
         },
         {

@@ -111,6 +111,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String     PATHS               = "paths";
   private static final String     HEALTH_CHECK_PATH   = "healthCheckPath";
   private static final String     CONTAINERS          = "containers";
+  private static final String     SCHEDULE            = "schedule";
 
   private static final String     DNS_SUFFIX          = "dnsSuffix";
 
@@ -504,9 +505,9 @@ public abstract class FugueDeploy extends CommandLineHandler
           ImmutableJsonObject tenantIdConfig         = createIdConfig(tenantId);
           ImmutableJsonObject tenantConfig           = fetchTenantConfig(tenantId);
           ImmutableJsonObject singleTenantIdConfig   = overlay(
-              tenantConfig,
               multiTenantDefaults,
               environmentConfig,
+              tenantConfig,
               multiTenantOverrides,
               tenantIdConfig);
           ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, tenantId);
@@ -570,9 +571,21 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   private ImmutableJsonObject fetchTenantConfig(String tenantId)
   {
+    String  dir = CONFIG + "/" + TENANT + "/" + tenantId;
     try
     {
-      return provider_.fetchConfig(CONFIG + "/" + TENANT, tenantId + DOT_JSON).immutify();
+      MutableJsonObject tenantConfig = provider_.fetchConfig(dir, FUGUE_PREFIX + TENANT + DOT_JSON);
+      
+      try
+      {
+        tenantConfig.addAll(provider_.fetchConfig(dir, service_ + DOT_JSON), "#");
+      }
+      catch(FileNotFoundException e)
+      {
+        log_.info("No tenant specific service config");
+      }
+      
+      return tenantConfig.immutify();
     }
     catch(IOException e)
     {
@@ -643,34 +656,34 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       MutableJsonObject json  = new MutableJsonObject();
       
-      String dir = CONFIG;
+      String dir = CONFIG + "/" + ENVIRONMENT;
       
-      fetch(false, json, dir, DEFAULTS, "defaults", "");
+      fetch(false, json, dir, DEFAULTS, service_, "defaults", "");
       
-      dir = dir + "/" + ENVIRONMENT + "/" + environmentType_;
+      dir = dir + "/" + environmentType_;
       
-      fetch(true, json, dir, ENVIRONMENT_TYPE, "environment type", environmentType_);  
+      fetch(true, json, dir, ENVIRONMENT_TYPE, service_, "environment type", environmentType_);  
       
       if(environment_ == null)
         return json.immutify();
       
       dir = dir + "/" + environment_;
       
-      fetch(true, json, dir, ENVIRONMENT, "environment", environment_);
+      fetch(true, json, dir, ENVIRONMENT, service_, "environment", environment_);
       
       if(realm_ == null)
         return json.immutify();
       
       dir = dir + "/" + realm_;
       
-      fetch(true, json, dir, REALM, "realm", realm_);
+      fetch(true, json, dir, REALM, service_, "realm", realm_);
       
       if(region_ == null)
         return json.immutify();
       
       dir = dir + "/" + region_;
       
-      fetch(true, json, dir, REGION, "region", region_);
+      fetch(true, json, dir, REGION, service_, "region", region_);
       
       return json.immutify();
     }
@@ -712,7 +725,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       String dir = CONFIG + "/" + TRACK;
 
-      fetch(true, json, dir, getTrack(), "Release Track", getTrack());
+      fetch(true, json, dir, getTrack(), null, "Release Track", getTrack());
     }
     catch(FileNotFoundException e)
     {
@@ -787,7 +800,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
   
-  private void fetch(boolean required, MutableJsonObject json, String dir, String fileName, String entityType, String entityName) throws IOException
+  private void fetch(boolean required, MutableJsonObject json, String dir, String fileName, String additionalFileName, String entityType, String entityName) throws IOException
   {
     try
     {
@@ -799,6 +812,18 @@ public abstract class FugueDeploy extends CommandLineHandler
         throw new IllegalArgumentException("No such " + entityType + " \"" + entityName + "\"", e);
       
       log_.warn("No " + entityType + " config");
+    }
+    
+    if(additionalFileName != null)
+    {
+      try
+      {
+        json.addAll(provider_.fetchConfig(dir, additionalFileName + DOT_JSON), "#");
+      }
+      catch(FileNotFoundException e)
+      {
+        log_.info("No " + entityType + " " + additionalFileName + " config");
+      }
     }
   }
   
@@ -862,6 +887,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
     protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath);
+    
+    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule);
    
     protected abstract void deployService();
     
@@ -1093,9 +1120,12 @@ public abstract class FugueDeploy extends CommandLineHandler
             IJsonDomNode        portNode = container.get(PORT);
             int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
             Collection<String>  paths = container.getListOf(String.class, PATHS);
-            String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+            boolean             scheduled = "SCHEDULED".equals(container.getString("containerType", "SERVICE"));
             
-            deployServiceContainer(name, port, paths, healthCheckPath);
+            if(scheduled)
+              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
+            else
+              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"));
           }
           catch(InvalidValueException e)
           {

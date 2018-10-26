@@ -99,6 +99,8 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
           log_.info("Idle schedule " + queueUrl_);
           manager_.printQueueSize();
         }
+        
+        
       }
       else
       {
@@ -151,17 +153,28 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
       }
     }
+    catch(RuntimeException e)
+    {
+      log_.error("Error processing message", e);
+    }
     catch (Throwable e)
     {
       /*
        * This method is called from an executor so I am catching Throwable because otherwise Errors will
-       * cause the process to fail silently.
+       * be swallowed.
        * 
        * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
        * I think it's worth trying.
        */
       
-      log_.error("Error processing message", e);
+      try
+      {
+        log_.error("Error processing message", e);
+      }
+      finally
+      {
+        System.exit(1);
+      }
     }
    
     

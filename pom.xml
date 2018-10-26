@@ -27,14 +27,14 @@
 	<parent>
     <groupId>org.symphonyoss.s2</groupId>
     <artifactId>S2-super-pom</artifactId>
-    <version>0.1.11</version>
+    <version>0.1.13-SNAPSHOT</version>
 	</parent>
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
 	<artifactId>fugue</artifactId>
 	<version>0.0.39-SNAPSHOT</version>
 	<name>fugue</name>
-	<description>Kubernetes based cloud platform abstraction</description>
+	<description>Cloud platform abstraction</description>
 	<url>https://github.com/SymphonyOSF/fuge</url>
 	<packaging>pom</packaging>
 

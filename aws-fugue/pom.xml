@@ -113,5 +113,16 @@
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-dynamodb</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-cloudwatch</artifactId>
+      <version>${aws.java.sdk.version}</version>
+   </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-events</artifactId>
+      <version>${aws.java.sdk.version}</version>
+   </dependency>
+	    
 	</dependencies>
 </project>
