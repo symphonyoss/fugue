@@ -88,8 +88,14 @@ public class S3Configuration extends Configuration
       {
         String region = host.substring(0, host.length() - AWS_COM.length());
         
-        if(region.startsWith("s3-"))
+        if(region.equals("s3"))
+        {
+          region = System.getenv("AWS_REGION");
+        }
+        else if(region.startsWith("s3"))
+        {
           region = region.substring(3);
+        }
         
         String path = configUrl.getPath();
         int i = path.indexOf('/', 1);

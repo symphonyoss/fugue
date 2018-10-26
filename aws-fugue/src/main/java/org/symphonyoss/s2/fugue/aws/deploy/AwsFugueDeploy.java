@@ -65,9 +65,7 @@ import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEventsClientBuild
 import com.amazonaws.services.cloudwatchevents.model.EcsParameters;
 import com.amazonaws.services.cloudwatchevents.model.LaunchType;
 import com.amazonaws.services.cloudwatchevents.model.PutRuleRequest;
-import com.amazonaws.services.cloudwatchevents.model.PutRuleResult;
 import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
-import com.amazonaws.services.cloudwatchevents.model.PutTargetsResult;
 import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
@@ -1183,7 +1181,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
-    protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances)
     {
       try
       {
@@ -1212,7 +1210,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
   //      registerTaskDef(name, port, healthCheckPath, tenantId);
         
-        createService(regionalHostName, targetGroupArn, name, port);
+        createService(regionalHostName, targetGroupArn, name, port, instances);
       }
       catch(RuntimeException e)
       {
@@ -1546,6 +1544,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
     {
       // TODO move from groovy land
+      
+      createTaskDef(name, port, paths, healthCheckPath);
     }
 
     @Override
@@ -1626,8 +1626,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
     
 
+    
+    private void createTaskDef(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+//      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
+//      boolean create      = true;
+//      
+//      ContainerDefinition containerDefinition = new ContainerDefinition()
+//          .withName(serviceName.toString())
+//          .withImage(image)
+//          ;
+//      ecsClient_.registerTaskDefinition(new RegisterTaskDefinitionRequest()
+//          .withContainerDefinitions(containerDefinition)
+//          );
+    }
 
-    private void createService(String regionalHostName, String targetGroupArn, String name, int port)
+    private void createService(String regionalHostName, String targetGroupArn, String name, int port, int desiredCnt)
     {
       log_.info("Cluster name is " + clusterName_);
       
@@ -1666,7 +1680,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withCluster(clusterName_)
             .withServiceName(serviceName.toString())
             .withTaskDefinition(serviceName.toString())
-            .withDesiredCount(1)
+            .withDesiredCount(desiredCnt)
     //        .withDeploymentConfiguration(new DeploymentConfiguration()
     //            .withMaximumPercent(maximumPercent)
     //            .withMinimumHealthyPercent(minimumHealthyPercent)
@@ -1688,7 +1702,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withCluster(clusterName_)
             .withService(serviceName.toString())
             .withTaskDefinition(serviceName.toString())
-            .withDesiredCount(1)
+            .withDesiredCount(desiredCnt)
 //            .withForceNewDeployment(true)
             );
         

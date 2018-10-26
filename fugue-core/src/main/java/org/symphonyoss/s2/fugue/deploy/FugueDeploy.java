@@ -112,6 +112,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String     HEALTH_CHECK_PATH   = "healthCheckPath";
   private static final String     CONTAINERS          = "containers";
   private static final String     SCHEDULE            = "schedule";
+  private static final String     INSTANCES           = "instances";
 
   private static final String     DNS_SUFFIX          = "dnsSuffix";
 
@@ -127,6 +128,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String                  realm_;
   private String                  region_;
   private String                  tenant_;
+  private String                  instances_;
 
   private boolean                 primaryEnvironment_ = false;
   private boolean                 primaryRegion_      = false;
@@ -171,6 +173,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     withFlag('a',   ACTION,               "FUGUE_ACTION",               String.class,   false, true,    (v) -> setAction(v));
     withFlag('E',   "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",  Boolean.class,  false, false,   (v) -> primaryEnvironment_  = v);
     withFlag('G',   "primaryRegion",      "FUGUE_PRIMARY_REGION",       Boolean.class,  false, false,   (v) -> primaryRegion_       = v);
+    withFlag('i',   "instances",          "FUGUE_INSTANCES",            String.class,   false, false,   (v) -> instances_           = v);
     
     provider_.init(this);
     
@@ -289,6 +292,15 @@ public abstract class FugueDeploy extends CommandLineHandler
     return primaryRegion_;
   }
 
+  /**
+   * 
+   * @return the desired instance count
+   */
+  public String getInstances()
+  {
+    return instances_;
+  }
+  
   /**
    * @return the environment type dns suffix.
    */
@@ -886,7 +898,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
-    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath);
+    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances);
     
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule);
    
@@ -1120,12 +1132,13 @@ public abstract class FugueDeploy extends CommandLineHandler
             IJsonDomNode        portNode = container.get(PORT);
             int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
             Collection<String>  paths = container.getListOf(String.class, PATHS);
+            int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
             boolean             scheduled = "SCHEDULED".equals(container.getString("containerType", "SERVICE"));
             
             if(scheduled)
               deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
             else
-              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"));
+              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
           }
           catch(InvalidValueException e)
           {
