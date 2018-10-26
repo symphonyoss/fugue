@@ -1226,8 +1226,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule)
     {
-      System.out.println("HERE1");
-      
       Name serviceName  = getNameFactory().getServiceItemName(name);
       Name baseName     = serviceName.append("schedule");
       Name ruleName     = baseName.append("rule");
@@ -1235,14 +1233,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
       String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
       
-
-      
       cweClient_.putRule(new PutRuleRequest()
           .withName(ruleName.toString())
           .withScheduleExpression("cron(" + schedule + ")")
           .withState(RuleState.ENABLED)
           );
-      
 
       PutTargetsRequest request = new PutTargetsRequest()
           .withTargets(new Target()
