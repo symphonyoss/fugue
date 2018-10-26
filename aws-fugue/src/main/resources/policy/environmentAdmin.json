@@ -92,10 +92,12 @@
             "Sid": "Events",
             "Effect": "Allow",
             "Action": [
+                "events:DescribeRule",
                 "events:DeleteRule",
                 "events:EnableRule",
                 "events:RemoveTargets",
-                "events:DisableRule"
+                "events:DisableRule",
+                "events:ListTargetsByRule"
             ],
             "Resource": "arn:aws:events:*:*:rule/sym-s2-${environmentType}-${environmentId}-*"
         },

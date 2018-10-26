@@ -63,6 +63,7 @@ import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEvents;
 import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEventsClientBuilder;
 import com.amazonaws.services.cloudwatchevents.model.EcsParameters;
+import com.amazonaws.services.cloudwatchevents.model.LaunchType;
 import com.amazonaws.services.cloudwatchevents.model.PutRuleRequest;
 import com.amazonaws.services.cloudwatchevents.model.PutRuleResult;
 import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
@@ -1223,24 +1224,23 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     
     @Override
-    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule)
     {
-      System.out.println("HERE");
+      System.out.println("HERE1");
       
-      Name baseName   = getNameFactory().getServiceItemName(name).append("schedule");
-//      Name policyName = baseName.append("policy");
-//      Name roleName   = baseName.append("role");
-      Name ruleName   = baseName.append("rule");
-      
+      Name serviceName  = getNameFactory().getServiceItemName(name);
+      Name baseName     = serviceName.append("schedule");
+      Name ruleName     = baseName.append("rule");
+
       String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
       String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
       
-      PutRuleResult ruleResponse = cweClient_.putRule(new PutRuleRequest()
+
+      
+      cweClient_.putRule(new PutRuleRequest()
           .withName(ruleName.toString())
-          //.withScheduleExpression("cron(0 6 * * ? *)")
-          .withScheduleExpression("cron(40 10 * * ? *)")
+          .withScheduleExpression("cron(" + schedule + ")")
           .withState(RuleState.ENABLED)
-//          .withRoleArn(roleArn)
           );
       
 
@@ -1250,16 +1250,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withRoleArn(roleArn)
               .withEcsParameters(new EcsParameters()
                   .withTaskCount(1)
-                  .withTaskDefinitionArn(getTaskDefinitionArn(name))
+                  .withTaskDefinitionArn(getTaskDefinitionArn(serviceName.toString()))
+                  .withLaunchType(LaunchType.EC2)
+                  .withGroup(name)
                   )
               .withId(name)
               )
           .withRule(ruleName.toString()
           );
 
-      PutTargetsResult response = cweClient_.putTargets(request);
-      
-      System.err.print(response);
+      cweClient_.putTargets(request);
     }
 
     private String getClusterArn()
@@ -1283,6 +1283,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     private void createR53RecordSet(String source, String target, boolean multiValue)
     {
       String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
+      
+      if(zoneId.startsWith("/hostedzone/"))
+        zoneId = zoneId.substring(12);
       
       String sourceDomain = source + ".";
       
