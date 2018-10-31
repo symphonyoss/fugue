@@ -47,9 +47,9 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  */
 public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends FugueLifecycleComponent<T>
 {
-  protected final INameFactory    nameFactory_;
-
+  protected final INameFactory        nameFactory_;
   protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
+  private   int                       totalSubscriptionCnt_;
   
   protected AbstractSubscriberBase(INameFactory nameFactory, Class<T> type)
   {
@@ -62,11 +62,15 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
   {
     assertConfigurable();
     
+    Collection<TopicName> topicNames = subscription.createTopicNames(nameFactory_);
+    
     subscribers_.add(new SubscriptionImpl<P>(
-        subscription.createTopicNames(nameFactory_),
+        topicNames,
         subscription.createObsoleteTopicNames(nameFactory_),
         subscription.getId(),
         subscription.getObsoleteId(), consumer));
+    
+    totalSubscriptionCnt_ += topicNames.size();
     
     return self();
   }
@@ -77,11 +81,15 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
   {
     assertConfigurable();
     
+    Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
+    
     subscribers_.add(new SubscriptionImpl<P>(
-        nameFactory_.getTopicNameCollection(topicId, additionalTopicIds),
+        topicNames,
         nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
         null,
         subscriptionId, consumer));
+    
+    totalSubscriptionCnt_ += topicNames.size();
     
     return self();
   }
@@ -94,6 +102,8 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
       throw new IllegalArgumentException("At least one topic name is required");
     
     subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
+    
+    totalSubscriptionCnt_ += topicNames.size();
     
     return self();
   }
@@ -116,11 +126,18 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
     
     subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
     
+    totalSubscriptionCnt_ += topicNameList.size();
+    
     return self();
   }
 
   protected List<SubscriptionImpl<P>> getSubscribers()
   {
     return subscribers_;
+  }
+  
+  protected int getTotalSubscriptionCnt()
+  {
+    return totalSubscriptionCnt_;
   }
 }
