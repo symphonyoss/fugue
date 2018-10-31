@@ -24,12 +24,18 @@
 package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.counter.Counter;
+import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
+import org.symphonyoss.s2.fugue.deploy.IBatch;
+import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
+import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
@@ -51,11 +57,12 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final ITraceContextFactory                 traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
-  private int messageBatchSize_ = 10;
+  private final Counter                              counter_;
+  private int                                        messageBatchSize_ = 10;
 
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<String> consumer)
+      IThreadSafeRetryableConsumer<String> consumer, Counter counter)
   {
     manager_ = manager;
     sqsClient_ = sqsClient;
@@ -63,6 +70,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
+    counter_ = counter;
   }
   
   class NonIdleSubscriber implements Runnable
@@ -82,6 +90,34 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
   public void run(boolean runIfIdle)
   {
+    if(runIfIdle)
+    {
+      try
+      {
+        while(true)
+        {
+          getSomeMessages();
+        }
+      }
+      finally
+      {
+        if(runIfIdle)
+        {
+          // This "can't happen"
+          log_.error("Main SQS thread returned, rescheduling...");
+          
+          manager_.submit(this, true);
+        }
+      }
+    }
+    else
+    {
+      getSomeMessages();
+    }
+  }
+  
+  private void getSomeMessages()
+  {
     // receive messages from the queue
     
     ReceiveMessageRequest request = new ReceiveMessageRequest(queueUrl_)
@@ -91,66 +127,67 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     {    
       List<Message> messages = sqsClient_.receiveMessage(request).getMessages();
   
-      if(messages.isEmpty())
+      log_.info("Read " + messages.size() + " for " + queueUrl_);
+      
+      switch(messages.size())
       {
-        if(runIfIdle)
-        {
-          manager_.submit(this, runIfIdle);
-          log_.info("Idle schedule " + queueUrl_);
-          manager_.printQueueSize();
-        }
-        
-        
-      }
-      else
-      {
-        log_.info("Read " + messages.size() + " for " + queueUrl_);
-        
-        // We need to do this before handling the message so that if there is an exception in thehandler code
-        // we don't loose this topic.
-        
-        if(runIfIdle)
-        {
-          manager_.submit(this, runIfIdle);
-          log_.debug("Idle re-schedule " + queueUrl_);
-        }
-        else
-        {
-          manager_.submit(nonIdleSubscriber_, runIfIdle);
-          log_.debug("Extra re-schedule " + queueUrl_);
-        }
-        manager_.printQueueSize();
-        
-        if(messages.size() > 2 /*== messageBatchSize_*/)
-        {
-          manager_.submit(nonIdleSubscriber_, false);
-
-          log_.debug("Extra schedule " + queueUrl_);
-        }
-        
-        for (Message m : messages)
-        {
-          ITraceContext trace = traceFactory_.createTransaction("SQS_Message", m.getMessageId());
-  
-          long retryTime = manager_.handleMessage(consumer_, m.getBody(), trace, m.getMessageId());
+        case 0:
+          // Nothing to do...
+          break;
           
-          if(retryTime < 0)
+        case 1:
+          // Single message, just process in the current thread
+          if(counter_ != null)
+            counter_.increment(1);
+          handleMessage(messages.get(0));
+          break;
+          
+        default:
+          if(counter_ != null)
+            counter_.increment(messages.size());
+          if(messages.size() > 2)
           {
-            trace.trace("ABOUT_TO_ACK");
-            sqsClient_.deleteMessage(queueUrl_, m.getReceiptHandle());
-          }
-          else
-          {
-            trace.trace("ABOUT_TO_NACK");
-            
-            int visibilityTimout = (int) (retryTime / 1000);
-            
-            sqsClient_.changeMessageVisibility(queueUrl_, m.getReceiptHandle(), visibilityTimout);
-          }
-          trace.finished();
-        }
-        
+            manager_.submit(nonIdleSubscriber_, false);
 
+            log_.debug("Extra schedule " + queueUrl_);
+          }
+          
+          // Fire off all but one envelopes in its own thread, do the final one in the current thread
+          int     index = 0;
+          IBatch  batch = manager_.newBatch();
+          
+          try
+          {
+            while(index < messages.size() - 1)
+            {
+              final int myIndex = index++;
+              
+              batch.submit(() -> 
+              {
+                handleMessage(messages.get(myIndex));
+              });
+            }
+            handleMessage(messages.get(index));
+            
+            batch.waitForAllTasks();
+          }
+          catch(RuntimeException e)
+          {
+            Throwable cause = e.getCause();
+            
+            if(cause instanceof ExecutionException)
+              cause = cause.getCause();
+            
+            if(cause instanceof RetryableConsumerException)
+            {
+              throw (RetryableConsumerException)cause;
+            }            
+            if(cause instanceof FatalConsumerException)
+            {
+              throw (FatalConsumerException)cause;
+            }
+            throw e;
+          }
       }
     }
     catch(RuntimeException e)
@@ -176,8 +213,27 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         System.exit(1);
       }
     }
-   
+  }
+
+  private void handleMessage(Message message)
+  {
+    ITraceContext trace = traceFactory_.createTransaction("SQS_Message", message.getMessageId());
     
+    long retryTime = manager_.handleMessage(consumer_, message.getBody(), trace, message.getMessageId());
     
+    if(retryTime < 0)
+    {
+      trace.trace("ABOUT_TO_ACK");
+      sqsClient_.deleteMessage(queueUrl_, message.getReceiptHandle());
+    }
+    else
+    {
+      trace.trace("ABOUT_TO_NACK");
+      
+      int visibilityTimout = (int) (retryTime / 1000);
+      
+      sqsClient_.changeMessageVisibility(queueUrl_, message.getReceiptHandle(), visibilityTimout);
+    }
+    trace.finished();
   }
 }
