@@ -198,13 +198,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   private static final String            POLICY                         = "policy";
   private static final String            GROUP                          = "group";
-  private static final String            ROLE                           = "role";
+  public static final String            ROLE                           = "role";
   private static final String            USER                           = "user";
   private static final String            ROOT                           = "root";
   private static final String            ADMIN                          = "admin";
   private static final String            SUPPORT                        = "support";
   private static final String            CICD                           = "cicd";
   private static final String            CONFIG                         = "config";
+  public static final String            DYNAMO_AUTOSCALE               = "dynamo-autoscale";
 
   private static final ObjectMapper      MAPPER                        = new ObjectMapper();
 
@@ -802,6 +803,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         }
       }
       
+      if(trustDocument != null)
+      {
+        log_.info("Updating trust policy for existing role " + roleName + "...");
+        
+        iam_.updateAssumeRolePolicy(new UpdateAssumeRolePolicyRequest()
+          .withPolicyDocument(trustDocument)
+          .withRoleName(roleName.toString())
+          );
+      }
+      
       return role.getArn();
     }
     catch(NoSuchEntityException e)
@@ -1031,6 +1042,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createEnvironmentTypeAdminUser(baseName, keys);
       createEnvironmentTypeCicdUser(baseName, keys);
       createEnvironmentTypeSupportUser(baseName, keys);
+      
+      createEnvironmentTypeRoles(baseName);
 
       if(keys.isEmpty())
       {
@@ -1057,6 +1070,19 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
+    private void createEnvironmentTypeRoles(Name baseName)
+    {
+      createAssumedRole(baseName.append(DYNAMO_AUTOSCALE), "dynamoDbAutoscale");
+    }
+    
+    private void createAssumedRole(Name name, String templateName)
+    {
+      String policyArn        = createPolicyFromResource(name, "policy/" + templateName + ".json");
+      String assumeRolePolicy = loadTemplateFromResource("policy/" + templateName + "Trust.json");
+      
+      createRole(name, assumeRolePolicy, policyArn);
+    }
+
     private void createEnvironmentTypeAdminUser(Name baseName, List<String> keys)
     {
       Name name = baseName.append(ADMIN);
@@ -1078,14 +1104,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //      String groupName = createGroup(name, policyArn);
 //      String result    = createUser(name, groupName, keys);
       
-      createRole(name, null, infraPolicyArn, appPolicyArn, fuguePolicyArn);
-      
+
       String assumeRolePolicy = loadTemplateFromResource("policy/environmentTypeSupportTrust.json");
       
-      iam_.updateAssumeRolePolicy(new UpdateAssumeRolePolicyRequest()
-          .withPolicyDocument(assumeRolePolicy)
-          .withRoleName(name.append(ROLE).toString())
-          );
+      createRole(name, assumeRolePolicy, infraPolicyArn, appPolicyArn, fuguePolicyArn);
     }
     
     private void createEnvironmentTypeCicdUser(Name baseName, List<String> keys)

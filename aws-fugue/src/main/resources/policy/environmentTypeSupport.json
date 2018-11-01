@@ -1,6 +1,20 @@
 {
     "Version": "2012-10-17",
     "Statement": [
+    {
+            "Sid": "FixStage",
+            "Effect": "Allow",
+            "Action": [
+                "iam:RemoveUserFromGroup",
+                "iam:DeleteUser",
+                "iam:DeleteLoginProfile",
+                "iam:DeleteAccessKey"
+            ],
+            "Resource": [
+                "arn:aws:iam::897972125978:user/sym-s2-fugue-stage-cicd-user",
+                "arn:aws:iam::897972125978:group/sym-s2-fugue-stage-cicd-group"
+            ]
+        },
         {
             "Sid": "FugueAdmin",
             "Effect": "Allow",
@@ -23,7 +37,12 @@
                 "arn:aws:iam::*:policy/sym-s2-${environmentType}-*",
                 "arn:aws:iam::*:role/sym-s2-${environmentType}-*",
                 "arn:aws:iam::*:user/sym-s2-${environmentType}-*",
-                "arn:aws:iam::*:group/sym-s2-${environmentType}-*"
+                "arn:aws:iam::*:group/sym-s2-${environmentType}-*",
+                
+                "arn:aws:iam::*:policy/sym-s2-fugue-${environmentType}-*",
+                "arn:aws:iam::*:role/sym-s2-fugue-${environmentType}-*",
+                "arn:aws:iam::*:user/sym-s2-fugue-${environmentType}-*",
+                "arn:aws:iam::*:group/sym-s2-fugue-${environmentType}-*"
             ]
         },
     {
@@ -115,6 +134,17 @@
         "sns:CheckIfPhoneNumberIsOptedOut"
       ],
       "Resource": "arn:aws:sns:*:*:sym-s2-${environmentType}-*"
+    },
+    {
+        "Sid": "AutoScale",
+        "Effect": "Allow",
+        "Action": [
+            "application-autoscaling:DescribeScalableTargets",
+            "application-autoscaling:DescribeScalingActivities",
+            "application-autoscaling:DescribeScalingPolicies",
+            "application-autoscaling:DescribeScheduledActions"
+        ],
+        "Resource": "*"
     }
   ]
 }

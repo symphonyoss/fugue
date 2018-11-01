@@ -985,8 +985,25 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected void populateTemplateVariables(ImmutableJsonObject config, Map<String, String> templateVariables)
     {
       IJsonObject<?>      id = config.getRequiredObject(ID);
-      Iterator<String>    it = id.getNameIterator();
+      Iterator<String>    it;
       
+      it = config.getNameIterator();
+      while(it.hasNext())
+      {
+        String name = it.next();
+        
+        if(name.startsWith("fugue"))
+        {
+          IJsonDomNode value = config.get(name);
+          
+          if(value instanceof IStringProvider)
+          {
+            templateVariables.put(name, ((IStringProvider)value).asString());
+          }
+        }
+      }
+      
+      it = id.getNameIterator();
       while(it.hasNext())
       {
         String name = it.next();
@@ -1006,6 +1023,8 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         // This is actually OK.
       }
+      
+
     }
     
     /**

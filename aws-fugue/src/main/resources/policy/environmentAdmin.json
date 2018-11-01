@@ -18,7 +18,8 @@
                 "iam:GetPolicyVersion",
                 "iam:CreatePolicyVersion",
                 "iam:DeletePolicyVersion",
-                "iam:ListPolicyVersions"
+                "iam:ListPolicyVersions",
+                "iam:UpdateAssumeRolePolicy"
             ],
             "Resource": [
                 "arn:aws:iam::*:group/sym-s2-${environmentType}-${environmentId}-*",

@@ -38,7 +38,8 @@
                 "iam:CreateRole",
                 "iam:ListAttachedRolePolicies",
                 "iam:AttachRolePolicy",
-                "iam:DetachRolePolicy"
+                "iam:DetachRolePolicy",
+                "iam:UpdateAssumeRolePolicy"
             ],
             "Resource": [
                 "arn:aws:iam::*:group/sym-s2-${environmentType}-*",

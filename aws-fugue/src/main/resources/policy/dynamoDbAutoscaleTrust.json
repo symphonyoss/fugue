@@ -4,10 +4,9 @@
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::${fugueSupportAccountId}:root"
+        "Service": "dynamodb.application-autoscaling.amazonaws.com"
       },
-      "Action": "sts:AssumeRole",
-      "Condition": {}
+      "Action": "sts:AssumeRole"
     }
   ]
 }
