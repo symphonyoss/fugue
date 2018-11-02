@@ -4,23 +4,13 @@
         {
             "Effect": "Allow",
             "Action": [
-                "ecs:RunTask"
+                "dynamodb:DescribeTable",
+                "dynamodb:UpdateTable",
+                "cloudwatch:PutMetricAlarm",
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:DeleteAlarms"
             ],
-            "Resource": [
-                "arn:aws:ecs:*:${awsAccountId}:task-definition/sym-s2-${environmentType}-${environmentId}-${serviceId}-*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": "iam:PassRole",
-            "Resource": [
-                "*"
-            ],
-            "Condition": {
-                "StringLike": {
-                    "iam:PassedToService": "ecs-tasks.amazonaws.com"
-                }
-            }
+            "Resource": "*"
         }
     ]
 }

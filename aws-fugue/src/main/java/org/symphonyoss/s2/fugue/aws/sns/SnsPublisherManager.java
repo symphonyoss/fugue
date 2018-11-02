@@ -32,11 +32,14 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
+import com.amazonaws.ClientConfiguration;
+import com.amazonaws.metrics.AwsSdkMetrics;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.PublishRequest;
@@ -82,13 +85,29 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     accountId_ = accountId;
     initialize_ = initialize;
     
+    com.amazonaws.metrics.internal.cloudwatch.DefaultMetricCollectorFactory foo;
+    
     log_.info("Starting SNSPublisherManager in " + region_ + "...");
+
+    // TODO: move this into its own component.
+    
+    AwsSdkMetrics.enableDefaultMetrics();
+
+//    AwsSdkMetrics.setCredentialProvider(credentialsProvider);
+  
+    AwsSdkMetrics.setMetricNameSpace(nameFactory_.getServiceName().toString());
+    
+    int maxConnections = 200;
+    
+    ClientConfiguration config = new ClientConfiguration()
+        .withMaxConnections(maxConnections)
+        ;
     
     snsClient_ = AmazonSNSClientBuilder.standard()
       .withRegion(region_)
+      .withClientConfiguration(config)
       .build();
     
-
   }
 
   @Override
@@ -141,12 +160,14 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     return publisher;
   }
   
-  protected void send(String topicArn, String msg)
+  protected void send(String topicArn, String msg, ITraceContext trace)
   {
     try
     {
       PublishRequest publishRequest = new PublishRequest(topicArn, msg);
+      trace.trace("ABOUT_TO_PUBLISH", "SNS_TOPIC", topicArn);
       snsClient_.publish(publishRequest);
+      trace.trace("PUBLISHED", "SNS_TOPIC", topicArn);
     }
     catch (RuntimeException e)
     {

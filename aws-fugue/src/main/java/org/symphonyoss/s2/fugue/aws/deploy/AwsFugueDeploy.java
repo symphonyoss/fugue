@@ -158,6 +158,7 @@ import com.amazonaws.services.route53.model.ListHostedZonesByNameRequest;
 import com.amazonaws.services.route53.model.ListHostedZonesByNameResult;
 import com.amazonaws.services.route53.model.ListResourceRecordSetsRequest;
 import com.amazonaws.services.route53.model.ListResourceRecordSetsResult;
+import com.amazonaws.services.route53.model.PriorRequestNotCompleteException;
 import com.amazonaws.services.route53.model.RRType;
 import com.amazonaws.services.route53.model.ResourceRecord;
 import com.amazonaws.services.route53.model.ResourceRecordSet;
@@ -205,6 +206,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            SUPPORT                        = "support";
   private static final String            CICD                           = "cicd";
   private static final String            CONFIG                         = "config";
+  @Deprecated
   public static final String            DYNAMO_AUTOSCALE               = "dynamo-autoscale";
 
   private static final ObjectMapper      MAPPER                        = new ObjectMapper();
@@ -1358,15 +1360,41 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             ;
         }
         
-        ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
-            .withHostedZoneId(zoneId)
-            .withChangeBatch(new ChangeBatch()
-                .withChanges(new Change()
-                    .withAction(ChangeAction.CREATE)
-                    .withResourceRecordSet(resourceRecordSet)
-                    )
-                )
-            );
+        RuntimeException savedException = new RuntimeException("No saved exception");
+        
+        for(int i=0 ; i<10 ; i++)
+        {
+          try
+          {
+            ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
+              .withHostedZoneId(zoneId)
+              .withChangeBatch(new ChangeBatch()
+                  .withChanges(new Change()
+                      .withAction(ChangeAction.CREATE)
+                      .withResourceRecordSet(resourceRecordSet)
+                      )
+                  )
+              );
+          }
+          catch(PriorRequestNotCompleteException e)
+          {
+            savedException = e;
+            log_.info("Route53 request still in progress", e);
+            
+            try
+            {
+              Thread.sleep(5000);
+            }
+            catch (InterruptedException e1)
+            {
+              log_.error("Interrupted", e1);
+              
+              throw e;
+            }
+          }
+        }
+        log_.error("Failed to create resource sets", savedException);
+        throw savedException;
       }
     }
 
@@ -1753,44 +1781,44 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           boolean ok = true;
           
-          // So the LB exists, check that it has the correct security groups and subnets
-          int     cnt = awsLoadBalancerSecurityGroups_.size();
-          
-          for(String sg : loadBalancer.getSecurityGroups())
-          {
-            if(awsLoadBalancerSecurityGroups_.contains(sg))
-            {
-              cnt--;
-            }
-            else
-            {
-              ok = false;
-              break;
-            }
-          }
-          
-          if(cnt > 0)
-            ok = false;
-          
-          if(ok)
-          {
-            cnt = awsLoadBalancerSubnets_.size();
-            for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
-            {
-              if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
-              {
-                cnt--;
-              }
-              else
-              {
-                ok = false;
-                break;
-              }
-            }
-            
-            if(cnt > 0)
-              ok = false;
-          }
+//          // So the LB exists, check that it has the correct security groups and subnets
+//          int     cnt = awsLoadBalancerSecurityGroups_.size();
+//          
+//          for(String sg : loadBalancer.getSecurityGroups())
+//          {
+//            if(awsLoadBalancerSecurityGroups_.contains(sg))
+//            {
+//              cnt--;
+//            }
+//            else
+//            {
+//              ok = false;
+//              break;
+//            }
+//          }
+//          
+//          if(cnt > 0)
+//            ok = false;
+//          
+//          if(ok)
+//          {
+//            cnt = awsLoadBalancerSubnets_.size();
+//            for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
+//            {
+//              if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
+//              {
+//                cnt--;
+//              }
+//              else
+//              {
+//                ok = false;
+//                break;
+//              }
+//            }
+//            
+//            if(cnt > 0)
+//              ok = false;
+//          }
           
           if(ok)
           {
