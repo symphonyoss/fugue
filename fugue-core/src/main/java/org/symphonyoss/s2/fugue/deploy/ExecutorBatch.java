@@ -47,8 +47,6 @@ public class ExecutorBatch implements IBatch
 {
   private static Logger log_ = LoggerFactory.getLogger(ExecutorBatch.class);
   
-//  private ExecutorService executor_;
-//  private List<Future<?>> futures_ = new LinkedList<>();
   private CompletionService<Void> completionService_;
   private boolean                 closed_;
   private int                     taskCnt_;
@@ -122,7 +120,7 @@ public class ExecutorBatch implements IBatch
 
     while(taskCnt_>0)
     {
-      log_.info("Waiting for " + taskCnt_ + " tasks...");
+//      log_.info("Waiting for " + taskCnt_ + " tasks...");
       try
       {
         completionService_.take().get();

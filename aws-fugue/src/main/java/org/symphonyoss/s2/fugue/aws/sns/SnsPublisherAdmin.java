@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
@@ -57,13 +58,14 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   /**
    * Constructor.
    * 
+   * @param config      The configuration provider.
    * @param nameFactory A name factory.
    * @param region      The AWS region to use.
    * @param accountId   The AWS numeric account ID 
    */
-  public SnsPublisherAdmin(INameFactory nameFactory, String region, String accountId)
+  public SnsPublisherAdmin(IConfiguration config, INameFactory nameFactory, String region, String accountId)
   {
-    super(nameFactory, region, accountId, true);
+    super(config, nameFactory, region, accountId, true);
   }
 
   @Override

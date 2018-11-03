@@ -33,12 +33,16 @@ import javax.annotation.Nonnull;
 
 import org.symphonyoss.s2.common.exception.NotFoundException;
 import org.symphonyoss.s2.common.fault.CodingFault;
-import org.symphonyoss.s2.common.fault.ProgramFault;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
+/**
+ * Base implementation of IConfiguration.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class Configuration implements IConfiguration
 {
   private JsonNode tree_;
@@ -113,7 +117,7 @@ public class Configuration implements IConfiguration
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault("Required property  \"" + name + "\" not found in " + name_, e);
+      throw new IllegalStateException("Required property  \"" + name + "\" not found in " + name_, e);
     }
   }
   
@@ -130,11 +134,74 @@ public class Configuration implements IConfiguration
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault("Required property  \"" + name + "\" not found in " + name_, e);
+      throw new IllegalStateException("Required property  \"" + name + "\" not found in " + name_, e);
     }
     catch(NumberFormatException e)
     {
-      throw new ProgramFault("Required long integer property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+      throw new IllegalStateException("Required long integer property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+    }
+  }
+  
+  @Override
+  public long getLong(String name, long defaultValue)
+  {
+    String s = null;
+    
+    try
+    {
+      s = getString(name);
+      
+      return Long.parseLong(s);
+    }
+    catch (NotFoundException e)
+    {
+      return defaultValue;
+    }
+    catch(NumberFormatException e)
+    {
+      throw new IllegalStateException("Long integer property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+    }
+  }
+  
+  @Override
+  public int getRequiredInt(String name)
+  {
+    String s = null;
+    
+    try
+    {
+      s = getString(name);
+      
+      return Integer.parseInt(s);
+    }
+    catch (NotFoundException e)
+    {
+      throw new IllegalStateException("Required property  \"" + name + "\" not found in " + name_, e);
+    }
+    catch(NumberFormatException e)
+    {
+      throw new IllegalStateException("Required int property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+    }
+  }
+  
+  @Override
+  public int getInt(String name, int defaultValue)
+  {
+    String s = null;
+    
+    try
+    {
+      s = getString(name);
+      
+      return Integer.parseInt(s);
+    }
+    catch (NotFoundException e)
+    {
+      return defaultValue;
+    }
+    catch(NumberFormatException e)
+    {
+      throw new IllegalStateException("Required int property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
     }
   }
 
@@ -160,7 +227,7 @@ public class Configuration implements IConfiguration
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault(e);
+      throw new IllegalStateException(e);
     }
   }
   
@@ -217,8 +284,50 @@ public class Configuration implements IConfiguration
     }
     catch (NotFoundException e)
     {
-      throw new ProgramFault("Required array property  \"" + name + "\" not found", e);
+      throw new IllegalStateException("Required array property  \"" + name + "\" not found", e);
     }
+  }
+  
+  @Override
+  public List<String> getListOfString(String name, List<String> defaultValue)
+  {
+    try
+    {
+      return getRequiredListOfString(name);
+    }
+    catch (IllegalStateException e)
+    {
+      return defaultValue;
+    }
+  }
+
+  @Override
+  public List<String> getRequiredListOfString(String name)
+  {
+
+    if(tree_ == null)
+      throw new IllegalStateException("No configuration loaded");
+    
+    JsonNode node = tree_.get(name);
+    
+    if(node == null)
+      throw new IllegalStateException("No such property");
+    
+    List<String> result = new ArrayList<>();
+    
+    if(node.isArray())
+    {
+      for(JsonNode child : node)
+      {
+        result.add(child.asText());
+      }
+    }
+    else
+    {
+      result.add(node.asText());
+    }
+      
+    return result;
   }
 
   @Override
@@ -231,30 +340,45 @@ public class Configuration implements IConfiguration
     
     if(subConfig == null)
     {
-      JsonNode node = tree_.get(name);
-      
-      if(node == null || !node.isObject())
-      {
-        try
-        {
-          node = new ObjectMapper().readTree("{}");
-        }
-        catch (IOException e)
-        {
-          throw new CodingFault(e);
-        }
-      }
-      
-      subConfig = new Configuration((ObjectNode)node);
+      subConfig = getConfiguration(name.split("/"), 0, false);
       
       subConfigMap_.put(name, subConfig);
     }
     
-    subConfig.name_ = name_ + "/" + name;
     
     return subConfig;
   }
 
+  private @Nonnull Configuration getConfiguration(String[] names, int index, boolean direct)
+  {
+    if(!direct && index < names.length - 1)
+    {
+      return getConfiguration(names, index, true).getConfiguration(names, index+1, false);
+    }
+    
+    JsonNode node = tree_.get(names[index]);
+    
+    if(node == null || !node.isObject())
+    {
+      try
+      {
+        node = new ObjectMapper().readTree("{}");
+      }
+      catch (IOException e)
+      {
+        throw new CodingFault(e);
+      }
+    }
+    
+    Configuration subConfig = new Configuration(node);
+    subConfig.name_ = name_ + "/" + names[index];
+    
+    subConfigMap_.put(subConfig.name_, subConfig);
+    
+    return subConfig;
+  }
+
+  @Override
   public String getName()
   {
     return name_;

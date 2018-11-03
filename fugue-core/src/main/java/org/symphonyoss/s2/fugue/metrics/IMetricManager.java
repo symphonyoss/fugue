@@ -21,34 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.config;
+package org.symphonyoss.s2.fugue.metrics;
 
-import java.io.IOException;
-
-import org.symphonyoss.s2.common.fault.CodingFault;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-/**
- * An empty configuration.
- * 
- * @author Bruce Skingle
- *
- */
-public class EmptyConfiguration extends Configuration
+public interface IMetricManager
 {
-  /**
-   * Constructor.
-   */
-  public EmptyConfiguration()
-  {
-    try
-    {
-      setTree(new ObjectMapper().readTree("{}"));
-    }
-    catch(IOException e)
-    {
-      throw new CodingFault("Can't happen", e);
-    }
-  }
+
+  void putMetric(long timestamp, int count);
+
 }

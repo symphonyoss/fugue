@@ -33,11 +33,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
+import org.symphonyoss.s2.common.fluent.Fluent;
+import org.symphonyoss.s2.common.fluent.IFluent;
+import org.symphonyoss.s2.fugue.metrics.IMetricManager;
 
-public abstract class Counter implements Runnable
+public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements Runnable
 {
   private static final long                 PERIOD    = 5;
   private static final Logger               log_      = LoggerFactory.getLogger(Counter.class);
+  private static ScheduledExecutorService   executor_ = Executors
+      .newSingleThreadScheduledExecutor(new NamedThreadFactory("counter", true));
 
   public boolean  debug_;
   
@@ -64,12 +69,15 @@ public abstract class Counter implements Runnable
   private AtomicInteger[]                   counter_;
   private AtomicInteger                     nowCounter_;
   private LinkedBlockingQueue<CounterValue> queue_    = new LinkedBlockingQueue<>();
-  private ScheduledExecutorService          executor_ = Executors
-      .newSingleThreadScheduledExecutor(new NamedThreadFactory("counter", true));
-
-  public Counter(int upperLimit, int upperSampleCntWindow, int upperSampleCntBreak, int upperCoolDown, int lowerLimit,
+  private IMetricManager metricManager_;
+  private long currentMinute_;
+  private int currentTotal_;
+  
+  public Counter(Class<T> type, int upperLimit, int upperSampleCntWindow, int upperSampleCntBreak, int upperCoolDown, int lowerLimit,
       int lowerSampleCntWindow, int lowerSampleCntBreak, int lowerCoolDown)
   {
+    super(type);
+    
     if(upperLimit <= lowerLimit)
       throw new IllegalArgumentException("Upper limit must be greater than lower limit");
     
@@ -97,6 +105,13 @@ public abstract class Counter implements Runnable
 
     upperLimitValidTime_ = baseTime_ + upperCoolDown_ + upperSampleCntWindow_;
     lowerLimitValidTime_ = baseTime_ + lowerCoolDown_ + lowerSampleCntWindow_;
+  }
+  
+  public T withMetricManager(IMetricManager metricManager)
+  {
+    metricManager_ = metricManager;
+    
+    return self();
   }
 
   private long getCurrentSecond()
@@ -285,16 +300,27 @@ public abstract class Counter implements Runnable
   
   private void process()
   {
-    CounterValue value;
-    
-    while((value = queue_.poll()) != null)
-      process(value.timestamp_, value.count_);
+    try
+    {
+      CounterValue value;
+      
+      while((value = queue_.poll()) != null)
+        process(value.timestamp_, value.count_);
+    }
+    catch(Exception e)
+    {
+      log_.error("Accumulator failed", e);
+      e.printStackTrace();
+    }
   }
 
   protected void process(long timestamp, int count)
   {
     if(debug_)
       System.out.println("> " + new Date(timestamp * 1000) + " " + count);
+    
+    if(metricManager_ != null)
+      accumulate(timestamp, count);
     
     upperSampleBuffer_[upperSampleIndex_++] = count;
     if(upperSampleIndex_ >= upperSampleCntWindow_)
@@ -356,6 +382,26 @@ public abstract class Counter implements Runnable
         lowerLimitValidTime_ = timestamp + lowerCoolDown_;
         lowerLimitBreak(max);
       }
+    }
+  }
+
+  private void accumulate(long timestamp, int count)
+  {
+    long minute = timestamp / 60;
+    
+    if(currentMinute_ == minute)
+    {
+      currentTotal_ += count;
+    }
+    else
+    {
+      if(currentMinute_ > 0)
+      {
+        metricManager_.putMetric(currentMinute_ * 60000, currentTotal_);
+      }
+      
+      currentMinute_ = minute;
+      currentTotal_ = count;
     }
   }
 

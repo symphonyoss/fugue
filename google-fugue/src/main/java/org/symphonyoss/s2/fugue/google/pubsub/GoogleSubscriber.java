@@ -36,6 +36,7 @@ import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.counter.Counter;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
@@ -56,24 +57,20 @@ public class GoogleSubscriber implements MessageReceiver
   private static final ScheduledThreadPoolExecutor  executor_ = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("google-failed-msg-ack", true));
   private static final int MAX_PENDING_RETRY_COUNT = 10000;
   
-  private final GoogleAbstractSubscriberManager<?>               manager_;
+  private final GoogleSubscriberManager                          manager_;
   private final ITraceContextFactory                             traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
   private final SubscriptionName                                 subscriptionName_;
+  private final Counter                                          counter_;
 
-  /**
-   * Constructor.
-   * @param manager       The manager.
-   * @param traceFactory  A trace factory.
-   * @param consumer      Sink for received messages.
-   * @param subscriptionName The name of the subscription we are processing for
-   */
-  public GoogleSubscriber(GoogleAbstractSubscriberManager<?> manager, ITraceContextFactory traceFactory, IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName)
+  /* package */ GoogleSubscriber(GoogleSubscriberManager manager, ITraceContextFactory traceFactory,
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, Counter counter)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     subscriptionName_ = subscriptionName;
+    counter_ = counter;
   }
 
   @Override
@@ -81,6 +78,8 @@ public class GoogleSubscriber implements MessageReceiver
   {
     try
     {
+      counter_.increment(1);
+      
       Timestamp ts = message.getPublishTime();
       
       ITraceContext trace = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),

@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class FileConfiguration extends Configuration
 {
+  /** Public factory */
   public static final IConfigurationFactory FACTORY = new IConfigurationFactory()
   {
     @Override

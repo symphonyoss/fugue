@@ -40,10 +40,19 @@ import org.symphonyoss.s2.fugue.Fugue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Implementation of IConfiguration from a GitHub repo.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class GitHubConfiguration extends Configuration
 {
   private static final Logger log_ = LoggerFactory.getLogger(GitHubConfiguration.class);
   
+  /**
+   * Constructor.
+   */
   public GitHubConfiguration()
   {
     loadConfigSpec(Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG));

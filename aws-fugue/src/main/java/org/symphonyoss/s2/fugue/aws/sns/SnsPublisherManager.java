@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -68,16 +69,17 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   /**
    * Constructor.
    * 
+   * @param config      The configuration provider.
    * @param nameFactory A name factory.
    * @param region      The AWS region to use.
    * @param accountId   The AWS numeric account ID 
    */
-  public SnsPublisherManager(INameFactory nameFactory, String region, String accountId)
+  public SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId)
   {
-    this(nameFactory, region, accountId, false);
+    this(config, nameFactory, region, accountId, false);
   }
   
-  protected SnsPublisherManager(INameFactory nameFactory, String region, String accountId, boolean initialize)
+  protected SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId, boolean initialize)
   {
     super(nameFactory, SnsPublisherManager.class);
     
@@ -85,27 +87,22 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     accountId_ = accountId;
     initialize_ = initialize;
     
+    IConfiguration snsConfig = config.getConfiguration("org/symphonyoss/s2/fugue/aws/sns");
+    
     com.amazonaws.metrics.internal.cloudwatch.DefaultMetricCollectorFactory foo;
     
-    log_.info("Starting SNSPublisherManager in " + region_ + "...");
-
-    // TODO: move this into its own component.
-    
-    AwsSdkMetrics.enableDefaultMetrics();
-
-//    AwsSdkMetrics.setCredentialProvider(credentialsProvider);
-  
-    AwsSdkMetrics.setMetricNameSpace(nameFactory_.getServiceName().toString());
-    
-    int maxConnections = 200;
-    
-    ClientConfiguration config = new ClientConfiguration()
-        .withMaxConnections(maxConnections)
+    ClientConfiguration clientConfig = new ClientConfiguration()
+        .withMaxConnections(snsConfig.getInt("maxConnections", ClientConfiguration.DEFAULT_MAX_CONNECTIONS))
+        .withClientExecutionTimeout(snsConfig.getInt("clientExecutionTimeout", ClientConfiguration.DEFAULT_CLIENT_EXECUTION_TIMEOUT))
+        .withConnectionMaxIdleMillis(snsConfig.getLong("connectionMaxIdleMillis", ClientConfiguration.DEFAULT_CONNECTION_MAX_IDLE_MILLIS))
+        .withConnectionTimeout(snsConfig.getInt("connectionTimeout", ClientConfiguration.DEFAULT_CONNECTION_TIMEOUT))
         ;
+    
+    log_.info("Starting SNSPublisherManager in " + region_ + " with " + clientConfig.getMaxConnections() + " max connections...");
     
     snsClient_ = AmazonSNSClientBuilder.standard()
       .withRegion(region_)
-      .withClientConfiguration(config)
+      .withClientConfiguration(clientConfig)
       .build();
     
   }

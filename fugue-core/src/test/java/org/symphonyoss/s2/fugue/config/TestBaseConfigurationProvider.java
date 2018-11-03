@@ -98,6 +98,23 @@ public class TestBaseConfigurationProvider
     assertEquals("Test propety is not valid", TEST_NEST_TWO_PROPERTY_VALUE, provider.getString(TEST_NEST_TWO_PROPERTY_NAME));
   }
   
+  @Test
+  public void testNestSubConfig() throws NotFoundException
+  {
+    Configuration provider = new Configuration(json_);
+    
+    assertEquals("testNestSubConfig1 is not valid", TEST_NEST_TWO_PROPERTY_VALUE,
+        provider
+          .getConfiguration(NEST_ONE)
+          .getConfiguration(NEST_TWO)
+          .getString(TEST_PROPERTY_NAME));
+    
+    assertEquals("testNestSubConfig2 is not valid", TEST_NEST_TWO_PROPERTY_VALUE,
+        provider
+          .getConfiguration(NEST_ONE + "/" + NEST_TWO)
+          .getString(TEST_PROPERTY_NAME));
+  }
+  
   @Test(expected=NotFoundException.class)
   public void testMissingNestTwo() throws NotFoundException
   {

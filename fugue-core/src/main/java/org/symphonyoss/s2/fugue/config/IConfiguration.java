@@ -26,10 +26,19 @@ package org.symphonyoss.s2.fugue.config;
 import java.util.List;
 
 import org.symphonyoss.s2.common.exception.NotFoundException;
-import org.symphonyoss.s2.common.fault.ProgramFault;
 
 /**
  * A provider of configuration values.
+ * 
+ * The slash character is used as a separator to indicate levels of sub-configuration so
+ * 
+ * <code>getConfiguration("foo").getConfiguration("bar") == getConfiguration("foo/bar")</code>
+ * 
+ * and
+ * 
+ * <code>getConfiguration("foo").getRequiredString("bar") == getRequiredString("foo/bar")</code>
+ * 
+ * etc.
  * 
  * @author Bruce Skingle
  *
@@ -41,7 +50,7 @@ public interface IConfiguration
    * 
    * @param name The name of a sub-configuration.
    * 
-   * @return An IConfigurationProvider which can be used to access the sub-configuration.
+   * @return An IConfiguration which can be used to access the sub-configuration.
    */
   IConfiguration getConfiguration(String name);
 
@@ -52,7 +61,10 @@ public interface IConfiguration
    * @return      The value of the given property name.
    * 
    * @throws NotFoundException  If the property is not defined in the current configuration.
+   * 
+   * @deprecated use getRequiredString(name) or getString(name, defaultValue) - will be deleted after 2018-12-31
    */
+  @Deprecated
   String getString(String name) throws NotFoundException;
 
   /**
@@ -67,26 +79,60 @@ public interface IConfiguration
   /**
    * Return the value of the given configuration property.
    * 
-   * This method throws a ProgramFault if the value does not exist.
+   * This method throws a IllegalStateException if the value does not exist.
    * 
    * @param name  The name of the required property.
    * @return      The value of the given property name.
    * 
-   * @throws ProgramFault  If the property is not defined in the current configuration.
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
    */
   String getRequiredString(String name);
   
   /**
    * Return the value of the given configuration property as a long integer.
    * 
-   * This method throws a ProgramFault if the value does not exist.
+   * This method throws a IllegalStateException if the value does not exist.
    * 
    * @param name  The name of the required property.
    * @return      The value of the given property name.
    * 
-   * @throws ProgramFault  If the property is not defined in the current configuration.
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
    */
   long getRequiredLong(String name);
+  
+  /**
+   * Return the value of the given configuration property as a long integer.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   * @return              The value of the given property name.
+   * 
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
+   */
+  long getLong(String name, long defaultValue);
+  
+  /**
+   * Return the value of the given configuration property as an integer.
+   * 
+   * This method throws a IllegalStateException if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
+   */
+  int getRequiredInt(String name);
+  
+  /**
+   * Return the value of the given configuration property as an integer.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   * @return              The value of the given property name.
+   * 
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
+   */
+  int getInt(String name, int defaultValue);
 
   /**
    * Return the value of the given configuration property as a boolean.
@@ -112,12 +158,12 @@ public interface IConfiguration
   /**
    * Return the value of the given configuration property as a boolean.
    * 
-   * This method throws a ProgramFault if the value does not exist.
+   * This method throws a IllegalStateException if the value does not exist.
    * 
    * @param name  The name of the required property.
    * @return      The value of the given property name.
    * 
-   * @throws ProgramFault  If the property is not defined in the current configuration.
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
    */
   boolean getRequiredBoolean(String name);
 
@@ -134,7 +180,10 @@ public interface IConfiguration
    * @return      The value of the given property name.
    * 
    * @throws NotFoundException  If the property is not defined in the current configuration.
+   * 
+   * @deprecated use getRequiredListOfString(name) or getListOfString(name, defaultValue) - will be deleted after 2018-12-31
    */
+  @Deprecated
   List<String> getStringArray(String name) throws NotFoundException;
 
   /**
@@ -146,14 +195,42 @@ public interface IConfiguration
    * I would have preferred for the list to be represented as a JSON array, but in fact
    * it must be a string containing comma separated values.
    * 
-   * This method throws a ProgramFault if the value does not exist.
+   * This method throws a IllegalStateException if the value does not exist.
    * 
    * @param name  The name of the required property.
    * @return      The value of the given property name.
    * 
-   * @throws ProgramFault  If the property is not defined in the current configuration.
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
+   * @deprecated use getRequiredListOfString(name) or getListOfString(name, defaultValue) - will be deleted after 2018-12-31
    */
+  @Deprecated
   List<String> getRequiredStringArray(String name);
+
+  /**
+   * Return the value of the given configuration property as a list of Strings.
+   * 
+   * The value must be represented as a JSON array.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   * @return              The value of the given property name.
+   */
+  List<String> getListOfString(String name, List<String> defaultValue);
+
+  /**
+   * Return the value of the given configuration property as a list of Strings.
+   * 
+   * 
+   * The value must be represented as a JSON array.
+   * 
+   * This method throws a IllegalStateException if the value does not exist.
+   * 
+   * @param name  The name of the required property.
+   * @return      The value of the given property name.
+   * 
+   * @throws IllegalStateException  If the property is not defined in the current configuration.
+   */
+  List<String> getRequiredListOfString(String name);
 
   /**
    * @return The name of this configuration.

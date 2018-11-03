@@ -39,6 +39,11 @@ public class ConfigurationDelegator implements IConfiguration
 {
   private final IConfiguration delegate_;
 
+  /**
+   * Constructor.
+   * 
+   * @param delegate A delegate.
+   */
   public ConfigurationDelegator(IConfiguration delegate)
   {
     delegate_ = delegate;
@@ -51,6 +56,7 @@ public class ConfigurationDelegator implements IConfiguration
   }
 
   @Override
+  @Deprecated
   public String getString(String name) throws NotFoundException
   {
     return delegate_.getString(name);
@@ -93,12 +99,14 @@ public class ConfigurationDelegator implements IConfiguration
   }
 
   @Override
+  @Deprecated
   public List<String> getStringArray(String name) throws NotFoundException
   {
     return delegate_.getStringArray(name);
   }
 
   @Override
+  @Deprecated
   public List<String> getRequiredStringArray(String name)
   {
     return delegate_.getRequiredStringArray(name);
@@ -108,6 +116,36 @@ public class ConfigurationDelegator implements IConfiguration
   public String getName()
   {
     return delegate_.getName();
+  }
+
+  @Override
+  public long getLong(String name, long defaultValue)
+  {
+    return delegate_.getLong(name, defaultValue);
+  }
+
+  @Override
+  public int getRequiredInt(String name)
+  {
+    return delegate_.getRequiredInt(name);
+  }
+
+  @Override
+  public int getInt(String name, int defaultValue)
+  {
+    return delegate_.getInt(name, defaultValue);
+  }
+
+  @Override
+  public List<String> getListOfString(String name, List<String> defaultValue)
+  {
+    return delegate_.getListOfString(name, defaultValue);
+  }
+
+  @Override
+  public List<String> getRequiredListOfString(String name)
+  {
+    return delegate_.getRequiredListOfString(name);
   }
   
 }

@@ -23,7 +23,20 @@
 
 package org.symphonyoss.s2.fugue.config;
 
+/**
+ * A factory for IConfiguration instances.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IConfigurationFactory
 {
+  /**
+   * Load configuration from the given source.
+   * 
+   * @param variableName Name of an environment variable or property containing the source of config.
+   * 
+   * @return an IConfiguration.
+   */
   IConfiguration  newInstance(String variableName);
 }
