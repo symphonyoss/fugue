@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransientTransactionFault;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -59,7 +59,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
   private static final Integer FAILURE_CNT_LIMIT = 5;
 
-  private final ITraceContextFactory        traceFactory_;
+  private final ITraceContextTransactionFactory        traceFactory_;
   private final IThreadSafeErrorConsumer<P> unprocessableMessageConsumer_;
   private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
                                                                             .maximumSize(5000)
@@ -67,7 +67,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
                                                                             .build();
   
   protected AbstractSubscriberManager(INameFactory nameFactory, Class<T> type, 
-      ITraceContextFactory traceFactory,
+      ITraceContextTransactionFactory traceFactory,
       IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
   {
     super(nameFactory, type);
@@ -108,7 +108,7 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
    */
   protected abstract void stopSubscriptions();
   
-  protected ITraceContextFactory getTraceFactory()
+  protected ITraceContextTransactionFactory getTraceFactory()
   {
     return traceFactory_;
   }
@@ -124,6 +124,16 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     }
     
     setLifeCycleState(FugueLifecycleState.Running);
+  }
+
+  @Override
+  public void quiesce()
+  {
+    setLifeCycleState(FugueLifecycleState.Quiescing);
+    
+    stopSubscriptions();
+    
+    setLifeCycleState(FugueLifecycleState.Quiescent);
   }
 
   @Override

@@ -27,7 +27,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -70,7 +70,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubsc
    * @param tags          Tags to be applied to created queues.
    */
   public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId,
-      ITraceContextFactory traceFactory, Map<String, String> tags)
+      ITraceContextTransactionFactory traceFactory, Map<String, String> tags)
   {
     super(nameFactory, SqsSubscriberAdmin.class);
     

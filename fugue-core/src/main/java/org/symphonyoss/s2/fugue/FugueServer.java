@@ -125,6 +125,13 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       }
       
       @Override
+      public void quiesce()
+      {
+        // TODO Auto-generated method stub
+        
+      }
+
+      @Override
       public void stop()
       {
         stopFugueServer();

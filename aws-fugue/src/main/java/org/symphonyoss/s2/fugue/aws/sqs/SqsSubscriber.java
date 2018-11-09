@@ -29,7 +29,8 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.Counter;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
@@ -54,14 +55,14 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final SqsSubscriberManager                 manager_;
   private final AmazonSQS                            sqsClient_;
   private final String                               queueUrl_;
-  private final ITraceContextFactory                 traceFactory_;
+  private final ITraceContextTransactionFactory                 traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
   private final Counter                              counter_;
   private int                                        messageBatchSize_ = 10;
 
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
-      ITraceContextFactory traceFactory,
+      ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, Counter counter)
   {
     manager_ = manager;
@@ -217,23 +218,27 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
   private void handleMessage(Message message)
   {
-    ITraceContext trace = traceFactory_.createTransaction("SQS_Message", message.getMessageId());
-    
-    long retryTime = manager_.handleMessage(consumer_, message.getBody(), trace, message.getMessageId());
-    
-    if(retryTime < 0)
+    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("SQS_Message", message.getMessageId()))
     {
-      trace.trace("ABOUT_TO_ACK");
-      sqsClient_.deleteMessage(queueUrl_, message.getReceiptHandle());
-    }
-    else
-    {
-      trace.trace("ABOUT_TO_NACK");
+      ITraceContext trace = traceTransaction.open();
       
-      int visibilityTimout = (int) (retryTime / 1000);
+      long retryTime = manager_.handleMessage(consumer_, message.getBody(), trace, message.getMessageId());
       
-      sqsClient_.changeMessageVisibility(queueUrl_, message.getReceiptHandle(), visibilityTimout);
+      if(retryTime < 0)
+      {
+        trace.trace("ABOUT_TO_ACK");
+        sqsClient_.deleteMessage(queueUrl_, message.getReceiptHandle());
+        traceTransaction.finished();
+      }
+      else
+      {
+        trace.trace("ABOUT_TO_NACK");
+        
+        int visibilityTimout = (int) (retryTime / 1000);
+        
+        sqsClient_.changeMessageVisibility(queueUrl_, message.getReceiptHandle(), visibilityTimout);
+        traceTransaction.aborted();
+      }
     }
-    trace.finished();
   }
 }

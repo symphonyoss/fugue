@@ -44,6 +44,17 @@ public interface IFugueComponent
    */
   void stop();
   
+  /**
+   * Quiesce method called prior to server stop.
+   * 
+   * Components will be quiesced in the reverse order to that in which they were started.
+   * 
+   * When in the quiescent state components should complete in progress work but not initiate any new work.
+   */
+  default void quiesce()
+  {
+  }
+  
   default FugueComponentState getComponentState()
   {
     return FugueComponentState.Warn;

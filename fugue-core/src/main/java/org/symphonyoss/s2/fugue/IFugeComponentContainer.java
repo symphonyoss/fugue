@@ -109,6 +109,15 @@ public interface IFugeComponentContainer<T extends IFluent<T>> extends IFluent<T
   /**
    * Stop the container.
    * 
+   * Calls quiesce() on all registered components which implement IFugueComponent.
+   * 
+   * @return This (fluent method).
+   */
+  T quiesce();
+
+  /**
+   * Stop the container.
+   * 
    * Calls stop() on all registered components which implement IFugueComponent.
    * 
    * @return This (fluent method).

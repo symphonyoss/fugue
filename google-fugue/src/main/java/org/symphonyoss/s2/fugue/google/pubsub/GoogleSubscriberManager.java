@@ -14,8 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
-import org.symphonyoss.s2.fugue.counter.Counter;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
+import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -23,12 +24,45 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
+import com.google.api.gax.batching.FlowControlSettings;
+import com.google.api.gax.core.ExecutorProvider;
+import com.google.api.gax.core.InstantiatingExecutorProvider;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
+import com.google.cloud.pubsub.v1.Subscriber.Builder;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 
+import io.grpc.StatusRuntimeException;
+
+/**
+ * Subscriber manager for Google pubsub.
+ * 
+ * The following configuration is supported:
+ * 
+  "org":
+  {
+    "symphonyoss":
+    {
+      "s2":
+      {
+        "fugue":
+        {
+          "google":
+          {
+            "pubsub":
+            {
+              "subscriberThreadPoolSize": 40
+            }
+          }
+        }
+      }
+    }
+  }
+ * @author Bruce Skingle
+ *
+ */
 public class GoogleSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
@@ -37,35 +71,40 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
   /* package */ final boolean                startSubscriptions_;
 
   /* package */ List<Subscriber>             subscriberList_ = new LinkedList<>();
+  List<GoogleSubscriber>                     receiverList_  = new LinkedList<>();
   /* package */ int                          subscriptionErrorCnt_;
+  private final IConfiguration pubSubConfig_;
 
-  private Counter counter_;
+  private ICounter counter_;
+
 
   /**
    * Constructor.
    * 
+   * @param config                          Configuration
    * @param nameFactory                     A NameFactory.
    * @param projectId                       The Google project ID for the pubsub service.
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */
-  public GoogleSubscriberManager(INameFactory nameFactory, String projectId,
-      ITraceContextFactory traceFactory,
+  public GoogleSubscriberManager(IConfiguration config, INameFactory nameFactory, String projectId,
+      ITraceContextTransactionFactory traceFactory,
       IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
     super(nameFactory, GoogleSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
     
     projectId_ = projectId;
     startSubscriptions_ = true;
+    
+    pubSubConfig_ = config.getConfiguration("org/symphonyoss/s2/fugue/google/pubsub");
   }
   
-  public GoogleSubscriberManager withCounter(Counter counter)
+  public GoogleSubscriberManager withCounter(ICounter counter)
   {
     counter_ = counter;
     
     return this;
   }
-  
 
   @Override
   protected void startSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
@@ -87,9 +126,23 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
         throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
       }
       
+      long threadsPerSubscription = pubSubConfig_.getLong("subscriberThreadsPerSubscription", 10L);
+      int subscriberThreadPoolSize = pubSubConfig_.getInt("subscriberThreadPoolSize", 4);
+      long maxOutstandingElementCount = pubSubConfig_.getLong("maxOutstandingElementCount", threadsPerSubscription);
+      
+      threadsPerSubscription = 1L;
+      subscriberThreadPoolSize = 1;
+      maxOutstandingElementCount = 1L;
+      
+      log_.info("Starting subscriptions threadsPerSubscription=" + threadsPerSubscription +
+          " subscriberThreadPoolSize=" + subscriberThreadPoolSize +
+          " maxOutstandingElementCount=" + maxOutstandingElementCount +
+          " ...");
+
+      
       for(TopicName topicName : subscription.getTopicNames())
       {
-        log_.info("Subscribing to topic " + topicName + "...");
+        log_.info("Subscribing to topic " + topicName + " ...");
         
         SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
@@ -97,7 +150,19 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
         
         GoogleSubscriber        receiver                = new GoogleSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_);
         ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
-        Subscriber              subscriber              = Subscriber.newBuilder(projectSubscriptionName, receiver).build();
+        Builder                 builder                 = Subscriber.newBuilder(projectSubscriptionName, receiver);
+        
+        ExecutorProvider executorProvider =
+            InstantiatingExecutorProvider.newBuilder()
+              .setExecutorThreadCount(subscriberThreadPoolSize)
+              .build();
+        builder.setExecutorProvider(executorProvider);
+        
+        
+        
+        builder.setFlowControlSettings(FlowControlSettings.newBuilder()
+            .setMaxOutstandingElementCount(maxOutstandingElementCount).build());
+        Subscriber              subscriber              = builder.build();
         
         subscriber.addListener(new Subscriber.Listener()
         {
@@ -111,6 +176,7 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
         synchronized (subscriberList_)
         {
           subscriberList_.add(subscriber);
+          receiverList_.add(receiver);
         }
         
         subscriber.startAsync();
@@ -138,6 +204,10 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
         log_.error("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
         subscriptionErrorCnt_++;
       }
+      catch(StatusRuntimeException e)
+      {
+        log_.error("Subscription " + subscriptionName + " on topic " + topicName + " cannot be validated - lets hope....", e);
+      }
     }
     catch (IOException e)
     {
@@ -148,17 +218,28 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
   @Override
   protected void stopSubscriptions()
   {
-    for(Subscriber subscriber : subscriberList_)
+    synchronized (subscriberList_)
     {
-      try
+//      for(GoogleSubscriber receiver : receiverList_)
+//      {
+//        receiver.stop();
+//      }
+      
+      
+      for(Subscriber subscriber : subscriberList_)
       {
-        subscriber.stopAsync();
-        
-        log_.info("Stopped subscriber " + subscriber.getSubscriptionNameString());
-      }
-      catch(RuntimeException e)
-      {
-        log_.error("Failed to stop subscriber " + subscriber.getSubscriptionNameString(), e);
+        try
+        {
+          log_.info("Stopping subscriber " + subscriber.getSubscriptionNameString() + "...");
+          
+          subscriber.stopAsync().awaitTerminated();
+          
+          log_.info("Stopped subscriber " + subscriber.getSubscriptionNameString());
+        }
+        catch(RuntimeException e)
+        {
+          log_.error("Failed to stop subscriber " + subscriber.getSubscriptionNameString(), e);
+        }
       }
     }
   }

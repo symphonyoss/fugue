@@ -21,20 +21,46 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.counter;
+package org.symphonyoss.s2.fugue.core.trace;
 
 /**
- * Listener for instance counters.
+ * A NO OP implementation of ITraceContextTransaction
  * 
  * @author Bruce Skingle
  *
  */
-public interface IInstanceCountListener
+public class NoOpTraceContextTransaction implements ITraceContextTransaction
 {
   /**
-   * Called when the instance count changes.
-   * 
-   * @param instanceCount The new instance count.
+   * The singleton instance.
    */
-  void instanceCountChanged(int instanceCount);
+  public static final NoOpTraceContextTransaction INSTANCE = new NoOpTraceContextTransaction();
+  
+  private NoOpTraceContextTransaction()
+  {
+  }
+
+  @Override
+  public NoOpTraceContext open()
+  {
+    return NoOpTraceContext.INSTANCE;
+  }
+
+  @Override
+  public void finished()
+  {
+    // NO OP
+  }
+
+  @Override
+  public void aborted()
+  {
+    // NO OP
+  }
+
+  @Override
+  public void close()
+  {
+    // NO OP
+  }
 }

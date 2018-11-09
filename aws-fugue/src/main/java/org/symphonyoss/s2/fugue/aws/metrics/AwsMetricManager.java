@@ -24,6 +24,8 @@
 package org.symphonyoss.s2.fugue.aws.metrics;
 
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.symphonyoss.s2.fugue.IFugueServer;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
@@ -43,33 +45,47 @@ public class AwsMetricManager implements IMetricManager
 {
   private final AmazonCloudWatch cwClient_;
   private String nameSpace_;
+  private String tenantId_;
   
   public AwsMetricManager(IConfiguration config, INameFactory nameFactory)
   {
     cwClient_ =
         AmazonCloudWatchClientBuilder.defaultClient();
     
-    nameSpace_ = nameFactory.getServiceItemName(IFugueServer.getInstanceId()).toString();
+    nameSpace_ = nameFactory.getMultiTenantServiceName().toString();
+    tenantId_ = config.getString("id/tenantId", null);
     
     AwsSdkMetrics.enableDefaultMetrics();
 
 //  AwsSdkMetrics.setCredentialProvider(credentialsProvider);
 
-    AwsSdkMetrics.setMetricNameSpace(nameFactory.getServiceItemName(IFugueServer.getInstanceId()).toString());
+    AwsSdkMetrics.setMetricNameSpace(nameSpace_);
   }
 
   @Override
   public void putMetric(long timestamp, int count)
   {
-    Dimension dimension = new Dimension()
-        .withName("MessageType")
-        .withValue("PubSub");
-
+    List<Dimension> dimensions = new LinkedList<>();
+    
+    dimensions.add(new Dimension()
+      .withName("MessageType")
+      .withValue("PubSub"));
+    
+    if(tenantId_ != null)
+      dimensions.add(new Dimension()
+          .withName("Tenant")
+          .withValue(tenantId_));
+    
+    dimensions.add(new Dimension()
+      .withName("Instance")
+      .withValue(IFugueServer.getInstanceId()));
+    
     MetricDatum datum = new MetricDatum()
         .withMetricName("MessageCount")
         .withUnit(StandardUnit.Count)
         .withValue((double)count)
-        .withDimensions(dimension)
+        .withDimensions(
+            dimensions)
         .withTimestamp(new Date(timestamp))
         ;
 

@@ -21,44 +21,42 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.core.trace.log;
+package org.symphonyoss.s2.fugue.core.trace.file;
 
 import java.time.Instant;
 import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.hash.HashProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 
-class LoggerTraceContext implements ITraceContext
+class FileTraceContext implements ITraceContext
 {
-  private static final Logger             log_       = LoggerFactory.getLogger(LoggerTraceContext.class);
+  private final Hash                               id_ = HashProvider.getCompositeHashOf(UUID.randomUUID());
+  private final String                             subjectType_;
+  private final String                             subjectId_;
+  private final Hash                               hash_;
+  private final FileTraceContextTransactionFactory factory_;
+  private final String                             parentHash_;
+  private final Instant                            timestamp_;
 
-  private final String                    subjectType_;
-  private final String                    subjectId_;
-  private final Hash                      hash_;
-  private final LoggerTraceContextTransactionFactory factory_;
-  private final String                    parentHash_;
-  private final Instant                   timestamp_;
-  private final Hash                      id_        = HashProvider.getCompositeHashOf(UUID.randomUUID());
-
-  private final long                      start_     = System.currentTimeMillis();
-  private long                            lastEvent_ = start_;
+  private final long                               start_;
+  private long                                     lastEvent_;
   
-  LoggerTraceContext(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId)
+  public FileTraceContext(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, Instant timestamp)
   {
     factory_ = factory;
     parentHash_ = parentHash == null ? "" : parentHash.toString();
     subjectType_ = subjectType;
     subjectId_ = subjectId;
     hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
+    timestamp_ = timestamp;
+    
+    start_     = timestamp_.toEpochMilli();
+    lastEvent_ = start_;
     
     trace("STARTED");
-    
-    timestamp_ = Instant.now();
   }
 
   @Override
@@ -82,8 +80,8 @@ class LoggerTraceContext implements ITraceContext
     
     lastEvent_ = now;
     
-    log_.debug(String.format("TRACE %-50.50s %-50.50s %-20.20s %5d %5d %-30.30s %-40.40s %-20.20s %s", parentHash_, id_, operationId, operation, total, 
-        subjectType_, subjectId_, subjectType, subjectId));
+    factory_.printf("%-50.50s %-50.50s %-20.20s %5d %5d %-30.30s %-40.40s %-20.20s %s%n", parentHash_, id_, operationId, operation, total, 
+        subjectType_, subjectId_, subjectType, subjectId);
   }
 
   @Override
@@ -91,7 +89,7 @@ class LoggerTraceContext implements ITraceContext
   {
     factory_.increment(externalSubjectType);
     
-    return new LoggerTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId);
+    return new FileTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId, Instant.now());
   }
 
   @Override
@@ -103,12 +101,12 @@ class LoggerTraceContext implements ITraceContext
   @Override
   public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
   {
-    return createSubContext(externalSubjectType, externalSubjectId);
+    return new FileTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId, time);
   }
 
   @Override
   public Instant getTimestamp()
   {
-    return timestamp_;
+    return Instant.EPOCH;
   }
 }

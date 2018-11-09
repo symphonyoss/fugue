@@ -11,7 +11,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -46,7 +46,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
    * @param traceFactory                    A trace context factory.
    */
   public GoogleSubscriberAdmin(INameFactory nameFactory, String projectId,
-      ITraceContextFactory traceFactory)
+      ITraceContextTransactionFactory traceFactory)
   {
     super(nameFactory, GoogleSubscriberAdmin.class);
     

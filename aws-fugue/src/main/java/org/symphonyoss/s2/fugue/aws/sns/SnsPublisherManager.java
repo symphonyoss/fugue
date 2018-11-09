@@ -89,8 +89,6 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     
     IConfiguration snsConfig = config.getConfiguration("org/symphonyoss/s2/fugue/aws/sns");
     
-    com.amazonaws.metrics.internal.cloudwatch.DefaultMetricCollectorFactory foo;
-    
     ClientConfiguration clientConfig = new ClientConfiguration()
         .withMaxConnections(snsConfig.getInt("maxConnections", ClientConfiguration.DEFAULT_MAX_CONNECTIONS))
         .withClientExecutionTimeout(snsConfig.getInt("clientExecutionTimeout", ClientConfiguration.DEFAULT_CLIENT_EXECUTION_TIMEOUT))
@@ -159,8 +157,10 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   
   protected void send(String topicArn, String msg, ITraceContext trace)
   {
+    trace.trace("ABOUT_TO_PUBLISH0", "SNS_TOPIC", topicArn);
     try
     {
+      trace.trace("ABOUT_TO_PUBLISH1", "SNS_TOPIC", topicArn);
       PublishRequest publishRequest = new PublishRequest(topicArn, msg);
       trace.trace("ABOUT_TO_PUBLISH", "SNS_TOPIC", topicArn);
       snsClient_.publish(publishRequest);

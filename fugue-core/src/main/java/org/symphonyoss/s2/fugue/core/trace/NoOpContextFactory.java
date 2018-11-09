@@ -25,26 +25,23 @@ package org.symphonyoss.s2.fugue.core.trace;
 
 import java.time.Instant;
 
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
-
 /**
- * An ITraceContextFactory which emits messages to the log.
+ * An NO-OP implementation of ITraceContextFactory.
  * 
  * @author Bruce Skingle
  *
  */
-public class NoOpContextFactory implements ITraceContextFactory
+public class NoOpContextFactory implements ITraceContextTransactionFactory
 {
   @Override
-  public ITraceContext createTransaction(String subjectType, String subjectId)
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId)
   {
-    return NoOpTraceContext.INSTANCE;
+    return NoOpTraceContextTransaction.INSTANCE;
   }
 
   @Override
-  public ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime)
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime)
   {
-    return NoOpTraceContext.INSTANCE;
+    return NoOpTraceContextTransaction.INSTANCE;
   }
 }

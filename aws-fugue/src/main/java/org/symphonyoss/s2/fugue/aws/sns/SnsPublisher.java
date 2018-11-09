@@ -41,7 +41,9 @@ class SnsPublisher implements IPublisher<String>
   @Override
   public synchronized void consume(String item, ITraceContext trace)
   {
+    trace.trace("COnsume1");
     manager_.send(topicArn_, item, trace);
+    trace.trace("COnsume2");
   }
 
   @Override

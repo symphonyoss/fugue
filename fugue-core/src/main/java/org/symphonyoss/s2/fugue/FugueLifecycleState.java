@@ -43,10 +43,17 @@ public enum FugueLifecycleState
   /** Transitioning into Running */
   Starting(false),
   
+  /** Draining */
+  Quiescent(false),
+  
+
+  /** Transitioning into Quiescent */
+  Quiescing(false),
+  
   /** Stopped. */
   Stopped(false),
   
-  /** Initializing, not yet started. */
+  /** Initialising, not yet started. */
   Initializing(true)
   ;
   

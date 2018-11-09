@@ -21,20 +21,23 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.counter;
+package org.symphonyoss.s2.fugue.core.trace.file;
+
+import java.time.Instant;
+
+import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.core.trace.AbstractTraceContextTransaction;
 
 /**
- * Listener for instance counters.
+ * A logger based implementation of ITraceContextTransaction
  * 
  * @author Bruce Skingle
  *
  */
-public interface IInstanceCountListener
+class FileTraceContextTransaction extends AbstractTraceContextTransaction
 {
-  /**
-   * Called when the instance count changes.
-   * 
-   * @param instanceCount The new instance count.
-   */
-  void instanceCountChanged(int instanceCount);
+  FileTraceContextTransaction(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, Instant time)
+  {
+    super(new FileTraceContext(factory, parentHash, subjectType, subjectId, time));
+  }
 }

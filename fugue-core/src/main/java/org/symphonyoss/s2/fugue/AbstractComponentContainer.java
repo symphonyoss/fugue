@@ -23,9 +23,9 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +52,7 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
   private final List<IUrlPathServlet>          servlets_            = new ArrayList<>();
   private final List<ICommand>                 commands_            = new ArrayList<>();
 
-  private Stack<IFugueComponent>               stopStack_           = new Stack<>();
+  private ArrayDeque<IFugueComponent>          stopStack_           = new ArrayDeque<>();
   
   /**
    * Constructor.
@@ -147,11 +147,56 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
   @Override
   public T start()
   {
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+    {
+      public void run()
+      {
+        FugueLifecycleState state = getLifecycleState();
+        
+        log_.info("Shutdown hook called from state " + state);
+        
+        switch(state)
+        {
+          case Initializing:
+          case Running:
+          case Starting:
+            log_.info("Attempting clean shutdown...");
+            setLifeCycleState(FugueLifecycleState.Stopping);
+            
+            if(doStop())
+            {
+              log_.error("Faild to stop cleanly");
+              System.err.println("Faild to stop cleanly");
+            }
+            else
+            {
+              setLifeCycleState(FugueLifecycleState.Stopped);
+              log_.info("Attempting clean shutdown...DONE");
+              System.err.println("Attempting clean shutdown...DONE");
+            }
+            // FALL THROUGH
+              
+          default:
+            try
+            {
+              // Sleep for 5 seconds in the hope that threads have time to finish....
+              System.err.println("Sleep for 5 seconds...");
+              Thread.sleep(5000);
+            }
+            catch (InterruptedException e)
+            {
+              System.err.println("Sleep for 5 seconds...INTERRUPTED");
+              e.printStackTrace();
+            }
+            System.err.println("Sleep for 5 seconds...DONE");
+        }
+      }
+    }));
+    
     setLifeCycleState(FugueLifecycleState.Starting);
     
     for(IFugueComponent component : components_)
     {
-      stopStack_.push(component);
       try
       {
         
@@ -176,6 +221,44 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
     return self();
   }
   
+  @Override
+  public T quiesce()
+  {
+    RuntimeException error = null;
+    
+    setLifeCycleState(FugueLifecycleState.Quiescing);
+    
+    log_.info("Quiescing...");
+    
+    for(IFugueComponent component : stopStack_)
+    {
+      try
+      {
+        log_.debug("Quiesce " + component);
+        component.quiesce();
+      }
+      catch(RuntimeException ex)
+      {
+        log_.error("Unable to quiesce component " + 
+            component, ex);
+        // Don't re-throw because we want other components to have a chance to stop
+        
+        error = ex;
+      }
+    }
+    
+    if(error == null)
+    {
+      setLifeCycleState(FugueLifecycleState.Quiescent);
+    }
+    else
+    {
+      setLifeCycleState(FugueLifecycleState.Failed);
+      throw error;
+    }
+    return self();
+  }
+
   @Override
   public T stop()
   {

@@ -34,17 +34,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.fluent.Fluent;
-import org.symphonyoss.s2.common.fluent.IFluent;
+import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.metrics.IMetricManager;
 
-public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements Runnable
+/**
+ * An implementation of ICounter with lower and upper limit checking.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <T> The type of the concrete subclass for fluent methods.
+ */
+public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements Runnable, ICounter, IFugueComponent
 {
   private static final long                 PERIOD    = 5;
   private static final Logger               log_      = LoggerFactory.getLogger(Counter.class);
   private static ScheduledExecutorService   executor_ = Executors
       .newSingleThreadScheduledExecutor(new NamedThreadFactory("counter", true));
 
-  public boolean  debug_;
+  protected boolean  debug_;
   
   private int                               upperLimit_;
   private final int                         upperSampleCntWindow_;
@@ -73,6 +80,19 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
   private long currentMinute_;
   private int currentTotal_;
   
+  /**
+   * Constructor.
+   * 
+   * @param type                  The type of the concrete subclass for fluent methods.
+   * @param upperLimit            The upper limit of the counter for a single period.
+   * @param upperSampleCntWindow  The number of periods to consider for upper limit processing.
+   * @param upperSampleCntBreak   The number of periods in the sample window which need to be above the limit for the limit to be considered broken.
+   * @param upperCoolDown         The number of periods after a limit break before another break will be processed.
+   * @param lowerLimit            The lower limit of the counter for a single period.
+   * @param lowerSampleCntWindow  The number of periods to consider for lower limit processing.
+   * @param lowerSampleCntBreak   The number of periods in the sample window which need to be below the limit for the limit to be considered broken.
+   * @param lowerCoolDown         The number of periods after a limit break before another break will be processed.
+   */
   public Counter(Class<T> type, int upperLimit, int upperSampleCntWindow, int upperSampleCntBreak, int upperCoolDown, int lowerLimit,
       int lowerSampleCntWindow, int lowerSampleCntBreak, int lowerCoolDown)
   {
@@ -98,15 +118,16 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
     for(int i=0 ; i<counter_.length ; i++)
       counter_[i] = new AtomicInteger();
     
-    baseTime_ = getCurrentSecond();
-    accumulateTime_ = baseTime_;
     
-    executor_.scheduleAtFixedRate(this, PERIOD, 1, TimeUnit.SECONDS);
-
-    upperLimitValidTime_ = baseTime_ + upperCoolDown_ + upperSampleCntWindow_;
-    lowerLimitValidTime_ = baseTime_ + lowerCoolDown_ + lowerSampleCntWindow_;
   }
   
+  /**
+   * Agregate counts and pass to the given metric manager.
+   * 
+   * @param metricManager A metric manager.
+   * 
+   * @return This (fluent method)
+   */
   public T withMetricManager(IMetricManager metricManager)
   {
     metricManager_ = metricManager;
@@ -119,27 +140,54 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
     return System.currentTimeMillis() / 1000;
   }
 
+  /**
+   * 
+   * @return The upper limit.
+   */
   public int getUpperLimit()
   {
     return upperLimit_;
   }
 
-  public void setUpperLimit(int upperLimit)
+  /**
+   * Set the upper limit.
+   * 
+   * @param upperLimit The new upper limit.
+   * 
+   * @return This (fluent method)
+   */
+  public T withUpperLimit(int upperLimit)
   {
     upperLimit_ = upperLimit;
+    
+    return self();
   }
 
+  /**
+   * 
+   * @return The lower limit.
+   */
   public int getLowerLimit()
   {
     return lowerLimit_;
   }
 
-  public void setLowerLimit(int lowerLimit)
+  /**
+   * Set the lower limit.
+   * 
+   * @param lowerLimit The new lower limit.
+   * 
+   * @return This (fluent method)
+   */
+  public T withLowerLimit(int lowerLimit)
   {
     lowerLimit_ = lowerLimit;
+    
+    return self();
   }
 
-  public void increment(int count)
+  @Override
+  public T increment(int count)
   {
     AtomicInteger counter;
     
@@ -176,6 +224,8 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
     {
       counter.addAndGet(count);
     }
+    
+    return self();
   }
 
   private synchronized int getCounterIndex(long now)
@@ -408,6 +458,27 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
   protected abstract void lowerLimitBreak(int max);
 
   protected abstract void upperLimitBreak(int max);
+
+  @Override
+  public void start()
+  {
+    baseTime_ = getCurrentSecond();
+    accumulateTime_ = baseTime_;
+    
+    executor_.scheduleAtFixedRate(this, PERIOD, 1, TimeUnit.SECONDS);
+
+    upperLimitValidTime_ = baseTime_ + upperCoolDown_ + upperSampleCntWindow_;
+    lowerLimitValidTime_ = baseTime_ + lowerCoolDown_ + lowerSampleCntWindow_;
+  }
+
+  @Override
+  public void stop()
+  {
+    if(currentTotal_ > 0)
+    {
+      metricManager_.putMetric(currentMinute_ * 60000, currentTotal_);
+    }
+  }
 
 //  public static void main(String[] argv) throws InterruptedException
 //  {

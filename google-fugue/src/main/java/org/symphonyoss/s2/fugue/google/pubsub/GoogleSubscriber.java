@@ -24,19 +24,18 @@
 package org.symphonyoss.s2.fugue.google.pubsub;
 
 import java.time.Instant;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
-import org.symphonyoss.s2.fugue.counter.Counter;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
+import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
@@ -57,14 +56,32 @@ public class GoogleSubscriber implements MessageReceiver
   private static final ScheduledThreadPoolExecutor  executor_ = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("google-failed-msg-ack", true));
   private static final int MAX_PENDING_RETRY_COUNT = 10000;
   
+//  static PrintStream debug_;
+//  
+//  static
+//  {
+//    try
+//    {
+//      debug_ = new PrintStream(new FileOutputStream("/tmp/goog-" + new Date()));
+//    }
+//    catch (FileNotFoundException e)
+//    {
+//      e.printStackTrace();
+//      
+//      debug_ = System.err;
+//    }
+//  }
+  
   private final GoogleSubscriberManager                          manager_;
-  private final ITraceContextFactory                             traceFactory_;
+  private final ITraceContextTransactionFactory                             traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
   private final SubscriptionName                                 subscriptionName_;
-  private final Counter                                          counter_;
+  private final ICounter                                         counter_;
+  
+  private AtomicBoolean                                          stopped_ = new AtomicBoolean();
 
-  /* package */ GoogleSubscriber(GoogleSubscriberManager manager, ITraceContextFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, Counter counter)
+  /* package */ GoogleSubscriber(GoogleSubscriberManager manager, ITraceContextTransactionFactory traceFactory,
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, ICounter counter)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
@@ -76,14 +93,26 @@ public class GoogleSubscriber implements MessageReceiver
   @Override
   public void receiveMessage(PubsubMessage message, AckReplyConsumer consumer)
   {
-    try
+//    long now = System.currentTimeMillis();
+//    debug_.println(">S" + now);
+    Timestamp ts = message.getPublishTime();
+    
+    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),
+        Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
     {
-      counter_.increment(1);
+      ITraceContext trace = traceTransaction.open();
       
-      Timestamp ts = message.getPublishTime();
-      
-      ITraceContext trace = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),
-          Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos()));
+      if(stopped_.get())
+      {
+        System.err.println("NAKing message");
+        trace.trace("ABORTING_SHUTDOWN");
+        traceTransaction.aborted();
+        consumer.nack();
+        return;
+        
+      }
+      if(counter_ != null)
+        counter_.increment(1);
       
       trace.trace("RECEIVED");
       ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
@@ -102,8 +131,10 @@ public class GoogleSubscriber implements MessageReceiver
         else
           executor_.schedule(() -> {consumer.nack();}, retryTime, TimeUnit.MILLISECONDS);
       }
-      
-      trace.finished();
+      traceTransaction.finished();
+//      long end = System.currentTimeMillis();
+//      debug_.println(">F" + (end - now) + " " + trace.getSubjectId());
+//      debug_.flush();
     }
     catch (Throwable e)
     {
@@ -116,5 +147,10 @@ public class GoogleSubscriber implements MessageReceiver
        */
       log_.error("Failed to handle message from " + subscriptionName_, e);
     }
+  }
+
+  public void stop()
+  {
+    stopped_.set(true);
   }
 }

@@ -34,20 +34,11 @@ import org.symphonyoss.s2.common.hash.Hash;
  * The default implementation emits pubsub messages for each context and each event although other implementations
  * are possible.
  * 
- * Note that the act of creating a TraceContext automatically creates a STARTED operation, callers do not need to explicitly
- * register a start operation.
- * 
  * @author Bruce Skingle
  *
  */
 public interface ITraceContext
 {
-  /** Standard normal termination of context operation */
-  String FINISHED = "TRACE_FINISHED";
-
-  /** Standard abnormal termination of context operation */
-  String ABORTED = "TRACE_ABORTED";
-
   /**
    * 
    * @return The Hash (ID) of this Trace Context.
@@ -88,22 +79,6 @@ public interface ITraceContext
   void trace(String operationId, String subjectType, String subjectId);
 
   /**
-   * Convenience method to record the normal completion of a trace context.
-   */
-  default void finished()
-  {
-    trace(FINISHED);
-  }
-  
-  /**
-   * Convenience method to record the abnormal completion of a trace context.
-   */
-  default void aborted()
-  {
-    trace(ABORTED);
-  }
-
-  /**
    * Create a sub-context relating to the processing of the given external subject.
    *  
    * @param subjectType The type of the subject of this process.
@@ -111,7 +86,7 @@ public interface ITraceContext
    * 
    * @return A new ITraceContext which is a sub-context of the current context.
    */
-  ITraceContext createSubContext(String subjectType, String subjectId);
+  ITraceContextTransaction createSubContext(String subjectType, String subjectId);
 
   /**
    * Create a sub-context relating to the processing of the given external subject.
@@ -122,5 +97,5 @@ public interface ITraceContext
    * 
    * @return A new ITraceContext which is a sub-context of the current context.
    */
-  ITraceContext createSubContext(String subjectType, String subjectId, Instant time);
+  ITraceContextTransaction createSubContext(String subjectType, String subjectId, Instant time);
 }

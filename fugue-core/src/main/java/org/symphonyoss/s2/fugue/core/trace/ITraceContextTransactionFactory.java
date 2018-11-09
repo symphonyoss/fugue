@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
  * @author Bruce Skingle
  *
  */
-public interface ITraceContextFactory
+public interface ITraceContextTransactionFactory
 {
   /**
    * Create a TraceTransaction with the given subject.
@@ -43,8 +43,8 @@ public interface ITraceContextFactory
    * 
    * @return  An ITraceTransaction.
    */
-  ITraceContext createTransaction(@Nullable String subjectType, @Nullable String subjectId);
+  ITraceContextTransaction createTransaction(@Nullable String subjectType, @Nullable String subjectId);
 
-  ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime);
+  ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime);
 
 }

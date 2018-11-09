@@ -24,17 +24,20 @@
 package org.symphonyoss.s2.fugue.counter;
 
 /**
- * Listener for instance counters.
+ * A counter for collecting metrics.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IInstanceCountListener
+public interface ICounter
 {
   /**
-   * Called when the instance count changes.
+   * Increment the counter by the given number.
    * 
-   * @param instanceCount The new instance count.
+   * @param count The increment.
+   * 
+   * @return this (fluent method).
    */
-  void instanceCountChanged(int instanceCount);
+  ICounter increment(int count);
+
 }

@@ -23,28 +23,19 @@
 
 package org.symphonyoss.s2.fugue.core.trace.log;
 
-import java.time.Instant;
-
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.core.trace.AbstractTraceContextTransaction;
 
 /**
- * An ITraceContextFactory which emits messages to the log.
+ * A logger based implementation of ITraceContextTransaction
  * 
  * @author Bruce Skingle
  *
  */
-public class LoggerTraceContextFactory implements ITraceContextFactory
+public class LoggerTraceContextTransaction extends AbstractTraceContextTransaction
 {
-  @Override
-  public ITraceContext createTransaction(String subjectType, String subjectId)
+  LoggerTraceContextTransaction(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId)
   {
-    return new LoggerTraceContext(subjectType, subjectId);
-  }
-
-  @Override
-  public ITraceContext createTransaction(String subjectType, String subjectId, Instant startTime)
-  {
-    return new LoggerTraceContext(subjectType, subjectId);
+    super(new LoggerTraceContext(factory, parentHash, subjectType, subjectId));
   }
 }

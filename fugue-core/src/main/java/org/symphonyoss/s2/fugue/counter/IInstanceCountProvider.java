@@ -23,9 +23,31 @@
 
 package org.symphonyoss.s2.fugue.counter;
 
+/**
+ * Provider of instance counts.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IInstanceCountProvider
 {
+  /**
+   * Add the given listener.
+   * 
+   * @param listener A listener.
+   */
   void addListener(IInstanceCountListener listener);
+  
+  /**
+   * Remove the given listener if it is currently registered.
+   * 
+   * @param listener A listener.
+   */
   void removeListener(IInstanceCountListener listener);
+  
+  /**
+   * 
+   * @return The current instance count.
+   */
   int getInstanceCount();
 }

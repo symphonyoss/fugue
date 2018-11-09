@@ -31,15 +31,24 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.List;
 
+import org.symphonyoss.s2.fugue.naming.Name;
+
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
+import com.amazonaws.services.identitymanagement.model.AddUserToGroupRequest;
+import com.amazonaws.services.identitymanagement.model.AttachGroupPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.AttachUserPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.AttachedPolicy;
 import com.amazonaws.services.identitymanagement.model.CreateAccessKeyRequest;
+import com.amazonaws.services.identitymanagement.model.CreateGroupRequest;
 import com.amazonaws.services.identitymanagement.model.CreateUserRequest;
+import com.amazonaws.services.identitymanagement.model.GetGroupRequest;
 import com.amazonaws.services.identitymanagement.model.GetUserRequest;
+import com.amazonaws.services.identitymanagement.model.Group;
+import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListAttachedUserPoliciesRequest;
+import com.amazonaws.services.identitymanagement.model.ListGroupsForUserRequest;
 import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
@@ -72,6 +81,7 @@ public class CreateUserForPolicy
   private String accountId_;
   private String policyArn_;
   private File credentialsFile_;
+  private String groupName_;
 
   private void run() throws IOException
   {
@@ -93,6 +103,7 @@ public class CreateUserForPolicy
  
     userName_      = baseName_ + "-user";
     policyName_    = baseName_ + "-policy";
+    groupName_    = baseName_ + "-group";
     
     GetCallerIdentityResult callerIdentity = sts_.getCallerIdentity(new GetCallerIdentityRequest());
     
@@ -105,20 +116,28 @@ public class CreateUserForPolicy
     String currentUsersHomeDir = System.getProperty("user.home");
     credentialsFile_ = new File(currentUsersHomeDir + File.separator + ".aws"  + File.separator + "credentials");
     
+    createGroup(groupName_, policyArn_);
+    createUser();
+    
+    
+  }
+  
+  private void createUser() throws IOException
+  {
     try
     {
       iam_.getUser(new GetUserRequest()
         .withUserName(userName_))
         .getUser();
       
-      List<AttachedPolicy> policies = iam_.listAttachedUserPolicies(new ListAttachedUserPoliciesRequest()
-          .withUserName(userName_)).getAttachedPolicies();
+      List<Group> groups = iam_.listGroupsForUser(new ListGroupsForUserRequest()
+          .withUserName(userName_)).getGroups();
       
-      for(AttachedPolicy policy : policies)
+      for(Group group : groups)
       {
-        if(policy.getPolicyName().equals(policyName_))
+        if(group.getGroupName().equals(groupName_))
         {
-          System.out.println("User \"" + userName_ + "\" exists and has policy \"" + policyName_ + "\"");
+          System.out.println("User \"" + userName_ + "\" is already a member of group \"" + groupName_ + "\"");
           return;
         }
       }
@@ -153,10 +172,55 @@ public class CreateUserForPolicy
         }
     }
     
-    System.out.println("Adding policy \"" + policyName_ + "\" to user \"" + userName_ + "\"");
+//    System.out.println("Adding policy \"" + policyName_ + "\" to user \"" + userName_ + "\"");
+//    
+//    iam_.attachUserPolicy(new AttachUserPolicyRequest()
+//        .withUserName(userName_)
+//        .withPolicyArn(policyArn_));
     
-    iam_.attachUserPolicy(new AttachUserPolicyRequest()
+    System.out.println("Adding user \"" + userName_ + "\" to group \"" + groupName_ + "\"");
+    
+    iam_.addUserToGroup(new AddUserToGroupRequest()
         .withUserName(userName_)
-        .withPolicyArn(policyArn_));
+        .withGroupName(groupName_));
+  }
+
+  private String createGroup(String groupName, String policyArn)
+  { 
+    try
+    {
+      iam_.getGroup(new GetGroupRequest()
+        .withGroupName(groupName))
+        .getGroup();
+      
+      List<AttachedPolicy> policies = iam_.listAttachedGroupPolicies(new ListAttachedGroupPoliciesRequest()
+          .withGroupName(groupName)).getAttachedPolicies();
+      
+      for(AttachedPolicy policy : policies)
+      {
+        if(policy.getPolicyArn().equals(policyArn))
+        {
+          System.out.println("Group already has policy attached.");
+          return groupName;
+        }
+      }
+      
+      System.out.println("Attaching policy to existing group...");
+    }
+    catch(NoSuchEntityException e)
+    {
+      System.out.println("Fugue environment group does not exist, creating...");
+      
+      iam_.createGroup(new CreateGroupRequest()
+          .withGroupName(groupName)).getGroup();
+      
+      System.out.println("Created group " + groupName);
+    }
+    
+    iam_.attachGroupPolicy(new AttachGroupPolicyRequest()
+        .withPolicyArn(policyArn)
+        .withGroupName(groupName));
+    
+    return groupName;
   }
 }

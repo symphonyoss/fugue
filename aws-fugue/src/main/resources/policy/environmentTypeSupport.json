@@ -136,13 +136,15 @@
       "Resource": "arn:aws:sns:*:*:sym-s2-${environmentType}-*"
     },
     {
-        "Sid": "AutoScale",
+        "Sid": "AllowAll",
         "Effect": "Allow",
         "Action": [
             "application-autoscaling:DescribeScalableTargets",
             "application-autoscaling:DescribeScalingActivities",
             "application-autoscaling:DescribeScalingPolicies",
-            "application-autoscaling:DescribeScheduledActions"
+            "application-autoscaling:DescribeScheduledActions",
+            "cloudwatch:PutDashboard",
+            "cloudwatch:DeleteDashboards"
         ],
         "Resource": "*"
     }

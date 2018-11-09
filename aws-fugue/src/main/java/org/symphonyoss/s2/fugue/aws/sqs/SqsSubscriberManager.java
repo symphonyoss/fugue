@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextFactory;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.Counter;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
@@ -47,6 +48,30 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 /**
  * AWS SQS implementation of SubscriberManager.
  * 
+ * The following configurayion is supported
+ * 
+ * 
+  "org":
+  {
+    "symphonyoss":
+    {
+      "s2":
+      {
+        "fugue":
+        {
+          "aws":
+          {
+            "sqs":
+            {
+              "subscriberThreadPoolSize": 40,
+              "handlerThreadPoolSize": 360
+            }
+          }
+        }
+      }
+    }
+  }
+ * 
  * @author Bruce Skingle
  *
  */
@@ -58,6 +83,7 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   private final boolean                       startSubscriptions_;
   private final LinkedBlockingQueue<Runnable> executorQueue_  = new LinkedBlockingQueue<Runnable>();
   private final LinkedBlockingQueue<Runnable> handlerQueue_  = new LinkedBlockingQueue<Runnable>();
+  private final IConfiguration                sqsConfig_;
 
   private AmazonSQS                           sqsClient_;
   private int                                 subscriberThreadPoolSize_;
@@ -71,13 +97,14 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   /**
    * Constructor.
    * 
+   * @param config                          Configuration
    * @param nameFactory                     A NameFactory.
    * @param region                          The AWS region in which to operate.
    * @param traceFactory                    A trace context factory.
    * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */
-  public SqsSubscriberManager(INameFactory nameFactory, String region,
-      ITraceContextFactory traceFactory,
+  public SqsSubscriberManager(IConfiguration config, INameFactory nameFactory, String region,
+      ITraceContextTransactionFactory traceFactory,
       IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
   {
     super(nameFactory, SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
@@ -88,7 +115,8 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
     region_ = region;
     startSubscriptions_ = true;
     
-    
+
+    sqsConfig_ = config.getConfiguration("org/symphonyoss/s2/fugue/aws/sqs");
   }
   
   public SqsSubscriberManager withCounter(Counter counter)
@@ -103,12 +131,13 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   {
     if(startSubscriptions_)
     {
-      subscriberThreadPoolSize_ = 5 * getTotalSubscriptionCnt();
+      
+      subscriberThreadPoolSize_ = sqsConfig_.getInt("subscriberThreadPoolSize", 5 * getTotalSubscriptionCnt());
       subscriberExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, subscriberThreadPoolSize_,
           0L, TimeUnit.MILLISECONDS,
           executorQueue_, new NamedThreadFactory("SQS-subscriber"));
       
-      handlerThreadPoolSize_ = 9 * subscriberThreadPoolSize_;
+      handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
       handlerExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, handlerThreadPoolSize_,
           0L, TimeUnit.MILLISECONDS,
           handlerQueue_, new NamedThreadFactory("SQS-handler", true));

@@ -86,6 +86,11 @@ public interface INameFactory
 
   CredentialName getCredentialName(String tenantId, String owner);
 
+  /**
+   * 
+   * @return the service name with no tenant element even if we are in a tenant specific context.
+   */
+  ServiceName getMultiTenantServiceName();
   ServiceName getServiceName();
 
   CredentialName getFugueCredentialName(String owner);
