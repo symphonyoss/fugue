@@ -133,16 +133,18 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
     {
       
       subscriberThreadPoolSize_ = sqsConfig_.getInt("subscriberThreadPoolSize", 5 * getTotalSubscriptionCnt());
+      handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
+
+      log_.info("Starting SQSSubscriberManager in " + region_ + " with " + subscriberThreadPoolSize_ + " subscriber threads and " + handlerThreadPoolSize_ + " handler threads...");
+
       subscriberExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, subscriberThreadPoolSize_,
           0L, TimeUnit.MILLISECONDS,
           executorQueue_, new NamedThreadFactory("SQS-subscriber"));
       
-      handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
       handlerExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, handlerThreadPoolSize_,
           0L, TimeUnit.MILLISECONDS,
           handlerQueue_, new NamedThreadFactory("SQS-handler", true));
       
-      log_.info("Starting SQSSubscriberManager in " + region_ + " with " + subscriberThreadPoolSize_ + " subscriber threads and " + handlerThreadPoolSize_ + " handler threads...");
     }
     else
     {

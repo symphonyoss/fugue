@@ -115,11 +115,13 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
   @Override
   protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
   {
-    log_.debug("About to delete subscription " + subscriptionName + " on topic " + topicName);
+    log_.info("About to delete subscription " + subscriptionName + " on topic " + topicName);
     
     try
     {
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
+      
+      log_.info("About to get subscription with name " + projectSubscriptionName);
       
       subscriptionAdminClient_.getSubscription(projectSubscriptionName);
       
@@ -129,6 +131,8 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
       }
       else
       {
+        log_.info("About to delete subscription with name " + projectSubscriptionName);
+        
           subscriptionAdminClient_.deleteSubscription(projectSubscriptionName);
           
           log_.info("Subscription " + subscriptionName + " deleted.");

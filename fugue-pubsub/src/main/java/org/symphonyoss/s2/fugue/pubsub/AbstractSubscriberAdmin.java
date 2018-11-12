@@ -25,6 +25,8 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.Collection;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
@@ -41,6 +43,8 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  */
 public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IFluent<T>> extends AbstractSubscriberBase<P, T> implements ISubscriberAdmin
 {
+  private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
+  
   protected AbstractSubscriberAdmin(INameFactory nameFactory, Class<T> type)
   {
     super(nameFactory, type);
@@ -90,6 +94,7 @@ public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IF
   @Override
   public void createSubscriptions(boolean dryRun)
   {
+    log_.info("About to create subscriptions...");
     for(SubscriptionImpl<?> subscription : getSubscribers())
     {
       for(TopicName topicName : subscription.getObsoleteTopicNames())
@@ -109,10 +114,14 @@ public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IF
   @Override
   public void deleteSubscriptions(boolean dryRun)
   {
+    log_.info("About to delete subscriptions...");
     for(SubscriptionImpl<?> subscription : getSubscribers())
     {
+
+      log_.info("About to delete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
       for(TopicName topicName : subscription.getObsoleteTopicNames())
       {
+        log_.info("About to delete subscriptions... topicName=" + topicName);
         deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
       }
       
