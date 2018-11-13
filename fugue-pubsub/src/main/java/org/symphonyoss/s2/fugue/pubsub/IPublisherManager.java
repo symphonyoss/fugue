@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import org.symphonyoss.s2.fugue.naming.TopicName;
+
 /**
  * A pub/sub publisher manager.
  * 
@@ -51,6 +53,15 @@ public interface IPublisherManager<P>
    */
   IPublisher<P> getPublisherByName(String serviceId, String topicId);
 
+  /**
+   * Get the IPublisher for the given named topic.
+   * 
+   * @param topicName   The name of a topic.
+   * 
+   * @return The publisher for the required topic.
+   */
+  IPublisher<P> getPublisherByName(TopicName topicName);
+  
 //  /**
 //   * Return the publisher for trace events.
 //   * 

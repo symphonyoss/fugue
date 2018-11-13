@@ -96,7 +96,7 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
     projectId_ = projectId;
     startSubscriptions_ = true;
     
-    pubSubConfig_ = config.getConfiguration("org/symphonyoss/s2/fugue/google/pubsub");
+    pubSubConfig_ = config.getConfiguration(GoogleConstants.CONFIG_PATH);
   }
   
   public GoogleSubscriberManager withCounter(ICounter counter)

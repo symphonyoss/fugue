@@ -21,7 +21,7 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.aws.sns;
+package org.symphonyoss.s2.fugue.google.pubsub;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,18 +32,15 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
-
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.metrics.AwsSdkMetrics;
-import com.amazonaws.services.sns.AmazonSNS;
-import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.PublishRequest;
 
 /**
  * Amazon SNS implementation of PublisherManager.
@@ -51,9 +48,9 @@ import com.amazonaws.services.sns.model.PublishRequest;
  * @author Bruce Skingle
  *
  */
-public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPublisherManager>
+public class GooglePublisherManager extends AbstractPublisherManager<String, GooglePublisherManager>
 {
-  private static final Logger          log_              = LoggerFactory.getLogger(SnsPublisherManager.class);
+  private static final Logger          log_              = LoggerFactory.getLogger(GooglePublisherManager.class);
 
   static final int                     MAX_MESSAGE_SIZE  = 256 * 1024;                                        // 256K
 
@@ -64,45 +61,25 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   private Map<TopicName, SnsPublisher> publisherNameMap_ = new HashMap<>();
   private List<SnsPublisher>           publishers_       = new ArrayList<>();
 
-  /* package */ AmazonSNS              snsClient_;
-
   /**
    * Constructor.
    * 
-   * @param config      The configuration provider.
-   * @param nameFactory A name factory.
-   * @param region      The AWS region to use.
-   * @param accountId   The AWS numeric account ID 
+   * @param config                          Configuration
+   * @param nameFactory                     A NameFactory.
+   * @param projectId                       The Google project ID for the pubsub service.
+   * @param traceFactory                    A trace context factory.
+   * @param unprocessableMessageConsumer    Consumer for invalid messages.
    */
-  public SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId)
+  public GooglePublisherManager(IConfiguration config, INameFactory nameFactory, String projectId,
+      ITraceContextTransactionFactory traceFactory,
+      IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
-    this(config, nameFactory, region, accountId, false);
-  }
-  
-  protected SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId, boolean initialize)
-  {
-    super(nameFactory, SnsPublisherManager.class);
+    super(nameFactory, GoogleSubscriberManager.class);
     
-    region_ = region;
-    accountId_ = accountId;
-    initialize_ = initialize;
+    projectId_ = projectId;
+    startSubscriptions_ = true;
     
-    IConfiguration snsConfig = config.getConfiguration("org/symphonyoss/s2/fugue/aws/sns");
-    
-    ClientConfiguration clientConfig = new ClientConfiguration()
-        .withMaxConnections(snsConfig.getInt("maxConnections", ClientConfiguration.DEFAULT_MAX_CONNECTIONS))
-        .withClientExecutionTimeout(snsConfig.getInt("clientExecutionTimeout", ClientConfiguration.DEFAULT_CLIENT_EXECUTION_TIMEOUT))
-        .withConnectionMaxIdleMillis(snsConfig.getLong("connectionMaxIdleMillis", ClientConfiguration.DEFAULT_CONNECTION_MAX_IDLE_MILLIS))
-        .withConnectionTimeout(snsConfig.getInt("connectionTimeout", ClientConfiguration.DEFAULT_CONNECTION_TIMEOUT))
-        ;
-    
-    log_.info("Starting SNSPublisherManager in " + region_ + " with " + clientConfig.getMaxConnections() + " max connections...");
-    
-    snsClient_ = AmazonSNSClientBuilder.standard()
-      .withRegion(region_)
-      .withClientConfiguration(clientConfig)
-      .build();
-    
+    pubSubConfig_ = config.getConfiguration(GoogleConstants.CONFIG_PATH);
   }
 
   @Override
@@ -140,7 +117,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   }
 
   @Override
-  public synchronized IPublisher<String> getPublisherByName(TopicName topicName)
+  protected synchronized IPublisher<String> getPublisherByName(TopicName topicName)
   {
     assertConfigurable();
     
