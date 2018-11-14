@@ -140,7 +140,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   }
 
   @Override
-  protected synchronized IPublisher<String> getPublisherByName(TopicName topicName)
+  public synchronized IPublisher<String> getPublisherByName(TopicName topicName)
   {
     assertConfigurable();
     

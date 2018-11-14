@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -91,6 +93,8 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   
   private ThreadPoolExecutor                  subscriberExecutor_;
   private ThreadPoolExecutor                  handlerExecutor_;
+  
+  private List<SqsSubscriber>                 subscribers_ = new LinkedList<>();
 
   private Counter counter_;
   
@@ -132,9 +136,12 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
     if(startSubscriptions_)
     {
       
-      subscriberThreadPoolSize_ = sqsConfig_.getInt("subscriberThreadPoolSize", 5 * getTotalSubscriptionCnt());
-      handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
+//      subscriberThreadPoolSize_ = sqsConfig_.getInt("subscriberThreadPoolSize", 8 * getTotalSubscriptionCnt());
+//      handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
 
+      subscriberThreadPoolSize_ = 8 * getTotalSubscriptionCnt();
+      handlerThreadPoolSize_ = 9 * subscriberThreadPoolSize_;
+      
       log_.info("Starting SQSSubscriberManager in " + region_ + " with " + subscriberThreadPoolSize_ + " subscriber threads and " + handlerThreadPoolSize_ + " handler threads...");
 
       subscriberExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, subscriberThreadPoolSize_,
@@ -174,6 +181,7 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
         
         SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer(), counter_);
 
+        subscribers_.add(subscriber);
         log_.info("Subscribing to " + subscriptionName + "...");
       
         submit(subscriber, true);
@@ -186,6 +194,9 @@ public class SqsSubscriberManager extends AbstractSubscriberManager<String, SqsS
   {
     if(startSubscriptions_)
     {
+      for(SqsSubscriber subscriber : subscribers_)
+        subscriber.stop();
+      
       subscriberExecutor_.shutdown();
       
       try {

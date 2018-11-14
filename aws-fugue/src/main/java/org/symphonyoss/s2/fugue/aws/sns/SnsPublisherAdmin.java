@@ -92,6 +92,14 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   }
   
   @Override
+  public IPublisher<String> getPublisherByName(TopicName topicName)
+  {
+    topics_.add(topicName);
+    
+    return super.getPublisherByName(topicName);
+  }
+
+  @Override
   public void createTopics(boolean dryRun)
   {
     for(TopicName topicName : topics_)

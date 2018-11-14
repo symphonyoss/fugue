@@ -61,6 +61,8 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final Counter                              counter_;
   private int                                        messageBatchSize_ = 10;
 
+  private boolean running_;
+
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, Counter counter)
@@ -72,6 +74,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
+    running_ = true;
   }
   
   class NonIdleSubscriber implements Runnable
@@ -91,29 +94,35 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
   public void run(boolean runIfIdle)
   {
-    if(runIfIdle)
+    if(isRunning())
     {
-      try
+      if(runIfIdle)
       {
-        while(true)
+        try
+        {
+          while(isRunning())
+          {
+            getSomeMessages();
+          }
+        }
+        finally
+        {
+          if(runIfIdle && isRunning())
+          {
+            // This "can't happen"
+            log_.error("Main SQS thread returned, rescheduling...");
+            
+            manager_.submit(this, true);
+          }
+        }
+      }
+      else
+      {
+        if(isRunning())
         {
           getSomeMessages();
         }
       }
-      finally
-      {
-        if(runIfIdle)
-        {
-          // This "can't happen"
-          log_.error("Main SQS thread returned, rescheduling...");
-          
-          manager_.submit(this, true);
-        }
-      }
-    }
-    else
-    {
-      getSomeMessages();
     }
   }
   
@@ -146,7 +155,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         default:
           if(counter_ != null)
             counter_.increment(messages.size());
-          if(messages.size() > 2)
+          if(messages.size() > 2 && isRunning())
           {
             manager_.submit(nonIdleSubscriber_, false);
 
@@ -240,5 +249,15 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
         traceTransaction.aborted();
       }
     }
+  }
+
+  synchronized boolean isRunning()
+  {
+    return running_;
+  }
+  
+  public synchronized void stop()
+  {
+    running_ = false;
   }
 }

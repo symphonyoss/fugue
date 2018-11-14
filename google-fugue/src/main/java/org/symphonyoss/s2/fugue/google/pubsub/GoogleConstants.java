@@ -21,33 +21,11 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.google.pubsub;
 
-import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.TopicName;
-
-public abstract class AbstractPublisherManager<P,T extends AbstractPublisherManager<P,T>>
-  extends FugueLifecycleComponent<T>
-  implements IPublisherManager<P>
+public class GoogleConstants
 {
-  protected final INameFactory nameFactory_;
 
-  protected AbstractPublisherManager(INameFactory nameFactory, Class<T> type)
-  {
-    super(type);
-    nameFactory_ = nameFactory;
-  }
-  
-  @Override
-  public IPublisher<P> getPublisherByName(String topicId)
-  {
-    return getPublisherByName(nameFactory_.getTopicName(topicId));
-  }
+  public static final String CONFIG_PATH = "org/symphonyoss/s2/fugue/google/pubsub";
 
-  @Override
-  public IPublisher<P> getPublisherByName(String serviceId, String topicId)
-  {
-    return getPublisherByName(nameFactory_.getTopicName(serviceId, topicId));
-  }
 }

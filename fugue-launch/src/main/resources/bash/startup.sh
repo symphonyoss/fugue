@@ -8,9 +8,8 @@ function start() {
     echo ENVIRONMENT START-------------------------------------------------------------------------------------
     env
     echo ENVIRONMENT END---------------------------------------------------------------------------------------
-#     echo FUGUE_CONFIG START-------------------------------------------------------------------------------------
-#     cat ${FUGUE_CONFIG}
-#     echo FUGUE_CONFIG END---------------------------------------------------------------------------------------
+    
+    java_args=${FUGUE_JAVA_ARGS:--Xms256m -Xmx256m}
     echo "Starting services..."
     
     echo WORKSPACE is ${WORKSPACE}
@@ -18,10 +17,10 @@ function start() {
     echo pwd
     pwd
     
-    echo java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml -Xms256m -Xmx256m $1
+    echo java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml ${java_args} $1
     
-    #java -cp "/maven/lib/*" "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" -Dlog4j.configurationFile=/maven/log4j2.xml $1
-    java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml -Xms256m -Xmx256m $1
+    #java -cp "/maven/lib/*" "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005" -Dlog4j.configurationFile=/maven/log4j2.xml ${java_args} $1
+    java -cp "/maven/lib/*" -Dlog4j.configurationFile=/maven/log4j2.xml ${java_args} $1
 }
 
 echo VERSION 1.1

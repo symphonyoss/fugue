@@ -153,25 +153,29 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
       {
         FugueLifecycleState state = getLifecycleState();
         
-        log_.info("Shutdown hook called from state " + state);
+        System.err.println("Shutdown hook called from state " + state);
         
         switch(state)
         {
           case Initializing:
           case Running:
           case Starting:
-            log_.info("Attempting clean shutdown...");
+            System.err.println("Attempting to quiesce...");
+            quiesce();
+            // fall through
+            
+          case Quiescing:
+          case Quiescent:
+            System.err.println("Attempting clean shutdown...");
             setLifeCycleState(FugueLifecycleState.Stopping);
             
             if(doStop())
             {
-              log_.error("Faild to stop cleanly");
               System.err.println("Faild to stop cleanly");
             }
             else
             {
               setLifeCycleState(FugueLifecycleState.Stopped);
-              log_.info("Attempting clean shutdown...DONE");
               System.err.println("Attempting clean shutdown...DONE");
             }
             // FALL THROUGH
