@@ -37,12 +37,13 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPublisherManager;
+import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 import com.amazonaws.ClientConfiguration;
-import com.amazonaws.metrics.AwsSdkMetrics;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
+import com.amazonaws.services.sns.model.MessageAttributeValue;
 import com.amazonaws.services.sns.model.PublishRequest;
 
 /**
@@ -51,7 +52,7 @@ import com.amazonaws.services.sns.model.PublishRequest;
  * @author Bruce Skingle
  *
  */
-public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPublisherManager>
+public class SnsPublisherManager extends AbstractPublisherManager<SnsPublisherManager>
 {
   private static final Logger          log_              = LoggerFactory.getLogger(SnsPublisherManager.class);
 
@@ -140,7 +141,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
   }
 
   @Override
-  public synchronized IPublisher<String> getPublisherByName(TopicName topicName)
+  public synchronized IPublisher getPublisherByName(TopicName topicName)
   {
     assertConfigurable();
     
@@ -155,14 +156,27 @@ public class SnsPublisherManager extends AbstractPublisherManager<String, SnsPub
     return publisher;
   }
   
-  protected void send(String topicArn, String msg, ITraceContext trace)
+  protected void send(String topicArn, IPubSubMessage pubSubMessage, ITraceContext trace)
   {
     trace.trace("ABOUT_TO_PUBLISH0", "SNS_TOPIC", topicArn);
     try
     {
-      trace.trace("ABOUT_TO_PUBLISH1", "SNS_TOPIC", topicArn);
-      PublishRequest publishRequest = new PublishRequest(topicArn, msg);
-      trace.trace("ABOUT_TO_PUBLISH", "SNS_TOPIC", topicArn);
+      PublishRequest publishRequest = new PublishRequest(topicArn, pubSubMessage.getPayload());
+      
+      if(!pubSubMessage.getAttributes().isEmpty())
+      {
+        Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
+        
+        for(Entry<String, String> entry : pubSubMessage.getAttributes().entrySet())
+        {
+          messageAttributes.put(entry.getKey(), new MessageAttributeValue()
+              .withDataType("String")
+              .withStringValue(entry.getValue()));
+        }
+        
+        publishRequest.withMessageAttributes(messageAttributes);
+      }
+      
       snsClient_.publish(publishRequest);
       trace.trace("PUBLISHED", "SNS_TOPIC", topicArn);
     }

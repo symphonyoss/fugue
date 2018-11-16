@@ -1218,11 +1218,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
         
         String regionalHostName = getNameFactory()
-            .getServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
         
         String wildCardHostName = getNameFactory()
             .withRegionId("*")
-            .getServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
         
         //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
         
@@ -1234,7 +1234,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
   //      registerTaskDef(name, port, healthCheckPath, tenantId);
         
-        createService(regionalHostName, targetGroupArn, name, port, instances);
+        createService(regionalHostName, targetGroupArn, name, port, instances, paths);
       }
       catch(RuntimeException e)
       {
@@ -1375,6 +1375,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                       )
                   )
               );
+            
+            return;
           }
           catch(PriorRequestNotCompleteException e)
           {
@@ -1513,54 +1515,60 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withRuleArn(rule.getRuleArn())
               );
         }
-        
-        if(conditionHost == null)
+        else
         {
-          if(remainingPaths.remove(conditionPath))
+          if(conditionHost == null)
           {
-            if(targetGroupArn.equals(actionTargetArn))
+            if(remainingPaths.remove(conditionPath))
             {
-              log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
+              if(targetGroupArn.equals(actionTargetArn))
+              {
+                log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
+              }
+              else
+              {
+                log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
+                // the rule is there but it's wrong
+                elbClient_.modifyRule(new ModifyRuleRequest()
+                    .withRuleArn(rule.getRuleArn())
+                    .withActions(new Action()
+                        .withTargetGroupArn(targetGroupArn)
+                        .withType(ActionTypeEnum.Forward)
+                        )
+                    );
+              }
             }
             else
             {
-              log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
-              // the rule is there but it's wrong
-              elbClient_.modifyRule(new ModifyRuleRequest()
-                  .withActions(new Action()
-                      .withTargetGroupArn(targetGroupArn)
-                      .withType(ActionTypeEnum.Forward)
-                      )
-                  );
-            }
-          }
-          else
-          {
-            // this rule is for a path which we don't have, maybe it was removed from the service
-            
-            if(!"default".equals(rule.getPriority()))
-            {
-              log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
+              // this rule is for a path which we don't have, maybe it was removed from the service
               
-              elbClient_.deleteRule(new DeleteRuleRequest()
-                  .withRuleArn(rule.getRuleArn())
-                  );
+              if(!"default".equals(rule.getPriority()))
+              {
+                if(targetGroupArn.equals(actionTargetArn))
+                {
+                  log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
+                  
+                  elbClient_.deleteRule(new DeleteRuleRequest()
+                      .withRuleArn(rule.getRuleArn())
+                      );
+                }
+              }
             }
           }
-        }
-        
-        if(!"default".equals(rule.getPriority()))
-        {
-          try
+          
+          if(!"default".equals(rule.getPriority()))
           {
-            int p = Integer.parseInt(rule.getPriority());
-            
-            if(p >= priority)
-              priority = p + 1;
-          }
-          catch(NumberFormatException e)
-          {
-            log_.warn("Rule has non-integer priority: " + rule);
+            try
+            {
+              int p = Integer.parseInt(rule.getPriority());
+              
+              if(p >= priority)
+                priority = p + 1;
+            }
+            catch(NumberFormatException e)
+            {
+              log_.warn("Rule has non-integer priority: " + rule);
+            }
           }
         }
       }
@@ -1691,7 +1699,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //          );
     }
 
-    private void createService(String regionalHostName, String targetGroupArn, String name, int port, int desiredCnt)
+    private void createService(String regionalHostName, String targetGroupArn, String name, int port, int desiredCnt, Collection<String> paths)
     {
       log_.info("Cluster name is " + clusterName_);
       
@@ -1726,7 +1734,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         log_.info("Creating service " + serviceName + "...");
         
-        CreateServiceResult createServiceResult = ecsClient_.createService(new CreateServiceRequest()
+        CreateServiceRequest request = new CreateServiceRequest()
             .withCluster(clusterName_)
             .withServiceName(serviceName.toString())
             .withTaskDefinition(serviceName.toString())
@@ -1735,12 +1743,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     //            .withMaximumPercent(maximumPercent)
     //            .withMinimumHealthyPercent(minimumHealthyPercent)
     //            )
+            ;
+        
+        if(!paths.isEmpty())
+        {
+          request
             .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
-                .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
-                .withContainerPort(port)
-                .withTargetGroupArn(targetGroupArn)
-                )
+              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
+              .withContainerPort(port)
+              .withTargetGroupArn(targetGroupArn)
             );
+        }
+        CreateServiceResult createServiceResult = ecsClient_.createService(request);
         
         log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
       }

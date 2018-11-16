@@ -25,11 +25,10 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.TopicName;
 
-public abstract class AbstractPublisherManager<P,T extends AbstractPublisherManager<P,T>>
+public abstract class AbstractPublisherManager<T extends AbstractPublisherManager<T>>
   extends FugueLifecycleComponent<T>
-  implements IPublisherManager<P>
+  implements IPublisherManager
 {
   protected final INameFactory nameFactory_;
 
@@ -40,13 +39,13 @@ public abstract class AbstractPublisherManager<P,T extends AbstractPublisherMana
   }
   
   @Override
-  public IPublisher<P> getPublisherByName(String topicId)
+  public IPublisher getPublisherByName(String topicId)
   {
     return getPublisherByName(nameFactory_.getTopicName(topicId));
   }
 
   @Override
-  public IPublisher<P> getPublisherByName(String serviceId, String topicId)
+  public IPublisher getPublisherByName(String serviceId, String topicId)
   {
     return getPublisherByName(nameFactory_.getTopicName(serviceId, topicId));
   }

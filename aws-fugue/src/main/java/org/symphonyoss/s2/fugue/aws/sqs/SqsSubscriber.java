@@ -31,8 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.counter.Counter;
-import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
+import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
@@ -58,14 +57,14 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final ITraceContextTransactionFactory                 traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
-  private final Counter                              counter_;
+  private final ICounter                             counter_;
   private int                                        messageBatchSize_ = 10;
 
-  private boolean running_;
+  private boolean running_ = true;
 
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<String> consumer, Counter counter)
+      IThreadSafeRetryableConsumer<String> consumer, ICounter counter)
   {
     manager_ = manager;
     sqsClient_ = sqsClient;
@@ -74,7 +73,6 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
-    running_ = true;
   }
   
   class NonIdleSubscriber implements Runnable
@@ -84,6 +82,11 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     {
       SqsSubscriber.this.run(false);
     }
+  }
+
+  public String getQueueUrl()
+  {
+    return queueUrl_;
   }
 
   @Override
@@ -227,7 +230,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
   private void handleMessage(Message message)
   {
-    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("SQS_Message", message.getMessageId()))
+    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message.getMessageId()))
     {
       ITraceContext trace = traceTransaction.open();
       

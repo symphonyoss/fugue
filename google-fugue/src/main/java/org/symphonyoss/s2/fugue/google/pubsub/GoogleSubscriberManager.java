@@ -12,26 +12,20 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
-import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
+import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
-import com.google.api.gax.batching.FlowControlSettings;
-import com.google.api.gax.core.ExecutorProvider;
-import com.google.api.gax.core.InstantiatingExecutorProvider;
 import com.google.api.gax.rpc.NotFoundException;
-import com.google.cloud.pubsub.v1.Subscriber;
-import com.google.cloud.pubsub.v1.Subscriber.Builder;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 
 import io.grpc.StatusRuntimeException;
@@ -53,7 +47,8 @@ import io.grpc.StatusRuntimeException;
           {
             "pubsub":
             {
-              "subscriberThreadPoolSize": 40
+              "subscriberThreadPoolSize": 40,
+              "handlerThreadPoolSize": 360
             }
           }
         }
@@ -63,20 +58,13 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractPullSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
-  /* package */ final String                 projectId_;
-  /* package */ final boolean                startSubscriptions_;
+  private final String                 projectId_;
 
-  /* package */ List<Subscriber>             subscriberList_ = new LinkedList<>();
-  List<GoogleSubscriber>                     receiverList_  = new LinkedList<>();
-  /* package */ int                          subscriptionErrorCnt_;
-  private final IConfiguration pubSubConfig_;
-
-  private ICounter counter_;
-
+  private List<GoogleSubscriber> subscribers_ = new LinkedList<>();
 
   /**
    * Constructor.
@@ -91,23 +79,13 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
       ITraceContextTransactionFactory traceFactory,
       IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
   {
-    super(nameFactory, GoogleSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
+    super(config, nameFactory, GoogleSubscriberManager.class, traceFactory, unprocessableMessageConsumer, GoogleConstants.CONFIG_PATH);
     
     projectId_ = projectId;
-    startSubscriptions_ = true;
-    
-    pubSubConfig_ = config.getConfiguration(GoogleConstants.CONFIG_PATH);
-  }
-  
-  public GoogleSubscriberManager withCounter(ICounter counter)
-  {
-    counter_ = counter;
-    
-    return this;
   }
 
   @Override
-  protected void startSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
+  protected void initSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
   { 
     for(TopicName topicName : subscription.getTopicNames())
     {
@@ -116,73 +94,78 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
       SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
       validateSubcription(topicName, subscriptionName);
-      
+
+      GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
+          getTraceFactory(), subscription.getConsumer(), getCounter());
+
+      subscribers_.add(subscriber);
+      log_.info("Subscribing to " + subscriptionName + "...");  
     }
     
-    if(startSubscriptions_)
-    {
-      if(subscriptionErrorCnt_>0)
-      {
-        throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
-      }
-      
-      long threadsPerSubscription = pubSubConfig_.getLong("subscriberThreadsPerSubscription", 10L);
-      int subscriberThreadPoolSize = pubSubConfig_.getInt("subscriberThreadPoolSize", 4);
-      long maxOutstandingElementCount = pubSubConfig_.getLong("maxOutstandingElementCount", threadsPerSubscription);
-      
-      threadsPerSubscription = 1L;
-      subscriberThreadPoolSize = 1;
-      maxOutstandingElementCount = 1L;
-      
-      log_.info("Starting subscriptions threadsPerSubscription=" + threadsPerSubscription +
-          " subscriberThreadPoolSize=" + subscriberThreadPoolSize +
-          " maxOutstandingElementCount=" + maxOutstandingElementCount +
-          " ...");
-
-      
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        log_.info("Subscribing to topic " + topicName + " ...");
-        
-        SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-
-        validateSubcription(topicName, subscriptionName);
-        
-        GoogleSubscriber        receiver                = new GoogleSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_);
-        ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
-        Builder                 builder                 = Subscriber.newBuilder(projectSubscriptionName, receiver);
-        
-        ExecutorProvider executorProvider =
-            InstantiatingExecutorProvider.newBuilder()
-              .setExecutorThreadCount(subscriberThreadPoolSize)
-              .build();
-        builder.setExecutorProvider(executorProvider);
-        
-        
-        
-        builder.setFlowControlSettings(FlowControlSettings.newBuilder()
-            .setMaxOutstandingElementCount(maxOutstandingElementCount).build());
-        Subscriber              subscriber              = builder.build();
-        
-        subscriber.addListener(new Subscriber.Listener()
-        {
-          @Override
-          public void failed(Subscriber.State from, Throwable failure)
-          {
-            log_.error("Error for " + projectSubscriptionName + " from " + from, failure);
-          }
-        }, MoreExecutors.directExecutor());
-        
-        synchronized (subscriberList_)
-        {
-          subscriberList_.add(subscriber);
-          receiverList_.add(receiver);
-        }
-        
-        subscriber.startAsync();
-        log_.info("Subscribing to " + projectSubscriptionName + "...");
-      }
-    }
+//    if(startSubscriptions_)
+//    {
+//      if(subscriptionErrorCnt_>0)
+//      {
+//        throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
+//      }
+//      
+//      long threadsPerSubscription = pubSubConfig_.getLong("subscriberThreadsPerSubscription", 10L);
+//      int subscriberThreadPoolSize = pubSubConfig_.getInt("subscriberThreadPoolSize", 4);
+//      long maxOutstandingElementCount = pubSubConfig_.getLong("maxOutstandingElementCount", threadsPerSubscription);
+//      
+//      threadsPerSubscription = 1L;
+//      subscriberThreadPoolSize = 1;
+//      maxOutstandingElementCount = 1L;
+//      
+//      log_.info("Starting subscriptions threadsPerSubscription=" + threadsPerSubscription +
+//          " subscriberThreadPoolSize=" + subscriberThreadPoolSize +
+//          " maxOutstandingElementCount=" + maxOutstandingElementCount +
+//          " ...");
+//
+//      
+//      for(TopicName topicName : subscription.getTopicNames())
+//      {
+//        log_.info("Subscribing to topic " + topicName + " ...");
+//        
+//        SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
+//
+//        validateSubcription(topicName, subscriptionName);
+//        
+//        GoogleSubscriber        receiver                = new GoogleSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_);
+//        ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
+//        Builder                 builder                 = Subscriber.newBuilder(projectSubscriptionName, receiver);
+//        
+////        ExecutorProvider executorProvider =
+////            InstantiatingExecutorProvider.newBuilder()
+////              .setExecutorThreadCount(subscriberThreadPoolSize)
+////              .build();
+////        builder.setExecutorProvider(executorProvider);
+////        
+////        
+////        
+////        builder.setFlowControlSettings(FlowControlSettings.newBuilder()
+////            .setMaxOutstandingElementCount(maxOutstandingElementCount).build());
+//        Subscriber              subscriber              = builder.build();
+//        
+//        subscriber.addListener(new Subscriber.Listener()
+//        {
+//          @Override
+//          public void failed(Subscriber.State from, Throwable failure)
+//          {
+//            log_.error("Error for " + projectSubscriptionName + " from " + from, failure);
+//          }
+//        }, MoreExecutors.directExecutor());
+//        
+//        synchronized (subscriberList_)
+//        {
+//          subscriberList_.add(subscriber);
+//          receiverList_.add(receiver);
+//        }
+//        
+//        subscriber.startAsync();
+//        log_.info("Subscribing to " + projectSubscriptionName + "...");
+//      }
+//    }
   }
   
   private void validateSubcription(TopicName topicName, SubscriptionName subscriptionName)
@@ -196,13 +179,10 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
         com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
         
         log_.info("Subscription " + subscriptionName + " on topic " + topicName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
-        
-        
       }
       catch(NotFoundException e)
       {   
-        log_.error("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
-        subscriptionErrorCnt_++;
+        throw new ProgramFault("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
       }
       catch(StatusRuntimeException e)
       {
@@ -216,31 +196,50 @@ public class GoogleSubscriberManager extends AbstractSubscriberManager<Immutable
   }
 
   @Override
-  protected void stopSubscriptions()
+  protected void startSubscriptions()
   {
-    synchronized (subscriberList_)
+    for(GoogleSubscriber subscriber : subscribers_)
     {
-//      for(GoogleSubscriber receiver : receiverList_)
-//      {
-//        receiver.stop();
-//      }
-      
-      
-      for(Subscriber subscriber : subscriberList_)
-      {
-        try
-        {
-          log_.info("Stopping subscriber " + subscriber.getSubscriptionNameString() + "...");
-          
-          subscriber.stopAsync().awaitTerminated();
-          
-          log_.info("Stopped subscriber " + subscriber.getSubscriptionNameString());
-        }
-        catch(RuntimeException e)
-        {
-          log_.error("Failed to stop subscriber " + subscriber.getSubscriptionNameString(), e);
-        }
-      }
+      log_.info("Starting subscription to " + subscriber.getSubscriptionName() + "...");
+      submit(subscriber, true);
     }
   }
+
+  @Override
+  protected void stopSubscriptions()
+  {
+     for(GoogleSubscriber subscriber : subscribers_)
+        subscriber.stop();
+      
+     super.stopSubscriptions();
+  }
+
+//  @Override
+//  protected void stopSubscriptions()
+//  {
+//    synchronized (subscriberList_)
+//    {
+////      for(GoogleSubscriber receiver : receiverList_)
+////      {
+////        receiver.stop();
+////      }
+//      
+//      
+//      for(Subscriber subscriber : subscriberList_)
+//      {
+//        try
+//        {
+//          log_.info("Stopping subscriber " + subscriber.getSubscriptionNameString() + "...");
+//          
+//          subscriber.stopAsync().awaitTerminated();
+//          
+//          log_.info("Stopped subscriber " + subscriber.getSubscriptionNameString());
+//        }
+//        catch(RuntimeException e)
+//        {
+//          log_.error("Failed to stop subscriber " + subscriber.getSubscriptionNameString(), e);
+//        }
+//      }
+//    }
+//  }
 }

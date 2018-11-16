@@ -72,6 +72,9 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
   {
     super(nameFactory, type);
     
+    if(unprocessableMessageConsumer==null)
+      throw new NullPointerException("unprocessableMessageConsumer is required.");
+
     traceFactory_ = traceFactory;
     unprocessableMessageConsumer_ = unprocessableMessageConsumer;
   }
@@ -101,8 +104,8 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     return super.withSubscription(consumer, subscriptionId, topicNames);
   }
 
-  protected abstract void startSubscription(SubscriptionImpl<P> subscription);
-
+  protected abstract void initSubscription(SubscriptionImpl<P> subscription);
+  protected abstract void startSubscriptions();
   /**
    * Stop all subscribers.
    */
@@ -120,8 +123,10 @@ public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<
     
     for(SubscriptionImpl<P> s : getSubscribers())
     {
-      startSubscription(s);
+      initSubscription(s);
     }
+    
+    startSubscriptions();
     
     setLifeCycleState(FugueLifecycleState.Running);
   }

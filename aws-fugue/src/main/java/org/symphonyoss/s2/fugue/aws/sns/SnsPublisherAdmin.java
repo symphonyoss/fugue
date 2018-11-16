@@ -49,7 +49,7 @@ import com.amazonaws.services.sns.model.Subscription;
  * @author Bruce Skingle
  *
  */
-public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisherAdmin<String>
+public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisherAdmin
 {
   private static final Logger log_            = LoggerFactory.getLogger(SnsPublisherAdmin.class);
 
@@ -75,7 +75,7 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   }
 
   @Override
-  public IPublisher<String> getPublisherByName(String topicId)
+  public IPublisher getPublisherByName(String topicId)
   {
     obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
     topics_.add(nameFactory_.getTopicName(topicId));
@@ -84,7 +84,7 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   }
 
   @Override
-  public IPublisher<String> getPublisherByName(String serviceId, String topicId)
+  public IPublisher getPublisherByName(String serviceId, String topicId)
   {
     topics_.add(nameFactory_.getTopicName(serviceId, topicId));
     
@@ -92,7 +92,7 @@ public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisher
   }
   
   @Override
-  public IPublisher<String> getPublisherByName(TopicName topicName)
+  public IPublisher getPublisherByName(TopicName topicName)
   {
     topics_.add(topicName);
     

@@ -25,7 +25,28 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeConsumer;
 
-public interface IPublisher<P> extends IThreadSafeConsumer<P>
+/**
+ * A pubsub publisher.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public interface IPublisher extends IThreadSafeConsumer<IPubSubMessage>
 {
+  /**
+   * 
+   * @return The size of the largest message which can be sent in bytes.
+   */
   int getMaximumMessageSize();
+  
+  /**
+   * Consume the given item.
+   * 
+   * A normal return from this method indicates that the item has been fully processed,
+   * and the provider can discard the item. In the event that the item cannot be
+   * processed then the implementation must throw some kind of Exception.
+   * 
+   * @param item The item to be consumed.
+   */
+  void consume(IPubSubMessage item);
 }

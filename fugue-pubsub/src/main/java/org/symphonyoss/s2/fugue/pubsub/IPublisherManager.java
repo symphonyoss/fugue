@@ -29,10 +29,8 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  * A pub/sub publisher manager.
  * 
  * @author Bruce Skingle
- *
- * @param <P> The type of the payload published.
  */
-public interface IPublisherManager<P>
+public interface IPublisherManager
 {
   /**
    * Get the IPublisher for the given named topic.
@@ -41,7 +39,7 @@ public interface IPublisherManager<P>
    * 
    * @return The publisher for the required topic.
    */
-  IPublisher<P> getPublisherByName(String topicId);
+  IPublisher getPublisherByName(String topicId);
 
   /**
    * Get the IPublisher for the given named topic.
@@ -51,7 +49,7 @@ public interface IPublisherManager<P>
    * 
    * @return The publisher for the required topic.
    */
-  IPublisher<P> getPublisherByName(String serviceId, String topicId);
+  IPublisher getPublisherByName(String serviceId, String topicId);
 
   /**
    * Get the IPublisher for the given named topic.
@@ -60,14 +58,7 @@ public interface IPublisherManager<P>
    * 
    * @return The publisher for the required topic.
    */
-  IPublisher<P> getPublisherByName(TopicName topicName);
-  
-//  /**
-//   * Return the publisher for trace events.
-//   * 
-//   * @return the publisher for trace events.
-//   */
-//  IPublisher<P> getTracePublisher();
+  IPublisher getPublisherByName(TopicName topicName);
   
   /**
    * Return the maximum allowed size of a message in bytes.

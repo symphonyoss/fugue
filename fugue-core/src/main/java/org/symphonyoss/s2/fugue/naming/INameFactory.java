@@ -92,6 +92,7 @@ public interface INameFactory
    */
   ServiceName getMultiTenantServiceName();
   ServiceName getServiceName();
+  ServiceName getRegionalServiceName();
 
   CredentialName getFugueCredentialName(String owner);
 

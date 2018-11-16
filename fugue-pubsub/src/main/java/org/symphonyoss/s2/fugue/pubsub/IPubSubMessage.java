@@ -23,28 +23,38 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import java.util.Map;
+
+import javax.annotation.Nonnull;
+
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+
 /**
- * The admin variation of an IPublisherManager which can be used to bootstrap an environment.
+ * A payload sent or received over a pub sub channel.
  * 
  * @author Bruce Skingle
  */
-public interface IPublisherAdmin extends IPublisherManager
+public interface IPubSubMessage
 {
-  /**
-   * Create topics for all registered publishers.
-   * 
-   * @param dryRun If true then don't change anything
-   */
-  void createTopics(boolean dryRun);
+  static final String PAYLOAD_TYPE_ATTRIBUTE = "payloadType";
+  static final String TENANT_ID_ATTRIBUTE    = "tenantId";
   
   /**
-   * Delete topics for all registered publishers.
    * 
-   * @param dryRun If true then don't change anything
+   * @return The message payload
    */
-  void deleteTopics(boolean dryRun);
+  @Nonnull String getPayload();
   
+  /**
+   * 
+   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
+   */
+  @Nonnull Map<String, String> getAttributes();
 
-  
-  void deleteObsoleteTopic(String topicId);
+  /**
+   * 
+   * @return The trace context.
+   */
+  @Nonnull ITraceContext getTraceContext();
+
 }

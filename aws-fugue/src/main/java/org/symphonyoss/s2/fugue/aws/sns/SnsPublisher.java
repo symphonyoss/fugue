@@ -24,10 +24,11 @@
 package org.symphonyoss.s2.fugue.aws.sns;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 
-class SnsPublisher implements IPublisher<String>
+class SnsPublisher implements IPublisher
 {
   private final String              topicArn_;
   private final SnsPublisherManager manager_;
@@ -39,11 +40,15 @@ class SnsPublisher implements IPublisher<String>
   }
 
   @Override
-  public synchronized void consume(String item, ITraceContext trace)
+  public void consume(IPubSubMessage item, ITraceContext trace)
   {
-    trace.trace("COnsume1");
     manager_.send(topicArn_, item, trace);
-    trace.trace("COnsume2");
+  }
+
+  @Override
+  public void consume(IPubSubMessage item)
+  {
+    manager_.send(topicArn_, item, item.getTraceContext());
   }
 
   @Override
