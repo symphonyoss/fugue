@@ -344,6 +344,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         tenantContextList_.add(createContext(tenant_, createNameFactory(environmentType_, environment_, realm_, region_, tenant_, service_)));
     }
 
+    log_.info("FugueDeploy v1.1");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
@@ -898,6 +899,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
+    protected abstract void configureServiceNetwork();
+    
     protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances);
     
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule);
@@ -1140,6 +1143,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployServiceContainers(IBatch batch)
     {
+      configureServiceNetwork();
+      
       for(String name : serviceContainerMap_.keySet())
       {
         JsonObject<?> container = serviceContainerMap_.get(name);

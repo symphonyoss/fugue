@@ -46,6 +46,7 @@ import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
+import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -1203,20 +1204,57 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       return createPolicy(name, loadTemplateFromResource(fileName));
     }
+    
+    @Override
+    protected void configureServiceNetwork()
+    {
+      try
+      {
+        String  tenantId        = getTenantId();
+//        Name    targetGroupName = getNameFactory().getServiceItemName(name);
+        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+        
+//        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+        
+        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+        
+        String regionalHostName = getNameFactory()
+            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+        
+//        String wildCardHostName = getNameFactory()
+//            .withRegionId("*")
+//            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+        
+        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+        
+//        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+        
+        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+        
+        getOrCreateCluster();
+        
+      }
+      catch(RuntimeException e)
+      {
+        e.printStackTrace();
+        
+        throw e;
+      }
+    }
 
     @Override
     protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances)
     {
       try
       {
-        String  tenantId        = getTenantId();
+//        String  tenantId        = getTenantId();
         Name    targetGroupName = getNameFactory().getServiceItemName(name);
-        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
-        
+//        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+//        
         String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-        
-        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
-        
+//        
+//        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+//        
         String regionalHostName = getNameFactory()
             .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
         
@@ -1224,11 +1262,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withRegionId("*")
             .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
         
-        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-        
+//        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+//        
         configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
-        
-        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+//        
+//        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
         
         getOrCreateCluster();
         
@@ -1305,6 +1343,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         zoneId = zoneId.substring(12);
       
       String sourceDomain = source + ".";
+      String setIdentifier = multiValue ? getNameFactory().getRegionName().toString().toLowerCase() : null;
+      
       
       ListResourceRecordSetsResult result = r53Clinet_.listResourceRecordSets(new ListResourceRecordSetsRequest()
           .withHostedZoneId(zoneId)
@@ -1312,13 +1352,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           );
       
       List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
+      boolean                 exists        = false;
       boolean                 ok            = false;
       
       for(ResourceRecordSet recordSet : recordSetList)
       {
-        if(sourceDomain.equals(recordSet.getName()))
+        if(sourceDomain.equals(recordSet.getName()) 
+            && strEquals(recordSet.getSetIdentifier(), setIdentifier)
+            )
         {
           log_.info("R53 record set exists for " + source);
+          exists = true;
           
           for(ResourceRecord record : recordSet.getResourceRecords())
           {
@@ -1356,7 +1400,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         {
           resourceRecordSet
             .withWeight(1L)
-            .withSetIdentifier(getNameFactory().getRegionName().toString().toLowerCase())
+            .withSetIdentifier(setIdentifier)
             ;
         }
         
@@ -1370,7 +1414,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withHostedZoneId(zoneId)
               .withChangeBatch(new ChangeBatch()
                   .withChanges(new Change()
-                      .withAction(ChangeAction.CREATE)
+                      .withAction(ChangeAction.UPSERT)
                       .withResourceRecordSet(resourceRecordSet)
                       )
                   )
@@ -1398,6 +1442,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         log_.error("Failed to create resource sets", savedException);
         throw savedException;
       }
+    }
+
+    private boolean strEquals(String a, String b)
+    {
+     if(a == null)
+       return b == null;
+     
+      return a.equals(b);
     }
 
     private String createTargetGroup(Name name, String healthCheckPath, int port)
