@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.symphonyoss.s2.fugue</groupId>
     <artifactId>fugue</artifactId>
-    <version>0.0.49</version>
+    <version>0.0.50-SNAPSHOT</version>
   </parent>
   <artifactId>fugue-pubsub</artifactId>
   
