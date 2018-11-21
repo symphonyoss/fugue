@@ -145,7 +145,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
 
         validateSubcription(topicName, subscriptionName);
         
-        GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_);
+        GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_, nameFactory_.getTenantId());
         ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
         Builder                 builder                 = Subscriber.newBuilder(projectSubscriptionName, receiver);
         

@@ -31,7 +31,6 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.IFugueComponent;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 
@@ -46,20 +45,6 @@ public class LoggerTraceContextTransactionFactory implements ITraceContextTransa
   private static final Logger log_ = LoggerFactory.getLogger(LoggerTraceContextTransactionFactory.class);
   
   private Map<String, Integer>  counterMap_ = new HashMap<>();
-  
-  @Override
-  public ITraceContextTransaction createTransaction(String subjectType, String subjectId)
-  {
-    increment(subjectType);
-    return new LoggerTraceContextTransaction(this, null, subjectType, subjectId);
-  }
-
-  @Override
-  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime)
-  {
-    increment(subjectType);
-    return new LoggerTraceContextTransaction(this, null, subjectType, subjectId);
-  }
 
   synchronized void increment(String subjectType)
   {
@@ -69,6 +54,27 @@ public class LoggerTraceContextTransactionFactory implements ITraceContextTransa
       counterMap_.put(subjectType, 1);
     else
       counterMap_.put(subjectType, count + 1);
+  }
+
+  @Override
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId)
+  {
+    return createTransaction(subjectType, subjectId, null);
+  }
+
+  @Override
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId)
+  {
+    return createTransaction(subjectType, subjectId, tenantId, Instant.now());
+  }
+
+  @Override
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId,
+      Instant startTime)
+  {
+    increment(subjectType);
+    
+    return new LoggerTraceContextTransaction(this, null, subjectType, subjectId, tenantId, startTime);
   }
 
   @Override

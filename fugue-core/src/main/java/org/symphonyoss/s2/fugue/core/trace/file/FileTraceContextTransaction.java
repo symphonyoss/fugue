@@ -34,10 +34,10 @@ import org.symphonyoss.s2.fugue.core.trace.AbstractTraceContextTransaction;
  * @author Bruce Skingle
  *
  */
-class FileTraceContextTransaction extends AbstractTraceContextTransaction
+class FileTraceContextTransaction extends AbstractTraceContextTransaction<FileTraceContext>
 {
-  FileTraceContextTransaction(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, Instant time)
+  FileTraceContextTransaction(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, String tenantId, Instant time)
   {
-    super(new FileTraceContext(factory, parentHash, subjectType, subjectId, time));
+    super(new FileTraceContext(factory, parentHash, subjectType, subjectId, tenantId, time));
   }
 }

@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.core.trace.log;
 
+import java.time.Instant;
+
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.AbstractTraceContextTransaction;
 
@@ -32,10 +34,10 @@ import org.symphonyoss.s2.fugue.core.trace.AbstractTraceContextTransaction;
  * @author Bruce Skingle
  *
  */
-public class LoggerTraceContextTransaction extends AbstractTraceContextTransaction
+public class LoggerTraceContextTransaction extends AbstractTraceContextTransaction<LoggerTraceContext>
 {
-  LoggerTraceContextTransaction(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId)
+  LoggerTraceContextTransaction(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, String tenantId, Instant startTime)
   {
-    super(new LoggerTraceContext(factory, parentHash, subjectType, subjectId));
+    super(new LoggerTraceContext(factory, parentHash, subjectType, subjectId, tenantId, startTime));
   }
 }

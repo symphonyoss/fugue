@@ -23,7 +23,9 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.URL;
 import java.util.EnumSet;
@@ -61,6 +63,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
 
   private static final String APP_SERVLET_ROOT = "/app/";
+  private static final long MEGABYTE = 1024L * 1024L;
   
   private final int                                  httpPort_;
 
@@ -80,6 +83,10 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   private StatusServlet statusServlet_;
 
   private boolean localWebLogin_;
+
+  private int maxMemory_;
+
+  private String pid_;
 
   /**
    * Constructor.
@@ -182,10 +189,11 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   @Override
   public synchronized FugueServer join() throws InterruptedException
   {
-    while(running_)
-      wait();
-    
-    return this;
+    return mainLoop(0L);
+//    while(running_)
+//      wait();
+//    
+//    return this;
   }
   
   @Override
@@ -509,5 +517,92 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     executors_.add(fugueExec);
     
     return fugueExec;
+  }
+  
+  @Override
+  public FugueServer mainLoop(long timeout) throws InterruptedException
+  {
+    long endTime = timeout <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + timeout;
+    Runtime runtime = Runtime.getRuntime();
+    pid_ = getPid();
+    ProcessBuilder builder = new ProcessBuilder()
+        .command("ps", "-o", "pid,rss,vsz,time");
+    
+    while(isRunning() && System.currentTimeMillis() < endTime)
+    {
+      log_.info(String.format("JVM Memory: %4d used, %4d free, %4d total, %3d processors", runtime.freeMemory() / MEGABYTE, runtime.totalMemory() / MEGABYTE, runtime.maxMemory() / MEGABYTE, runtime.availableProcessors()));
+      run(builder);
+      log_.info("pid " + pid_ + " max memory " + maxMemory_);
+      
+      long bedtime = endTime - System.currentTimeMillis();
+      
+      if(bedtime > 60000)
+        bedtime = 60000;
+      
+      Thread.sleep(bedtime);
+    }
+    
+    return this;
+  }
+
+  private void run(ProcessBuilder builder)
+  {
+    try
+    {
+      Process process = builder.start();
+      
+      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream())))
+      {
+        String line = in.readLine();
+        log_.info(line);
+        while((line = in.readLine()) != null)
+        {
+          String[] words = line.trim().split(" +");
+          
+          if(pid_.equals(words[0]))
+          {
+            log_.info(line);
+            try
+            {
+              String word = words[1];
+              int mem = 0;
+              
+              if(word.endsWith("m"))
+                mem = Integer.parseInt(word.substring(0, word.length()-1));
+              else if(word.endsWith("g"))
+                  mem = (int)(1000 * Double.parseDouble(word.substring(0, word.length()-1)));
+              else
+                mem = Integer.parseInt(word);
+              
+              if(mem > maxMemory_)
+                maxMemory_ = mem;
+            }
+            catch(NumberFormatException e)
+            {
+              log_.error("Failed to parse memory", e);
+            }
+          }
+        }
+      }
+      
+      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getErrorStream())))
+      {
+        String line;
+        while((line = in.readLine()) != null)
+          log_.warn(line);
+      }
+    }
+    catch (IOException e)
+    {
+      log_.error("Unable to run command", e);
+    }
+  }
+
+  private String getPid()
+  {
+    String processName =
+        java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+      
+    return processName.split("@")[0];
   }
 }

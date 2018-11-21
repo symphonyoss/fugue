@@ -72,7 +72,19 @@ public class NoOpTraceContext implements ITraceContext
   }
 
   @Override
-  public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId)
+  {
+    return NoOpTraceContextTransaction.INSTANCE;
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, Instant time)
+  {
+    return NoOpTraceContextTransaction.INSTANCE;
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time)
   {
     return NoOpTraceContextTransaction.INSTANCE;
   }

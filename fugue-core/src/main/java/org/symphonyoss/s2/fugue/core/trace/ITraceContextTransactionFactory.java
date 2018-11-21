@@ -45,6 +45,27 @@ public interface ITraceContextTransactionFactory
    */
   ITraceContextTransaction createTransaction(@Nullable String subjectType, @Nullable String subjectId);
 
-  ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime);
+  /**
+   * Create a TraceTransaction with the given subject for the given tenantId.
+   * 
+   * @param subjectType The type of the subject of the transaction
+   * @param subjectId   The ID of the subject of the transaction.
+   * @param tenantId    The ID of the tenant for whom this work is being done.
+   * 
+   * @return  An ITraceTransaction.
+   */
+  ITraceContextTransaction createTransaction(@Nullable String subjectType, @Nullable String subjectId, String tenantId);
+
+  /**
+   * Create a TraceTransaction with the given subject for the given tenantId.
+   * 
+   * @param subjectType The type of the subject of the transaction
+   * @param subjectId   The ID of the subject of the transaction.
+   * @param tenantId    The ID of the tenant for whom this work is being done.
+   * @param startTime   The start time for the transaction.
+   * 
+   * @return  An ITraceTransaction.
+   */
+  ITraceContextTransaction createTransaction(@Nullable String subjectType, @Nullable String subjectId, @Nullable String tenantId, Instant startTime);
 
 }

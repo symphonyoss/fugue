@@ -27,6 +27,8 @@ import java.util.Collection;
 
 import javax.annotation.Nullable;
 
+import com.google.common.collect.ImmutableMap;
+
 public interface INameFactory
 {
 
@@ -126,4 +128,34 @@ public interface INameFactory
    * @return a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
    */
   INameFactory withTenantId(String tenantId);
+  
+  String getEnvironmentType();
+  
+  String getEnvironmentId();
+
+  String getTenantId();
+  
+  String getServiceId();
+
+  String getRealmId();
+  
+  String getRegionId();
+  
+  String getRequiredEnvironmentType();
+  
+  String getRequiredEnvironmentId();
+
+  String getRequiredTenantId();
+  
+  String getRequiredServiceId();
+
+  String getRequiredRealmId();
+  
+  String getRequiredRegionId();
+
+  ImmutableMap<String, String> getTags();
+
+  Name getFugueEnvironmentTypeName();
+
+  TopicName getTenantTopicName(String topicId);
 }

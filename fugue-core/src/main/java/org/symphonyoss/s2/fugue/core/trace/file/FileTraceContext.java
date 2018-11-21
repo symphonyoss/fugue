@@ -30,12 +30,14 @@ import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.hash.HashProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
+import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContextTransaction;
 
 class FileTraceContext implements ITraceContext
 {
   private final Hash                               id_ = HashProvider.getCompositeHashOf(UUID.randomUUID());
   private final String                             subjectType_;
   private final String                             subjectId_;
+  private final String                             tenantId_;
   private final Hash                               hash_;
   private final FileTraceContextTransactionFactory factory_;
   private final String                             parentHash_;
@@ -44,12 +46,13 @@ class FileTraceContext implements ITraceContext
   private final long                               start_;
   private long                                     lastEvent_;
   
-  public FileTraceContext(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, Instant timestamp)
+  public FileTraceContext(FileTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, String tenantId, Instant timestamp)
   {
     factory_ = factory;
     parentHash_ = parentHash == null ? "" : parentHash.toString();
     subjectType_ = subjectType;
     subjectId_ = subjectId;
+    tenantId_ = tenantId;
     hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
     timestamp_ = timestamp;
     
@@ -80,16 +83,34 @@ class FileTraceContext implements ITraceContext
     
     lastEvent_ = now;
     
-    factory_.printf("%-50.50s %-50.50s %-20.20s %5d %5d %-30.30s %-40.40s %-20.20s %s%n", parentHash_, id_, operationId, operation, total, 
-        subjectType_, subjectId_, subjectType, subjectId);
+    factory_.printf("%-50.50s %-50.50s %-20.20s %5d %5d %-14s %-30.30s %-40.40s %-20.20s %s%n", parentHash_, id_, operationId, operation, total, 
+        tenantId_, subjectType_, subjectId_, subjectType, subjectId);
   }
 
   @Override
-  public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId)
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId)
   {
-    factory_.increment(externalSubjectType);
+    return createSubContext(subjectType, subjectId, tenantId_);
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId)
+  {
+    return createSubContext(subjectType, subjectId, tenantId, Instant.now());
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, Instant time)
+  {
+    return createSubContext(subjectType, subjectId, tenantId_, time);
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time)
+  {
+    factory_.increment(subjectType);
     
-    return new FileTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId, Instant.now());
+    return new FileTraceContextTransaction(factory_, hash_, subjectType, subjectId, tenantId, time);
   }
 
   @Override
@@ -97,13 +118,7 @@ class FileTraceContext implements ITraceContext
   {
     trace(operationId);
   }
-
-  @Override
-  public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
-  {
-    return new FileTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId, time);
-  }
-
+  
   @Override
   public Instant getTimestamp()
   {

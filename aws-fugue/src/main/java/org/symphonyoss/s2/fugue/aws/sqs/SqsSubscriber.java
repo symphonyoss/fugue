@@ -58,13 +58,15 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
   private final ICounter                             counter_;
+  private final String                               tenantId_;
   private int                                        messageBatchSize_ = 10;
 
   private boolean running_ = true;
 
+
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
       ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<String> consumer, ICounter counter)
+      IThreadSafeRetryableConsumer<String> consumer, ICounter counter, String tenantId)
   {
     manager_ = manager;
     sqsClient_ = sqsClient;
@@ -73,6 +75,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
+    tenantId_ = tenantId;
   }
   
   class NonIdleSubscriber implements Runnable
@@ -230,7 +233,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
   private void handleMessage(Message message)
   {
-    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message.getMessageId()))
+    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message.getMessageId(), tenantId_))
     {
       ITraceContext trace = traceTransaction.open();
       

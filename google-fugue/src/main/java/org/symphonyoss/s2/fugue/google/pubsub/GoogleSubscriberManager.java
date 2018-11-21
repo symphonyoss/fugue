@@ -96,7 +96,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
       validateSubcription(topicName, subscriptionName);
 
       GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
-          getTraceFactory(), subscription.getConsumer(), getCounter());
+          getTraceFactory(), subscription.getConsumer(), getCounter(), nameFactory_.getTenantId());
 
       subscribers_.add(subscriber);
       log_.info("Subscribing to " + subscriptionName + "...");  

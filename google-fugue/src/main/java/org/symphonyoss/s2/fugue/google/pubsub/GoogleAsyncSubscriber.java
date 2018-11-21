@@ -77,17 +77,19 @@ public class GoogleAsyncSubscriber implements MessageReceiver
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
   private final SubscriptionName                                 subscriptionName_;
   private final ICounter                                         counter_;
+  private final String                                           tenantId_;
 
   private AtomicBoolean                                          stopped_                = new AtomicBoolean();
 
   /* package */ GoogleAsyncSubscriber(GoogleAsyncSubscriberManager manager, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, ICounter counter)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, ICounter counter, String tenantId)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     subscriptionName_ = subscriptionName;
     counter_ = counter;
+    tenantId_ = tenantId;
   }
 
   @Override
@@ -98,7 +100,7 @@ public class GoogleAsyncSubscriber implements MessageReceiver
     Timestamp ts = message.getPublishTime();
     
     try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),
-        Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
+        tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
     {
       ITraceContext trace = traceTransaction.open();
       

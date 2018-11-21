@@ -119,7 +119,8 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
       String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
           sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
       
-      SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer(), getCounter());
+      SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer(),
+          getCounter(), nameFactory_.getTenantId());
 
       subscribers_.add(subscriber);
       log_.info("Subscribing to " + subscriptionName + "...");  

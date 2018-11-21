@@ -40,7 +40,14 @@ public class NoOpContextFactory implements ITraceContextTransactionFactory
   }
 
   @Override
-  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime)
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId)
+  {
+    return NoOpTraceContextTransaction.INSTANCE;
+  }
+
+  @Override
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId,
+      Instant startTime)
   {
     return NoOpTraceContextTransaction.INSTANCE;
   }

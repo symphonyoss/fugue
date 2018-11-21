@@ -69,13 +69,14 @@ public class GoogleSubscriber implements Runnable
   private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                                           subscriptionName_;
   private final ICounter                                         counter_;
+  private final String                                           tenantId_;
   private boolean                                                running_   = true;
   private int                                                    batchSize_ = 10;
   private SubscriberStubSettings subscriberStubSettings_;
 
   /* package */ GoogleSubscriber(GoogleSubscriberManager manager,
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter, String tenantId)
   {
     manager_ = manager;
     subscriptionName_ = subscriptionName;
@@ -83,6 +84,7 @@ public class GoogleSubscriber implements Runnable
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
+    tenantId_ = tenantId;
     
     try
     {
@@ -275,7 +277,7 @@ public class GoogleSubscriber implements Runnable
     Timestamp     ts      = message.getPublishTime();
     
     try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:Google", message.getMessageId(),
-        Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
+        tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
     {
       ITraceContext trace = traceTransaction.open();
       

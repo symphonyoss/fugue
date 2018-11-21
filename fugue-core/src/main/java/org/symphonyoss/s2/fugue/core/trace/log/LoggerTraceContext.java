@@ -35,30 +35,35 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 
 class LoggerTraceContext implements ITraceContext
 {
-  private static final Logger             log_       = LoggerFactory.getLogger(LoggerTraceContext.class);
+  private static final Logger                        log_       = LoggerFactory.getLogger(LoggerTraceContext.class);
 
-  private final String                    subjectType_;
-  private final String                    subjectId_;
-  private final Hash                      hash_;
+  private final String                               subjectType_;
+  private final String                               subjectId_;
+  private final String                               tenantId_;
+  private final Hash                                 hash_;
   private final LoggerTraceContextTransactionFactory factory_;
-  private final String                    parentHash_;
-  private final Instant                   timestamp_;
-  private final Hash                      id_        = HashProvider.getCompositeHashOf(UUID.randomUUID());
+  private final String                               parentHash_;
+  private final Instant                              timestamp_;
+  private final Hash                                 id_        = HashProvider.getCompositeHashOf(UUID.randomUUID());
 
-  private final long                      start_     = System.currentTimeMillis();
-  private long                            lastEvent_ = start_;
+  private final long                                 start_;
+  private long                                       lastEvent_;
+
   
-  LoggerTraceContext(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId)
+  LoggerTraceContext(LoggerTraceContextTransactionFactory factory, Hash parentHash, String subjectType, String subjectId, String tenantId, Instant startTime)
   {
     factory_ = factory;
     parentHash_ = parentHash == null ? "" : parentHash.toString();
     subjectType_ = subjectType;
     subjectId_ = subjectId;
+    tenantId_ = tenantId;
     hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
     
     trace("STARTED");
     
-    timestamp_ = Instant.now();
+    timestamp_ = startTime;
+    start_     = startTime.toEpochMilli();
+    lastEvent_ = start_;
   }
 
   @Override
@@ -82,28 +87,40 @@ class LoggerTraceContext implements ITraceContext
     
     lastEvent_ = now;
     
-    log_.debug(String.format("TRACE %-50.50s %-50.50s %-20.20s %5d %5d %-30.30s %-40.40s %-20.20s %s", parentHash_, id_, operationId, operation, total, 
-        subjectType_, subjectId_, subjectType, subjectId));
+    log_.debug(String.format("TRACE %-50.50s %-50.50s %-20.20s %5d %5d %-14s %-30.30s %-40.40s %-20.20s %s", parentHash_, id_, operationId, operation, total, 
+        tenantId_, subjectType_, subjectId_, subjectType, subjectId));
   }
 
   @Override
-  public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId)
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId)
   {
-    factory_.increment(externalSubjectType);
+    return createSubContext(subjectType, subjectId, tenantId_);
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId)
+  {
+    return createSubContext(subjectType, subjectId, tenantId, Instant.now());
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, Instant time)
+  {
+    return createSubContext(subjectType, subjectId, tenantId_, time);
+  }
+
+  @Override
+  public ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time)
+  {
+    factory_.increment(subjectType);
     
-    return new LoggerTraceContextTransaction(factory_, hash_, externalSubjectType, externalSubjectId);
+    return new LoggerTraceContextTransaction(factory_, hash_, subjectType, subjectId, tenantId, time);
   }
 
   @Override
   public void trace(String operationId, Instant time)
   {
     trace(operationId);
-  }
-
-  @Override
-  public ITraceContextTransaction createSubContext(String externalSubjectType, String externalSubjectId, Instant time)
-  {
-    return createSubContext(externalSubjectType, externalSubjectId);
   }
 
   @Override

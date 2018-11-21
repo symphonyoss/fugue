@@ -93,9 +93,32 @@ public interface ITraceContext
    *  
    * @param subjectType The type of the subject of this process.
    * @param subjectId   The ID of the subject of this process.
+   * @param tenantId    The tenantId of the tenant for whom this transaction is working.
+   * 
+   * @return A new ITraceContext which is a sub-context of the current context.
+   */
+  ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId);
+
+  /**
+   * Create a sub-context relating to the processing of the given external subject.
+   *  
+   * @param subjectType The type of the subject of this process.
+   * @param subjectId   The ID of the subject of this process.
    * @param time        The time at which the sub-transaction started.
    * 
    * @return A new ITraceContext which is a sub-context of the current context.
    */
   ITraceContextTransaction createSubContext(String subjectType, String subjectId, Instant time);
+
+  /**
+   * Create a sub-context relating to the processing of the given external subject.
+   *  
+   * @param subjectType The type of the subject of this process.
+   * @param subjectId   The ID of the subject of this process.
+   * @param tenantId    The tenantId of the tenant for whom this transaction is working.
+   * @param time        The time at which the sub-transaction started.
+   * 
+   * @return A new ITraceContext which is a sub-context of the current context.
+   */
+  ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time);
 }

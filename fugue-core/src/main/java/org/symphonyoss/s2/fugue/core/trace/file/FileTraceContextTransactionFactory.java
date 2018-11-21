@@ -72,15 +72,21 @@ public class FileTraceContextTransactionFactory implements ITraceContextTransact
   @Override
   public ITraceContextTransaction createTransaction(String subjectType, String subjectId)
   {
-    increment(subjectType);
-    return new FileTraceContextTransaction(this, null, subjectType, subjectId, Instant.now());
+    return createTransaction(subjectType, subjectId, null);
   }
 
   @Override
-  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, Instant startTime)
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId)
+  {
+    return createTransaction(subjectType, subjectId, tenantId, Instant.now());
+  }
+
+  @Override
+  public ITraceContextTransaction createTransaction(String subjectType, String subjectId, String tenantId,
+      Instant startTime)
   {
     increment(subjectType);
-    return new FileTraceContextTransaction(this, null, subjectType, subjectId, startTime);
+    return new FileTraceContextTransaction(this, null, subjectType, subjectId, tenantId, startTime);
   }
 
   synchronized void increment(String subjectType)

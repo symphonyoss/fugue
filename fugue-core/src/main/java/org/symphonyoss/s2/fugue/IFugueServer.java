@@ -204,4 +204,17 @@ public interface IFugueServer
    */
   IFugueServer withLocalWebLogin();
 
+  /**
+   * Run the main loop process for up to timeout milliseconds.
+   * 
+   * This is an alternative to calling join() on this object from the main thread.
+   * This method periodically prints various debug information to the log.
+   * 
+   * @param timeout Limit in ms of time to run.
+   * @return this (Fluent method).
+   * 
+   * @throws InterruptedException IF a sleep is interrupted.
+   */
+  FugueServer mainLoop(long timeout) throws InterruptedException;
+
 }
