@@ -107,6 +107,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final Logger     log_                = LoggerFactory.getLogger(FugueDeploy.class);
   private static final String     SINGLE_TENANT       = "singleTenant";
   private static final String     MULTI_TENANT        = "multiTenant";
+  private static final String     TRUST               = "trust";
   private static final String     PORT                = "port";
   private static final String     PATHS               = "paths";
   private static final String     HEALTH_CHECK_PATH   = "healthCheckPath";
@@ -143,6 +144,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private DeploymentContext       multiTenantContext_;
 
   private Map<String, String>     tags_               = new HashMap<>();
+  
+  private Map<String, String> policyTrust_;
   
   protected abstract DeploymentContext  createContext(String tenantId, INameFactory nameFactory);
   
@@ -445,7 +448,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       // deploy multi-tenant containers first
       
 
-      
+      policyTrust_ = fetchPolicies(dir, TRUST);
 
       multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
       
@@ -893,7 +896,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void createEnvironment();
     
-    protected abstract void processRole(String name, String roleSpec);
+    protected abstract void processRole(String name, String roleSpec, String trustSpec);
     
     protected abstract void saveConfig();
     
@@ -1100,12 +1103,14 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         String name     = entry.getKey();
         String template = entry.getValue();
+        String trustTemplate = policyTrust_.get(name);
         
         batch.submit(() ->
         {
           String roleSpec = sub_.replace(template);
+          String trustSpec = trustTemplate == null ? null : sub_.replace(trustTemplate);
           
-          processRole(name, roleSpec);
+          processRole(name, roleSpec, trustSpec);
         });
       }
       

@@ -34,6 +34,7 @@ import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.secret.ISecretManager;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.secretsmanager.AWSSecretsManager;
 import com.amazonaws.services.secretsmanager.AWSSecretsManagerClientBuilder;
 import com.amazonaws.services.secretsmanager.model.CreateSecretRequest;
@@ -75,6 +76,22 @@ public class AwsSecretManager implements ISecretManager
 
     secretClient_ = AWSSecretsManagerClientBuilder.standard()
         .withRegion(region_)
+        .build();
+  }
+  
+  /**
+   * Constructor.
+   * 
+   * @param region The AWS region in which to operate.
+   * @param credentials AWS credentials.
+   */
+  public AwsSecretManager(String region, AWSCredentialsProvider credentials)
+  {
+    region_ = region;
+
+    secretClient_ = AWSSecretsManagerClientBuilder.standard()
+        .withRegion(region_)
+        .withCredentials(credentials)
         .build();
   }
   

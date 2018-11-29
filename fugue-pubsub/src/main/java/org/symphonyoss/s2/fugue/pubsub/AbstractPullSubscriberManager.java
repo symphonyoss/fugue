@@ -32,7 +32,9 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
+import org.symphonyoss.s2.fugue.counter.BusyCounter;
 import org.symphonyoss.s2.fugue.counter.Counter;
+import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
@@ -48,6 +50,7 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
   private final IConfiguration                sqsConfig_;
 
   private ICounter                            counter_;
+  private IBusyCounter                        busyCounter_;
   private int                                 subscriberThreadPoolSize_;
   private int                                 handlerThreadPoolSize_;
   private final LinkedBlockingQueue<Runnable> executorQueue_ = new LinkedBlockingQueue<Runnable>();
@@ -74,6 +77,18 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
   protected ICounter getCounter()
   {
     return counter_;
+  }
+
+  public T withBusyCounter(IBusyCounter busyCounter)
+  {
+    busyCounter_ = busyCounter;
+    
+    return self();
+  }
+  
+  protected IBusyCounter getBusyCounter()
+  {
+    return busyCounter_;
   }
 
   @Override

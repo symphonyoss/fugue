@@ -38,6 +38,7 @@ public interface IPubSubMessage
 {
   static final String PAYLOAD_TYPE_ATTRIBUTE = "payloadType";
   static final String TENANT_ID_ATTRIBUTE    = "tenantId";
+  static final String FINAL_ATTRIBUTE        = "final";
   
   /**
    * 

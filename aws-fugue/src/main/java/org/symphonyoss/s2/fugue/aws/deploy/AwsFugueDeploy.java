@@ -1137,13 +1137,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
     
     @Override
-    protected void processRole(String roleName, String roleSpec)
+    protected void processRole(String roleName, String roleSpec, String trustSpec)
     {
       Name name = getNameFactory().getServiceItemName(roleName);
 //          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
-      createRole(name, TRUST_ECS_DOCUMENT, policyArn);
+      
+      createRole(name, trustSpec==null ? 
+          TRUST_ECS_DOCUMENT : 
+            trustSpec, 
+            policyArn);
     }
 
     @Override

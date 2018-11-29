@@ -217,4 +217,16 @@ public interface IFugueServer
    */
   FugueServer mainLoop(long timeout) throws InterruptedException;
 
+  /**
+   * 
+   * @return The application name.
+   */
+  String getApplicationName();
+
+  /**
+   * 
+   * @return the http port in use.
+   */
+  int getHttpPort();
+
 }

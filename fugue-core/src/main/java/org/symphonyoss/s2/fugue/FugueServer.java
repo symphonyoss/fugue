@@ -65,6 +65,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   private static final String APP_SERVLET_ROOT = "/app/";
   private static final long MEGABYTE = 1024L * 1024L;
   
+  private final String                               applicationName_;
   private final int                                  httpPort_;
 
   private HttpServer                                 server_;
@@ -87,6 +88,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   private int maxMemory_;
 
   private String pid_;
+
 
   /**
    * Constructor.
@@ -120,7 +122,8 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       System.out.println("log4j2.xml from system property = " + configFile);
     }
     
-    httpPort_   = httpPort;
+    applicationName_  = name;
+    httpPort_         = httpPort;
     
     register(new IFugueLifecycleComponent()
     {
@@ -174,6 +177,18 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
         });
     
     register(new HealthCheckServlet());
+  }
+
+  @Override
+  public String getApplicationName()
+  {
+    return applicationName_;
+  }
+
+  @Override
+  public int getHttpPort()
+  {
+    return httpPort_;
   }
 
   @Override
@@ -270,7 +285,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     return running_;
   }
 
-  private synchronized boolean setRunning(boolean running)
+  public synchronized boolean setRunning(boolean running)
   {
     boolean v = running_;
     running_ = running;
@@ -367,9 +382,11 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
 
   private final void stopFugueServer()
   {
-    if(!setRunning(false))
+    setRunning(false);
+    
+    if(!started_)
     {
-      log_.info("Not running, no need to stop");
+      log_.info("Not started, no need to stop");
       return;
     }
 
@@ -539,7 +556,13 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       if(bedtime > 60000)
         bedtime = 60000;
       
-      Thread.sleep(bedtime);
+      if(bedtime>0)
+      {
+        synchronized(this)
+        {
+          wait(bedtime);
+        }
+      }
     }
     
     return this;

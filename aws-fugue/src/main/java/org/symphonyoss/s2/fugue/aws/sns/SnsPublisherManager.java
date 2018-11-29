@@ -41,6 +41,7 @@ import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 import com.amazonaws.ClientConfiguration;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.MessageAttributeValue;
@@ -77,10 +78,24 @@ public class SnsPublisherManager extends AbstractPublisherManager<SnsPublisherMa
    */
   public SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId)
   {
-    this(config, nameFactory, region, accountId, false);
+    this(config, nameFactory, region, accountId, null, false);
   }
   
-  protected SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId, boolean initialize)
+  /**
+   * Constructor.
+   * 
+   * @param config      The configuration provider.
+   * @param nameFactory A name factory.
+   * @param region      The AWS region to use.
+   * @param accountId   The AWS numeric account ID 
+   * @param credentials AWS credentials.
+   */
+  public SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId, AWSCredentialsProvider credentials)
+  {
+    this(config, nameFactory, region, accountId, credentials, false);
+  }
+  
+  protected SnsPublisherManager(IConfiguration config, INameFactory nameFactory, String region, String accountId, AWSCredentialsProvider credentials, boolean initialize)
   {
     super(nameFactory, SnsPublisherManager.class);
     
@@ -99,10 +114,16 @@ public class SnsPublisherManager extends AbstractPublisherManager<SnsPublisherMa
     
     log_.info("Starting SNSPublisherManager in " + region_ + " with " + clientConfig.getMaxConnections() + " max connections...");
     
-    snsClient_ = AmazonSNSClientBuilder.standard()
-      .withRegion(region_)
-      .withClientConfiguration(clientConfig)
-      .build();
+    AmazonSNSClientBuilder builder = AmazonSNSClientBuilder.standard()
+        .withRegion(region_)
+        .withClientConfiguration(clientConfig);
+    
+    if(credentials != null)
+    {
+      builder.withCredentials(credentials);
+    }
+    
+    snsClient_ = builder.build();
     
   }
 
@@ -149,16 +170,16 @@ public class SnsPublisherManager extends AbstractPublisherManager<SnsPublisherMa
     
     if(publisher == null)
     {
-      publisher = new SnsPublisher(getTopicARN(topicName), this);
+      publisher = new SnsPublisher(topicName, getTopicARN(topicName), this);
       publisherNameMap_.put(topicName, publisher);
     }
     
     return publisher;
   }
   
-  protected void send(String topicArn, IPubSubMessage pubSubMessage, ITraceContext trace)
+  protected void send(String topicName, String topicArn, IPubSubMessage pubSubMessage, ITraceContext trace)
   {
-    trace.trace("ABOUT_TO_PUBLISH0", "SNS_TOPIC", topicArn);
+    trace.trace("ABOUT-TO-PUBLISH", "SNS_TOPIC", topicName);
     try
     {
       PublishRequest publishRequest = new PublishRequest(topicArn, pubSubMessage.getPayload());
@@ -178,7 +199,7 @@ public class SnsPublisherManager extends AbstractPublisherManager<SnsPublisherMa
       }
       
       snsClient_.publish(publishRequest);
-      trace.trace("PUBLISHED", "SNS_TOPIC", topicArn);
+      trace.trace("PUBLISHED", "SNS_TOPIC", topicName);
     }
     catch (RuntimeException e)
     {

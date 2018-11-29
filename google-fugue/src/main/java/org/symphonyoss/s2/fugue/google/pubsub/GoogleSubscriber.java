@@ -35,6 +35,7 @@ import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
+import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -69,14 +70,18 @@ public class GoogleSubscriber implements Runnable
   private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                                           subscriptionName_;
   private final ICounter                                         counter_;
+  private final IBusyCounter                                     busyCounter_;
   private final String                                           tenantId_;
   private boolean                                                running_   = true;
   private int                                                    batchSize_ = 10;
   private SubscriberStubSettings subscriberStubSettings_;
 
+  private final PullRequest blockingPullRequest_;
+  private final PullRequest nonBlockingPullRequest_;
+
   /* package */ GoogleSubscriber(GoogleSubscriberManager manager,
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter, String tenantId)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
     manager_ = manager;
     subscriptionName_ = subscriptionName;
@@ -84,6 +89,7 @@ public class GoogleSubscriber implements Runnable
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
+    busyCounter_ = busyCounter;
     tenantId_ = tenantId;
     
     try
@@ -95,6 +101,15 @@ public class GoogleSubscriber implements Runnable
       throw new CodingFault(e);
     }
 
+    blockingPullRequest_ = PullRequest.newBuilder().setMaxMessages(batchSize_)
+        .setReturnImmediately(false) // return immediately if messages are not available
+        .setSubscription(subscriptionName_)
+        .build();
+    
+    nonBlockingPullRequest_ = PullRequest.newBuilder().setMaxMessages(batchSize_)
+        .setReturnImmediately(true) // return immediately if messages are not available
+        .setSubscription(subscriptionName_)
+        .build();
   }
   
   String getSubscriptionName()
@@ -158,32 +173,42 @@ public class GoogleSubscriber implements Runnable
         
     try (SubscriberStub subscriber = GrpcSubscriberStub.create(subscriberStubSettings_))
     {
-      PullRequest pullRequest = PullRequest.newBuilder().setMaxMessages(batchSize_)
-          .setReturnImmediately(false) // return immediately if messages are not available
-          .setSubscription(subscriptionName_)
-          .build();
-
-      PullResponse pullResponse = subscriber.pullCallable().call(pullRequest);
-      List<ReceivedMessage> messages = pullResponse.getReceivedMessagesList();
+      PullResponse pullResponse = subscriber.pullCallable().call(nonBlockingPullRequest_);
       
-      
-      /*****
-      List<String> ackIds = new ArrayList<>();
-      for (ReceivedMessage message : messages)
+     
+      if(pullResponse.getReceivedMessagesList().isEmpty())
       {
-        // handle received message
-        // ...
-        ackIds.add(message.getAckId());
+        if(busyCounter_ != null)
+        {
+          if(busyCounter_.idle())
+          {
+            stop();
+            return;
+          }
+        }
+        
+        log_.info(">>>>>>>>Blocking read for " + subscriptionName_ + "...");
+        
+        pullResponse = subscriber.pullCallable().call(blockingPullRequest_);
+        
+        log_.info(">>>>>>>>Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
       }
-      // acknowledge received messages
-      AcknowledgeRequest acknowledgeRequest = AcknowledgeRequest.newBuilder().setSubscription(subscriptionName)
-          .addAllAckIds(ackIds).build();
-      // use acknowledgeCallable().futureCall to asynchronously perform this
-      // operation
-      subscriber.acknowledgeCallable().call(acknowledgeRequest);
-******/
-  
-      log_.info("Read " + messages.size() + " for " + subscriptionName_);
+      else
+      {
+        if(busyCounter_ != null)
+          busyCounter_.busy();
+        
+        if(isRunning())
+        {
+          manager_.submit(nonIdleSubscriber_, false);
+
+          log_.debug("Extra schedule " + subscriptionName_);
+        }
+        
+        log_.info(">>>>>>>>Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
+      }
+      
+      List<ReceivedMessage> messages = pullResponse.getReceivedMessagesList();
       
       switch(messages.size())
       {
@@ -201,12 +226,6 @@ public class GoogleSubscriber implements Runnable
         default:
           if(counter_ != null)
             counter_.increment(messages.size());
-          if(messages.size() > 2 && isRunning())
-          {
-            manager_.submit(nonIdleSubscriber_, false);
-
-            log_.debug("Extra schedule " + subscriptionName_);
-          }
           
           // Fire off all but one envelopes in its own thread, do the final one in the current thread
           int     index = 0;

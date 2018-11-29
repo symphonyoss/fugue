@@ -23,8 +23,17 @@
 
 package org.symphonyoss.s2.fugue.aws.sts;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicSessionCredentials;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
+import com.amazonaws.services.securitytoken.model.AssumeRoleRequest;
+import com.amazonaws.services.securitytoken.model.AssumeRoleResult;
+import com.amazonaws.services.securitytoken.model.Credentials;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 
@@ -44,7 +53,7 @@ public class StsManager
   /**
    * Constructor.
    * 
-   * @param region  The AWS region to use.
+   * @param region      The AWS region to use.
    */
   public StsManager(String region)
   {
@@ -57,6 +66,45 @@ public class StsManager
     identityResult_ = stsClient_.getCallerIdentity(new GetCallerIdentityRequest());
     
     accountId_ = identityResult_.getAccount();
+  }
+  
+  /**
+   * Assume the given role.
+   * 
+   * @param assumeRole  A role to be assumed.
+   * 
+   * @return A credentials provider containing the assumed credentials.
+   */
+  public AWSCredentialsProvider assumeRole(String assumeRole)
+  {
+    if(assumeRole == null)
+      return DefaultAWSCredentialsProviderChain.getInstance();
+    
+    try
+    {
+      AssumeRoleResult roleResult = stsClient_.assumeRole(new AssumeRoleRequest()
+        .withRoleArn(roleArn(assumeRole))
+        .withRoleSessionName(assumeRole)
+        );
+      
+      Credentials creds = roleResult.getCredentials();
+      
+      BasicSessionCredentials sessionCredentials = new BasicSessionCredentials(
+          creds.getAccessKeyId(),
+          creds.getSecretAccessKey(),
+          creds.getSessionToken());
+
+       return new AWSStaticCredentialsProvider(sessionCredentials);
+    }
+    catch(RuntimeException e)
+    {
+      throw new IllegalStateException("Unable to assume role " + assumeRole, e);
+    }
+  }
+
+  private String roleArn(String roleName)
+  {
+    return "arn:aws:iam::" + accountId_ + ":role/" + roleName;
   }
 
   /**

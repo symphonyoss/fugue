@@ -178,7 +178,10 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
               setLifeCycleState(FugueLifecycleState.Stopped);
               System.err.println("Attempting clean shutdown...DONE");
             }
-            // FALL THROUGH
+            break;
+            
+          case Stopped:
+            break;
               
           default:
             try
