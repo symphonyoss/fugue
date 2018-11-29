@@ -32,7 +32,7 @@
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
 	<artifactId>fugue</artifactId>
-	<version>0.0.51-SNAPSHOT</version>
+	<version>0.0.52-SNAPSHOT</version>
 	<name>fugue</name>
 	<description>Cloud platform abstraction</description>
 	<url>https://github.com/SymphonyOSF/fuge</url>
