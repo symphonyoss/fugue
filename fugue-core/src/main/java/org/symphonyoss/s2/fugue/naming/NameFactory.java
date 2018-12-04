@@ -23,12 +23,369 @@
 
 package org.symphonyoss.s2.fugue.naming;
 
+import java.util.ArrayList;
+import java.util.Collection;
+
 import javax.annotation.Nonnull;
 
-public abstract class NameFactory implements INameFactory
+import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
+
+public class NameFactory implements INameFactory
 {
   protected final String CONFIG = "config";
   protected final String FUGUE  = "fugue";
+  
+
+  private final String globalNamePrefix_;
+  private final String environmentType_;
+  private final String environmentId_;
+  private final String realmId_;
+  private final String regionId_;
+  private final String tenantId_;
+  private final String serviceId_;
+  private final ImmutableMap<String, String>  tags_;
+  
+  
+  public NameFactory(IGlobalConfiguration config)
+  {
+    this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRealmId(), config.getRegionId(), config.getTenantId(), config.getServiceId());
+  }
+
+  public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String realmId, String regionId, String tenantId, String serviceId)
+  {
+    globalNamePrefix_ = globalNamePrefix;
+    environmentType_ = environmentType;
+    environmentId_ = environmentId;
+    realmId_ = realmId;
+    regionId_ = regionId;
+    tenantId_ = tenantId;
+    serviceId_ = serviceId;
+    tags_ = createTags();
+  }
+  
+  protected NameFactory(INameFactory nameFactory)
+  {
+    globalNamePrefix_ = nameFactory.getGlobalNamePrefix();
+    environmentType_ = nameFactory.getEnvironmentType();
+    environmentId_ = nameFactory.getEnvironmentId();
+    realmId_ = nameFactory.getRealmId();
+    regionId_ = nameFactory.getRegionId();
+    tenantId_ = nameFactory.getTenantId();
+    serviceId_ = nameFactory.getServiceId();
+    tags_ = createTags();
+  }
+  
+  @Override
+  public INameFactory withRegionId(String regionId)
+  {
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, realmId_, regionId, tenantId_, serviceId_);
+  }
+  
+  @Override
+  public INameFactory withTenantId(String tenantId)
+  {
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, realmId_, regionId_, tenantId, serviceId_);
+  }
+  
+  @Override
+  public INameFactory withGlobalNamePrefix(String globalNamePrefix)
+  {
+    return new NameFactory(globalNamePrefix, environmentType_, environmentId_, realmId_, regionId_, tenantId_, serviceId_);
+  }
+
+  private ImmutableMap<String, String> createTags()
+  {
+    Builder<String, String> builder = new ImmutableMap.Builder<String, String>();
+    
+    putIfNotNull(builder, "FUGUE_ENVIRONMENT_TYPE", environmentType_);
+    putIfNotNull(builder, "FUGUE_ENVIRONMENT",      environmentId_);
+    putIfNotNull(builder, "FUGUE_REALM",            realmId_);
+    putIfNotNull(builder, "FUGUE_REGION",           regionId_);
+    putIfNotNull(builder, "FUGUE_TENANT",           tenantId_);
+    
+    return builder.build();
+  }
+
+  private void putIfNotNull(Builder<String, String> builder, String name, String value)
+  {
+      if(value != null)
+        builder.put(name, value);
+  }
+
+  @Override
+  public String getGlobalNamePrefix()
+  {
+    return globalNamePrefix_;
+  }
+
+  @Override
+  public String getEnvironmentType()
+  {
+    return environmentType_;
+  }
+
+  @Override
+  public String getEnvironmentId()
+  {
+    return environmentId_;
+  }
+  
+  @Override
+  public String getRealmId()
+  {
+    return realmId_;
+  }
+  
+  @Override
+  public String getRegionId()
+  {
+    return regionId_;
+  }
+  
+  @Override
+  public String getTenantId()
+  {
+    return tenantId_;
+  }
+  
+  @Override
+  public String getServiceId()
+  {
+    return serviceId_;
+  }
+
+  private @Nonnull String require(String value, String name)
+  {
+    if(value == null)
+      throw new IllegalStateException(name + " is not present.");
+    
+    return value;
+  }
+  
+  @Override
+  public String getRequiredEnvironmentType()
+  {
+    return require(environmentType_, "environmentType");
+  }
+
+  @Override
+  public String getRequiredEnvironmentId()
+  {
+    return require(environmentId_, "environmentId");
+  }
+  
+  @Override
+  public String getRequiredRealmId()
+  {
+    return require(realmId_, "realmId");
+  }
+  
+  @Override
+  public String getRequiredRegionId()
+  {
+    return require(regionId_, "regionId");
+  }
+  
+  @Override
+  public String getRequiredTenantId()
+  {
+    return require(tenantId_, "tenantId");
+  }
+  
+  @Override
+  public String getRequiredServiceId()
+  {
+    return require(serviceId_, "serviceId");
+  }
+
+  @Override
+  public ImmutableMap<String, String> getTags()
+  {
+    return tags_;
+  }
+
+//  @Override
+//  public Name getName(String ...names)
+//  {
+//    return new Name(getGlobalNamePrefix(), names);
+//  }
+  
+  @Override
+  public ServiceName  getServiceName()
+  {
+    return createServiceName(serviceId_, tenantId_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getRequiredServiceId());
+  }
+  
+  @Override
+  public ServiceName  getRegionalServiceName()
+  {
+    return createServiceName(serviceId_, tenantId_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, tenantId_, getRequiredServiceId());
+  }
+  
+  @Override
+  public ServiceName  getMultiTenantServiceName()
+  {
+    return createServiceName(serviceId_, null, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, null, getRequiredServiceId());
+  }
+  
+  @Override
+  public ServiceName  getServiceItemName(String name)
+  {
+    return createServiceName(serviceId_, tenantId_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getRequiredServiceId(), name);
+  }
+  
+  @Override
+  public TableName  getTableName(String tableId)
+  {
+    return createTableName(serviceId_, tableId, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, serviceId_, tableId);
+  }
+  
+  @Deprecated
+  public TableName  getObsoleteTableName(String tableId)
+  {
+    return createTableName(serviceId_, tableId, environmentType_, environmentId_, realmId_, tableId);
+  }
+  
+  @Override
+  @Deprecated
+  public TopicName  getObsoleteTopicName(String topicId)
+  {
+    return createTopicName(getServiceId(), true, topicId, environmentType_, environmentId_, realmId_, topicId);
+  }
+  
+  @Override
+  @Deprecated
+  public Collection<TopicName> getObsoleteTopicNameCollection(String topicId, String... additionalTopicIds)
+  {
+    ArrayList<TopicName> result = new ArrayList<>(additionalTopicIds==null ? 1 : 1 + additionalTopicIds.length);
+    
+    result.add(getObsoleteTopicName(topicId));
+    
+    if(additionalTopicIds != null)
+    {
+      for(String id : additionalTopicIds)
+      {
+        result.add(getObsoleteTopicName(id));
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public TopicName getTopicName(String topicId)
+  {
+    return createTopicName(getServiceId(), true, topicId, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, getServiceId(), topicId);
+  }
+
+  @Override
+  public TopicName getTenantTopicName(String topicId)
+  {
+    return createTopicName(getServiceId(), true, topicId, 
+        getGlobalNamePrefix(), environmentType_, environmentId_,
+        getServiceId(), getTenantId(),
+        topicId);
+  }
+
+  @Override
+  public Collection<TopicName> getTopicNameCollection(String topicId, String... additionalTopicIds)
+  {
+    ArrayList<TopicName> result = new ArrayList<>(additionalTopicIds==null ? 1 : 1 + additionalTopicIds.length);
+    
+    result.add(getTopicName(topicId));
+    
+    if(additionalTopicIds != null)
+    {
+      for(String id : additionalTopicIds)
+      {
+        result.add(getTopicName(id));
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public TopicName getTopicName(String serviceId, String topicId)
+  {
+    return createTopicName(serviceId, getServiceId().equals(serviceId), topicId,
+        getGlobalNamePrefix(), environmentType_, environmentId_, serviceId, topicId);
+  }
+
+  @Override
+  public Name getConfigBucketName(String regionId)
+  {
+    return createName(getGlobalNamePrefix(), FUGUE, getRequiredEnvironmentType(), regionId, CONFIG);
+  }
+  
+  @Override
+  public Name getFugueName()
+  {
+    return createName(getGlobalNamePrefix(), FUGUE, environmentType_, environmentId_, regionId_, serviceId_);
+  }
+  
+  @Override
+  public Name getFugueEnvironmentTypeName()
+  {
+    return createName(getGlobalNamePrefix(), FUGUE, environmentType_);
+  }
+  
+  @Override
+  public Name getName()
+  {
+    return createName(getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, serviceId_);
+  }
+
+  @Override
+  public Name getRegionName()
+  {
+    return createName(getGlobalNamePrefix(), environmentType_, environmentId_, regionId_);
+  }
+  
+  @Override
+  public Name getRegionalName(String name)
+  {
+    return createName(getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, name);
+  }
+
+  @Override
+  public CredentialName getFugueCredentialName(String owner)
+  {
+    return createCredentialName(getGlobalNamePrefix(), FUGUE + "-" + environmentType_, environmentId_, null, owner, CredentialName.SUFFIX);
+  }
+
+  @Override
+  public CredentialName getEnvironmentCredentialName(String owner)
+  {
+    return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, null, owner, CredentialName.SUFFIX);
+  }
+  
+  @Override
+  public CredentialName getCredentialName(String tenantId, String owner)
+  {
+    return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, tenantId, owner, CredentialName.SUFFIX);
+  }
+  
+  @Override
+  public SubscriptionName getSubscriptionName(TopicName topicName, String subscriptionId)
+  {
+    return createSubscriptionName(topicName, getServiceId(), subscriptionId,
+        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getServiceId(), subscriptionId, topicName.getTopicId(), topicName.getServiceId());
+  }
+
+  @Override
+  @Deprecated
+  public SubscriptionName getObsoleteSubscriptionName(TopicName topicName, String subscriptionId)
+  {
+    return createSubscriptionName(topicName, getServiceId(), subscriptionId, topicName.toString(), subscriptionId);
+  }
   
   protected Name createName(@Nonnull String name, String ...additional)
   {

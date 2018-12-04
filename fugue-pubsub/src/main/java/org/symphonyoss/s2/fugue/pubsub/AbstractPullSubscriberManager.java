@@ -31,26 +31,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.counter.BusyCounter;
-import org.symphonyoss.s2.fugue.counter.Counter;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
-import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 
-
+/**
+ * Base class for synchronous pull type implementations.
+ * 
+ * @author Bruce Skingle
+ *
+ * @param <P> Type of payload received.
+ * @param <T> Type of concrete manager, needed for fluent methods.
+ */
 public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
 {
   private static final Logger                 log_           = LoggerFactory
       .getLogger(AbstractPullSubscriberManager.class);
 
-  private final IConfiguration                sqsConfig_;
+  private final IBusyCounter                  busyCounter_;
 
-  private ICounter                            counter_;
-  private IBusyCounter                        busyCounter_;
   private int                                 subscriberThreadPoolSize_;
   private int                                 handlerThreadPoolSize_;
   private final LinkedBlockingQueue<Runnable> executorQueue_ = new LinkedBlockingQueue<Runnable>();
@@ -58,33 +57,50 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
   private ThreadPoolExecutor                  subscriberExecutor_;
   private ThreadPoolExecutor                  handlerExecutor_;
   
-  protected AbstractPullSubscriberManager(IConfiguration config, INameFactory nameFactory, Class<T> type,
-      ITraceContextTransactionFactory traceFactory, IThreadSafeErrorConsumer<P> unprocessableMessageConsumer,
-      String configPath)
+  protected AbstractPullSubscriberManager(Builder<P,?,T> builder)
   {
-    super(nameFactory, type, traceFactory, unprocessableMessageConsumer);
+    super(builder);
     
-    sqsConfig_ = config.getConfiguration(configPath);
+    busyCounter_  = builder.busyCounter_;
+    
+    IConfiguration subscriberConfig = config_.getConfiguration(builder.getConfigPath());
+    
+    subscriberThreadPoolSize_ = subscriberConfig.getInt("subscriberThreadPoolSize", 4);
+    handlerThreadPoolSize_ = subscriberConfig.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
+
+//    subscriberThreadPoolSize_ = 4; //8 * getTotalSubscriptionCnt();
   }
 
-  public T withCounter(Counter counter)
+  /**
+   * Builder.
+   * 
+   * @author Bruce Skingle
+   *
+   * @param <T>   The concrete type returned by fluent methods.
+   * @param <B>   The concrete type of the built object.
+   */
+  public static abstract class Builder<P, T extends IPullSubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>>
+  extends AbstractSubscriberManager.Builder<P,T,B>
+  implements IPullSubscriberManagerBuilder<P,T,B>
   {
-    counter_ = counter;
+    private IBusyCounter         busyCounter_;
+
+    protected Builder(Class<T> type, Class<B> builtType)
+    {
+      super(type, builtType);
+    }
     
-    return self();
-  }
-  
-  protected ICounter getCounter()
-  {
-    return counter_;
+    @Override
+    public T withBusyCounter(IBusyCounter busyCounter)
+    {
+      busyCounter_ = busyCounter;
+      
+      return self();
+    }
+    
+    protected abstract String getConfigPath();
   }
 
-  public T withBusyCounter(IBusyCounter busyCounter)
-  {
-    busyCounter_ = busyCounter;
-    
-    return self();
-  }
   
   protected IBusyCounter getBusyCounter()
   {
@@ -94,8 +110,6 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
   @Override
   public void start()
   {
-    initialize();
-    
     int min = getTotalSubscriptionCnt() * 2;
     
     if(subscriberThreadPoolSize_ < min)
@@ -130,15 +144,6 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
         handlerQueue_, new NamedThreadFactory("PubSub-handler", true));
       
     super.start();
-  }
-
-  protected void initialize()
-  {
-    subscriberThreadPoolSize_ = sqsConfig_.getInt("subscriberThreadPoolSize", 4);
-    handlerThreadPoolSize_ = sqsConfig_.getInt("handlerThreadPoolSize", 9 * subscriberThreadPoolSize_);
-
-//    subscriberThreadPoolSize_ = 4; //8 * getTotalSubscriptionCnt();
-//    handlerThreadPoolSize_ = 9 * subscriberThreadPoolSize_;
   }
   
   @Override

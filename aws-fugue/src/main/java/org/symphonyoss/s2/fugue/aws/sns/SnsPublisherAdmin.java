@@ -29,8 +29,6 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.config.IConfiguration;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 import org.symphonyoss.s2.fugue.pubsub.IPublisherAdmin;
@@ -49,23 +47,59 @@ import com.amazonaws.services.sns.model.Subscription;
  * @author Bruce Skingle
  *
  */
-public class SnsPublisherAdmin extends SnsPublisherManager implements IPublisherAdmin
+public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> implements IPublisherAdmin
 {
   private static final Logger log_            = LoggerFactory.getLogger(SnsPublisherAdmin.class);
 
   private Set<TopicName>      obsoleteTopics_ = new HashSet<>();
   private Set<TopicName>      topics_         = new HashSet<>();
-  /**
-   * Constructor.
-   * 
-   * @param config      The configuration provider.
-   * @param nameFactory A name factory.
-   * @param region      The AWS region to use.
-   * @param accountId   The AWS numeric account ID 
-   */
-  public SnsPublisherAdmin(IConfiguration config, INameFactory nameFactory, String region, String accountId)
+//  /**
+//   * Constructor.
+//   * 
+//   * @param config      The configuration provider.
+//   * @param nameFactory A name factory.
+//   * @param region      The AWS region to use.
+//   * @param accountId   The AWS numeric account ID 
+//   */
+//  public SnsPublisherAdmin(IConfiguration config, INameFactory nameFactory, String region, String accountId)
+//  {
+//    super(config, nameFactory, region, accountId, true);
+//  }
+  
+  private SnsPublisherAdmin(Builder builder)
   {
-    super(config, nameFactory, region, accountId, true);
+    super(builder);
+  }
+
+  /**
+   * Concrete builder.
+   * 
+   * @author Bruce Skingle
+   */
+  public static class Builder extends SnsPublisherBase.Builder<Builder, SnsPublisherAdmin>
+  {
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class, SnsPublisherAdmin.class);
+    }
+
+    @Override
+    public SnsPublisherAdmin build()
+    {
+      validate();
+      
+      return new SnsPublisherAdmin(this);
+    }
+  }
+
+  @Override
+  public boolean validateTopic(TopicName topicName)
+  {
+    // topics may not have been created yet
+    return true;
   }
 
   @Override

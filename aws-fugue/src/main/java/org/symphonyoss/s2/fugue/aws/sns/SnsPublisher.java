@@ -33,9 +33,9 @@ class SnsPublisher implements IPublisher
 {
   private final String              topicName_;
   private final String              topicArn_;
-  private final SnsPublisherManager manager_;
+  private final SnsPublisherBase<?> manager_;
 
-  SnsPublisher(TopicName topicName, String topicArn, SnsPublisherManager manager)
+  SnsPublisher(TopicName topicName, String topicArn, SnsPublisherBase<?> manager)
   {
     topicName_ = topicName.toString();
     topicArn_ = topicArn;

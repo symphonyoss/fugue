@@ -21,30 +21,32 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
-
-import org.symphonyoss.s2.common.fluent.IFluent;
+package org.symphonyoss.s2.fugue.config;
 
 /**
- * A subscriber admin controller.
+ * The top level or global configuration for a process.
  * 
  * @author Bruce Skingle
  *
- * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public interface ISubscriberAdmin<T extends ISubscriberAdmin<T>> extends IFluent<T>
+public interface IGlobalConfiguration extends IConfiguration
 {
-  /**
-   * Create all configured subscriptions.
-   * 
-   * @param dryRun If true then don't change anything
-   */
-  void createSubscriptions(boolean dryRun);
+  String getGlobalNamePrefix();
+
+  String getEnvironmentType();
+
+  String getEnvironmentId();
+
+  @Deprecated
+  String getRealmId();
+
+  String getRegionId();
+
+  String getTenantId();
+
+  String getServiceId();
+
+  String getCloudServiceProviderId();
   
-  /**
-   * Delete all configured subscriptions.
-   * 
-   * @param dryRun If true then don't change anything
-   */
-  void deleteSubscriptions(boolean dryRun);
+  String getCloudRegionId();
 }

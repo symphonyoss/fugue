@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import org.symphonyoss.s2.common.fault.CodingFault;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -42,9 +43,14 @@ public class EmptyConfiguration extends Configuration
    */
   public EmptyConfiguration()
   {
+    super(getTree());
+  }
+
+  private static JsonNode getTree()
+  {
     try
     {
-      setTree(new ObjectMapper().readTree("{}"));
+      return new ObjectMapper().readTree("{}");
     }
     catch(IOException e)
     {

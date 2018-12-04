@@ -29,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 
@@ -38,41 +37,58 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  * 
  * @author Bruce Skingle
  *
- * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberAdmin<P, T extends ISubscriberAdmin & IFluent<T>> extends AbstractSubscriberBase<P, T> implements ISubscriberAdmin
+public abstract class AbstractSubscriberAdmin<T extends ISubscriberAdmin<T> & IFluent<T>> extends AbstractSubscriberBase<Void, T> implements ISubscriberAdmin<T>
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
   
-  protected AbstractSubscriberAdmin(INameFactory nameFactory, Class<T> type)
+  protected AbstractSubscriberAdmin(Builder<?,T> builder)
   {
-    super(nameFactory, type);
+    super(builder);
   }
 
-  @Override
-  public ISubscriberAdmin withSubscription(Subscription subscription)
+  /**
+   * Builder.
+   * 
+   * @author Bruce Skingle
+   *
+   * @param <T>   The concrete type returned by fluent methods.
+   * @param <B>   The concrete type of the built object.
+   */
+  public static abstract class Builder<T extends ISubscriberAdminBuilder<T,B>, B extends ISubscriberAdmin<B>>
+  extends AbstractSubscriberBase.Builder<Void,T,B>
+  implements ISubscriberAdminBuilder<T,B>
   {
-    return super.withSubscription(null, subscription);
-  }
+    protected Builder(Class<T> type, Class<B> builtType)
+    {
+      super(type, builtType);
+    }
 
-  @Override
-  public T withSubscription(String subscriptionId, String topicId,
-      String... additionalTopicIds)
-  {
-    return super.withSubscription(null, subscriptionId, topicId, additionalTopicIds);
-  }
-
-  @Override
-  public T withSubscription(String subscriptionId, Collection<TopicName> topicNames)
-  {
-    return super.withSubscription(null, subscriptionId, topicNames);
-  }
+    @Override
+    public T withSubscription(Subscription subscription)
+    {
+      return super.withSubscription(null, subscription);
+    }
   
-  @Override
-  public T withSubscription(String subscriptionId, String[] topicNames)
-  {
-    return super.withSubscription(null, subscriptionId, topicNames);
+    @Override
+    public T withSubscription(String subscriptionId, String topicId,
+        String... additionalTopicIds)
+    {
+      return super.withSubscription(null, subscriptionId, topicId, additionalTopicIds);
+    }
+  
+    @Override
+    public T withSubscription(String subscriptionId, Collection<TopicName> topicNames)
+    {
+      return super.withSubscription(null, subscriptionId, topicNames);
+    }
+    
+    @Override
+    public T withSubscription(String subscriptionId, String[] topicNames)
+    {
+      return super.withSubscription(null, subscriptionId, topicNames);
+    }
   }
 
   @Override

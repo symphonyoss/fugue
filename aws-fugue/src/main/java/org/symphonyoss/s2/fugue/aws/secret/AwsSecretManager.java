@@ -31,6 +31,8 @@ import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.secret.ISecretManager;
 
@@ -61,38 +63,72 @@ public class AwsSecretManager implements ISecretManager
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private final String              region_;
-  
   private AWSSecretsManager         secretClient_;
 
-  /**
-   * Constructor.
-   * 
-   * @param region The AWS region in which to operate.
-   */
-  public AwsSecretManager(String region)
+  private AwsSecretManager(Builder builder)
   {
-    region_ = region;
-
-    secretClient_ = AWSSecretsManagerClientBuilder.standard()
-        .withRegion(region_)
-        .build();
+    secretClient_ = builder.secretClientBuilder_.build();
   }
   
+  
   /**
-   * Constructor.
+   * Builder for AwsSecretManager.
    * 
-   * @param region The AWS region in which to operate.
-   * @param credentials AWS credentials.
+   * @author Bruce Skingle
+   *
    */
-  public AwsSecretManager(String region, AWSCredentialsProvider credentials)
+  public static class Builder extends BaseAbstractBuilder<Builder>
   {
-    region_ = region;
+    protected final AWSSecretsManagerClientBuilder  secretClientBuilder_;
 
-    secretClient_ = AWSSecretsManagerClientBuilder.standard()
+    protected String                            region_;
+    
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+      
+      secretClientBuilder_ = AWSSecretsManagerClientBuilder.standard();
+    }
+
+    /**
+     * Build from the current settings.
+     * 
+     * @return A new AwsSecretManager.
+     */
+    public AwsSecretManager build()
+    {
+      validate();
+      return new AwsSecretManager(this);
+    }
+    
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(region_,      "region");
+   
+      secretClientBuilder_
         .withRegion(region_)
-        .withCredentials(credentials)
-        .build();
+        ;
+    }
+
+    public Builder withRegion(String region)
+    {
+      region_ = region;
+      
+      return self();
+    }
+
+    public Builder withCredentials(AWSCredentialsProvider credentials)
+    {
+      secretClientBuilder_.withCredentials(credentials);
+      
+      return self();
+    }
   }
   
   @Override

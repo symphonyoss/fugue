@@ -48,9 +48,6 @@ public class Configuration implements IConfiguration
   private JsonNode tree_;
   private Map<String, Configuration> subConfigMap_ = new HashMap<>();
   private String name_ = "";
-
-  protected Configuration()
-  {}
   
   protected Configuration(JsonNode tree)
   {
@@ -58,10 +55,10 @@ public class Configuration implements IConfiguration
   }
 
   
-  protected void setTree(JsonNode tree)
-  {
-    tree_ = tree;
-  }
+//  protected void setTree(JsonNode tree)
+//  {
+//    tree_ = tree;
+//  }
   
 //  /* package */  JsonNode getTree()
 //  {

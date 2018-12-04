@@ -49,59 +49,78 @@ public class FileConfiguration extends Configuration
   public static final IConfigurationFactory FACTORY = new IConfigurationFactory()
   {
     @Override
-    public IConfiguration newInstance(String variableName)
+    public FileConfiguration newInstance()
     {
-      return new FileConfiguration(variableName);
+      return new FileConfiguration();
     }
 
   };
       
   private static final Logger log_ = LoggerFactory.getLogger(FileConfiguration.class);
   
-  private FileConfiguration(String variableName)
+  private FileConfiguration()
   {
-    String fugueConfig = Fugue.getRequiredProperty(variableName);
-
-    File file = new File(fugueConfig);
+    this(new FileConfig());
     
-    if(file.exists())
-    {
-      try(InputStream in = new FileInputStream(file))
-      {
-        log_.info("Loading config from file " + file.getAbsolutePath());
-        
-        loadConfig(in);
-        setName(file.getAbsolutePath() + " ");
-      }
-      catch (FileNotFoundException e)
-      {
-        throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.", e);
-      }
-      catch (IOException e)
-      {
-        log_.warn("Failed to close config input", e);
-      }
-    }
-    else
-    {
-      throw new ProgramFault(variableName + " is " + fugueConfig + " but this file does not exist.");
-    }
+  }
+  
+  private FileConfiguration(FileConfig fileConfig)
+  {
+    super(fileConfig.tree_);
+    setName(fileConfig.name_);
   }
 
-
-  private void loadConfig(InputStream in)
+  private static class FileConfig
   {
-    ObjectMapper mapper = new ObjectMapper();
-    
-    try
+    private JsonNode tree_;
+    private String   name_;
+
+    private FileConfig()
     {
-      JsonNode configSpec = mapper.readTree(in);
+      String fugueConfig = Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG);
+  
+      File file = new File(fugueConfig);
       
-      setTree(configSpec);
+      if(file.exists())
+      {
+        try(InputStream in = new FileInputStream(file))
+        {
+          log_.info("Loading config from file " + file.getAbsolutePath());
+          
+          name_ = file.getAbsolutePath() + " ";
+          
+          loadConfig(in);
+        }
+        catch (FileNotFoundException e)
+        {
+          throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.", e);
+        }
+        catch (IOException e)
+        {
+          log_.warn("Failed to close config input", e);
+        }
+      }
+      else
+      {
+        throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.");
+      }
     }
-    catch (IOException e1)
+  
+  
+    private void loadConfig(InputStream in)
     {
-      throw new ProgramFault("Cannot parse config.", e1);
+      ObjectMapper mapper = new ObjectMapper();
+      
+      try
+      {
+        JsonNode configSpec = mapper.readTree(in);
+        
+        tree_ = configSpec;
+      }
+      catch (IOException e1)
+      {
+        throw new ProgramFault("Cannot parse config.", e1);
+      }
     }
   }
 }

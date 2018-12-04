@@ -137,6 +137,7 @@ public interface INameFactory
   
   String getServiceId();
 
+  @Deprecated
   String getRealmId();
   
   String getRegionId();
@@ -158,4 +159,8 @@ public interface INameFactory
   Name getFugueEnvironmentTypeName();
 
   TopicName getTenantTopicName(String topicId);
+
+  String getGlobalNamePrefix();
+
+  INameFactory withGlobalNamePrefix(String globalNamePrefix);
 }

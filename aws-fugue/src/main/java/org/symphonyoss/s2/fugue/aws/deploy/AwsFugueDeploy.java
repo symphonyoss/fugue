@@ -256,7 +256,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       .defaultClient();
   private final AWSSecurityTokenService  sts_                          = AWSSecurityTokenServiceClientBuilder
       .defaultClient();
-  private final AwsSecretManager         secretManager_                = new AwsSecretManager("us-east-1");
+  private final AwsSecretManager         secretManager_                = new AwsSecretManager.Builder().withRegion("us-east-1").build();
 
   private String                         awsAccountId_;
 //  private User                           awsUser_;

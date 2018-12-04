@@ -102,6 +102,12 @@ public interface IFugeComponentContainer<T extends IFluent<T>> extends IFluent<T
    * 
    * Calls start() on all registered components which implement IFugueComponent.
    * 
+   * Unless some component starts a non-daemon thread the process will terminate. If no thread
+   * exists to keep the application alive then call join() after this method returns since
+   * this method is fluent you can call <code>start().join()</code>.
+   * 
+   * @throws IllegalStateException  If the current state is not compatible with starting.
+   * 
    * @return This (fluent method).
    */
   T start();
@@ -123,5 +129,36 @@ public interface IFugeComponentContainer<T extends IFluent<T>> extends IFluent<T
    * @return This (fluent method).
    */
   T stop();
+
+  /**
+   * Run the main loop process for up to timeout milliseconds.
+   * 
+   * This is an alternative to calling join() on a server object from the main thread.
+   * This method periodically prints various debug information to the log.
+   * 
+   * @param timeout Limit in ms of time to run.
+   * @return this (Fluent method).
+   * 
+   * @throws InterruptedException If a sleep is interrupted.
+   */
+  T mainLoop(long timeout) throws InterruptedException;
+
+  /**
+   * Set the running state of the container.
+   * 
+   * @param running the new state.
+   * 
+   * @return the previous state.
+   */
+  boolean setRunning(boolean running);
+
+  /**
+   * Return true iff the container is running.
+   * 
+   * Threads may call this method in their main loop to determine if they should terminate.
+   * 
+   * @return true iff the server is running.
+   */
+  boolean isRunning();
 
 }

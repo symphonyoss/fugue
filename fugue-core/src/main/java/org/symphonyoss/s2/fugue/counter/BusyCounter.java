@@ -77,9 +77,13 @@ public class BusyCounter implements IBusyCounter
     return false;
   }
 
+  /**
+   * Scale up
+   * @return true iff the caller should scale up, i.e. if this call FAILS
+   */
   protected boolean scaleUp()
   {
-    return false; 
+    return true; 
   }
 
   protected boolean doScaleDown()
