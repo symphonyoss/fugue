@@ -65,7 +65,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
   
   private GoogleSubscriberManager(Builder builder)
   {
-    super(builder);
+    super(GoogleSubscriberManager.class, builder);
     
     projectId_ = builder.projectId_;
   }
@@ -85,7 +85,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
      */
     public Builder()
     {
-      super(Builder.class, GoogleSubscriberManager.class);
+      super(Builder.class);
     }
     
     @Override
@@ -117,10 +117,8 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
     }
 
     @Override
-    public GoogleSubscriberManager build()
+    protected GoogleSubscriberManager construct()
     {
-      validate();
-      
       return new GoogleSubscriberManager(this);
     }
   }

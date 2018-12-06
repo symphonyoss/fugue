@@ -27,7 +27,6 @@ import java.util.Collection;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -39,13 +38,13 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  *
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberAdmin<T extends ISubscriberAdmin<T> & IFluent<T>> extends AbstractSubscriberBase<Void, T> implements ISubscriberAdmin<T>
+public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<T>> extends AbstractSubscriberBase<Void, T> implements ISubscriberAdmin<T>
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
   
-  protected AbstractSubscriberAdmin(Builder<?,T> builder)
+  protected AbstractSubscriberAdmin(Class<T> type, Builder<?,T> builder)
   {
-    super(builder);
+    super(type, builder);
   }
 
   /**
@@ -56,13 +55,13 @@ public abstract class AbstractSubscriberAdmin<T extends ISubscriberAdmin<T> & IF
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<T extends ISubscriberAdminBuilder<T,B>, B extends ISubscriberAdmin<B>>
+  public static abstract class Builder<T extends Builder<T,B>, B extends AbstractSubscriberAdmin<B>>
   extends AbstractSubscriberBase.Builder<Void,T,B>
   implements ISubscriberAdminBuilder<T,B>
   {
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
     }
 
     @Override

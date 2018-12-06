@@ -71,9 +71,9 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
   protected final AmazonSNS                    snsClient_;
 
   
-  protected SnsPublisherBase(Builder<?,T> builder)
+  protected SnsPublisherBase(Class<T> type, Builder<?,T> builder)
   {
-    super(builder);
+    super(type, builder);
     
     region_    = builder.region_;
     accountId_ = builder.accountId_;
@@ -116,9 +116,9 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
     protected String                       region_;
     protected String                       accountId_;
     
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
       
       snsBuilder_ = AmazonSNSClientBuilder.standard();
     }

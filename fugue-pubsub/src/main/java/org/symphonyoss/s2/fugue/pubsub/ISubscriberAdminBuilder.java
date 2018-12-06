@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.Collection;
 
-import org.symphonyoss.s2.common.fluent.IFluentBuilder;
+import org.symphonyoss.s2.common.fluent.IBuilder;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 
 /**
@@ -36,7 +36,7 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  * @param <T> Type of concrete builder, needed for fluent methods.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface ISubscriberAdminBuilder<T extends ISubscriberAdminBuilder<T,B>, B extends ISubscriberAdmin<B>> extends IFluentBuilder<T,B>
+public interface ISubscriberAdminBuilder<T extends ISubscriberAdminBuilder<T,B>, B extends ISubscriberAdmin<B>> extends IBuilder<T,B>
 {
   T withSubscription(Subscription subscription);
   

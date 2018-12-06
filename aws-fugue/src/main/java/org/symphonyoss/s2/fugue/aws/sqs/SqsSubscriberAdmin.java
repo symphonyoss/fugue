@@ -64,7 +64,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
   
   private SqsSubscriberAdmin(Builder builder)
   {
-    super(builder);
+    super(SqsSubscriberAdmin.class, builder);
     
     accountId_  = builder.accountId_;
     region_     = builder.region_;
@@ -96,7 +96,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
      */
     public Builder()
     {
-      super(Builder.class, SqsSubscriberAdmin.class);
+      super(Builder.class);
       
       sqsBuilder_ = AmazonSQSClientBuilder.standard();
       snsBuilder_ = AmazonSNSClientBuilder.standard();
@@ -173,7 +173,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     }
 
     @Override
-    public SqsSubscriberAdmin build()
+    protected SqsSubscriberAdmin construct()
     {
       return new SqsSubscriberAdmin(this);
     }

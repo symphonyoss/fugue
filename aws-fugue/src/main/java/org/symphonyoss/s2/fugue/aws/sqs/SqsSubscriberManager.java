@@ -81,7 +81,7 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
 
   private SqsSubscriberManager(Builder builder)
   {
-    super(builder);
+    super(SqsSubscriberManager.class, builder);
     
     sqsClient_ = builder.sqsBuilder_.build();
     
@@ -110,7 +110,7 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
      */
     public Builder()
     {
-      super(Builder.class, SqsSubscriberManager.class);
+      super(Builder.class);
       
       sqsBuilder_ = AmazonSQSClientBuilder.standard();
     }
@@ -160,10 +160,8 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
     }
 
     @Override
-    public SqsSubscriberManager build()
+    protected SqsSubscriberManager construct()
     {
-      validate();
-      
       return new SqsSubscriberManager(this);
     }
   }

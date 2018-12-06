@@ -25,7 +25,7 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.Collection;
 
-import org.symphonyoss.s2.common.fluent.IFluentBuilder;
+import org.symphonyoss.s2.common.fluent.IBuilder;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.ICounter;
@@ -43,7 +43,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  * @param <T> Type of concrete builder, needed for fluent methods.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface ISubscriberManagerBuilder<P,T extends ISubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>> extends IFluentBuilder<T,B>
+public interface ISubscriberManagerBuilder<P,T extends ISubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>> extends IBuilder<T,B>
 {
   T withNameFactory(INameFactory nameFactory);
   

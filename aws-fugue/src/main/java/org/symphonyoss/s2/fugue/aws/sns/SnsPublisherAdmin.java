@@ -68,7 +68,7 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
   
   private SnsPublisherAdmin(Builder builder)
   {
-    super(builder);
+    super(SnsPublisherAdmin.class, builder);
   }
 
   /**
@@ -83,14 +83,12 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
      */
     public Builder()
     {
-      super(Builder.class, SnsPublisherAdmin.class);
+      super(Builder.class);
     }
 
     @Override
-    public SnsPublisherAdmin build()
+    protected SnsPublisherAdmin construct()
     {
-      validate();
-      
       return new SnsPublisherAdmin(this);
     }
   }

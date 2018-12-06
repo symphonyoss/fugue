@@ -38,7 +38,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
   
   private GoogleSubscriberAdmin(Builder builder)
   {
-    super(builder);
+    super(GoogleSubscriberAdmin.class, builder);
     
     projectId_ = builder.projectId_;
     
@@ -67,7 +67,7 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
      */
     public Builder()
     {
-      super(Builder.class, GoogleSubscriberAdmin.class);
+      super(Builder.class);
     }
     
     /**
@@ -93,10 +93,8 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
     }
 
     @Override
-    public GoogleSubscriberAdmin build()
+    protected GoogleSubscriberAdmin construct()
     {
-      validate();
-      
       return new GoogleSubscriberAdmin(this);
     }
   }

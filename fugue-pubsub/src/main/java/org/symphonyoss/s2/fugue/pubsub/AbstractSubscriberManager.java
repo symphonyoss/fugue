@@ -53,7 +53,7 @@ import com.google.common.cache.CacheBuilder;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<P,T>> extends AbstractSubscriberBase<P,T>
+public abstract class AbstractSubscriberManager<P, T extends AbstractSubscriberManager<P,T>> extends AbstractSubscriberBase<P,T>
 implements ISubscriberManager<P, T>
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
@@ -75,9 +75,9 @@ implements ISubscriberManager<P, T>
                                                                             .build();
   
 
-  protected AbstractSubscriberManager(Builder<P,?,T> builder)
+  protected AbstractSubscriberManager(Class<T> type, Builder<P,?,T> builder)
   {
-    super(builder);
+    super(type, builder);
     
     traceFactory_                 = builder.traceFactory_;
     unprocessableMessageConsumer_ = builder.unprocessableMessageConsumer_;
@@ -93,7 +93,7 @@ implements ISubscriberManager<P, T>
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  protected static abstract class Builder<P, T extends ISubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>>
+  protected static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberManager<P,B>>
   extends AbstractSubscriberBase.Builder<P,T,B>
   implements ISubscriberManagerBuilder<P,T,B>
   {
@@ -102,9 +102,9 @@ implements ISubscriberManager<P, T>
     private IConfiguration                  config_;
     private ICounter                        counter_;
 
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
     }
 
     @Override

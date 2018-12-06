@@ -43,7 +43,7 @@ import org.symphonyoss.s2.fugue.deploy.IBatch;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
+public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
 {
   private static final Logger                 log_           = LoggerFactory
       .getLogger(AbstractPullSubscriberManager.class);
@@ -57,9 +57,9 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
   private ThreadPoolExecutor                  subscriberExecutor_;
   private ThreadPoolExecutor                  handlerExecutor_;
   
-  protected AbstractPullSubscriberManager(Builder<P,?,T> builder)
+  protected AbstractPullSubscriberManager(Class<T> type, Builder<P,?,T> builder)
   {
-    super(builder);
+    super(type, builder);
     
     busyCounter_  = builder.busyCounter_;
     
@@ -79,15 +79,15 @@ public abstract class AbstractPullSubscriberManager<P, T extends ISubscriberMana
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<P, T extends IPullSubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>>
+  public static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractPullSubscriberManager<P,B>>
   extends AbstractSubscriberManager.Builder<P,T,B>
   implements IPullSubscriberManagerBuilder<P,T,B>
   {
     private IBusyCounter         busyCounter_;
 
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
     }
     
     @Override

@@ -39,7 +39,7 @@ public class SnsPublisherManager extends SnsPublisherBase<SnsPublisherManager>
 
   private SnsPublisherManager(Builder builder)
   {
-    super(builder);
+    super(SnsPublisherManager.class, builder);
     
     log_.info("Starting SnsPublisherManager in " + builder.region_ + "...");
   }
@@ -55,14 +55,12 @@ public class SnsPublisherManager extends SnsPublisherBase<SnsPublisherManager>
     /** Constructor. */
     public Builder()
     {
-      super(Builder.class, SnsPublisherManager.class);
+      super(Builder.class);
     }
 
     @Override
-    public SnsPublisherManager build()
+    protected SnsPublisherManager construct()
     {
-      validate();
-      
       return new SnsPublisherManager(this);
     }
   }

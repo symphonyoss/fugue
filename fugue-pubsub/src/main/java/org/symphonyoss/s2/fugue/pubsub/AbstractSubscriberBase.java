@@ -30,9 +30,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.common.fluent.FluentBuilder;
-import org.symphonyoss.s2.common.fluent.IFluent;
-import org.symphonyoss.s2.common.fluent.IFluentBuilder;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -48,16 +46,16 @@ import com.google.common.collect.ImmutableList;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends FugueLifecycleComponent<T>
+public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase<P,T>> extends FugueLifecycleComponent<T>
 {
   protected final INameFactory                       nameFactory_;
   protected final ImmutableList<SubscriptionImpl<P>> subscribers_;
   
   protected final int                                  totalSubscriptionCnt_;
   
-  protected AbstractSubscriberBase(Builder<P,?,T> builder)
+  protected AbstractSubscriberBase(Class<T> type, Builder<P,?,T> builder)
   {
-    super(builder.getBuiltType());
+    super(type);
     
     nameFactory_          = builder.nameFactory_;
     subscribers_          = ImmutableList.copyOf(builder.subscribers_);
@@ -69,19 +67,20 @@ public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends Fu
    * 
    * @author Bruce Skingle
    *
+   * @param <P>   Type of payload received by subscribers.
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<P, T extends IFluentBuilder<T,B>, B extends IFluent<B>> extends FluentBuilder<T,B>
+  public static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberBase<P,B>> extends BaseAbstractBuilder<T,B>
   {
     private INameFactory              nameFactory_;
     private int                       totalSubscriptionCnt_;
     private List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
     private List<Runnable>            taskList_    = new ArrayList<>();
     
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
     }
     
     public T withNameFactory(INameFactory nameFactory)

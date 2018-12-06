@@ -77,12 +77,12 @@ public class AwsSecretManager implements ISecretManager
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends BaseAbstractBuilder<Builder>
+  public static class Builder extends BaseAbstractBuilder<Builder, AwsSecretManager>
   {
     protected final AWSSecretsManagerClientBuilder  secretClientBuilder_;
 
     protected String                            region_;
-    
+
     /**
      * Constructor.
      */
@@ -92,15 +92,10 @@ public class AwsSecretManager implements ISecretManager
       
       secretClientBuilder_ = AWSSecretsManagerClientBuilder.standard();
     }
-
-    /**
-     * Build from the current settings.
-     * 
-     * @return A new AwsSecretManager.
-     */
-    public AwsSecretManager build()
+    
+    @Override
+    protected AwsSecretManager construct()
     {
-      validate();
       return new AwsSecretManager(this);
     }
     

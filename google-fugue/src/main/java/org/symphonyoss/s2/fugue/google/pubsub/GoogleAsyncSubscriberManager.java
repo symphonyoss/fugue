@@ -17,7 +17,6 @@ import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.google.pubsub.GoogleSubscriberAdmin.Builder;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -76,7 +75,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
 
   private GoogleAsyncSubscriberManager(Builder builder)
   {
-    super(builder);
+    super(GoogleAsyncSubscriberManager.class, builder);
     
     projectId_ = builder.projectId_;
   }
@@ -103,7 +102,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
     public Builder(INameFactory nameFactory, ITraceContextTransactionFactory traceFactory,
         IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer, IConfiguration config, String projectId)
     {
-      super(Builder.class, GoogleAsyncSubscriberManager.class);
+      super(Builder.class);
     }
     
     /**
@@ -129,10 +128,8 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
     }
 
     @Override
-    public GoogleAsyncSubscriberManager build()
+    protected GoogleAsyncSubscriberManager construct()
     {
-      validate();
-      
       return new GoogleAsyncSubscriberManager(this);
     }
   }

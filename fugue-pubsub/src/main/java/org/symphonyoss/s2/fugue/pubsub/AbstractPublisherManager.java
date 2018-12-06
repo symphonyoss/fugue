@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.common.fluent.FluentBuilder;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.common.fluent.IFluent;
 import org.symphonyoss.s2.common.fluent.IFluentBuilder;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
@@ -50,9 +50,9 @@ public abstract class AbstractPublisherManager<T extends AbstractPublisherManage
 {
   protected final INameFactory   nameFactory_;
   
-  protected AbstractPublisherManager(Builder<?,T> builder)
+  protected AbstractPublisherManager(Class<T> builtType, Builder<?,T> builder)
   {
-    super(builder.getBuiltType());
+    super(builtType);
     
     nameFactory_  = builder.nameFactory_;
   }
@@ -65,16 +65,16 @@ public abstract class AbstractPublisherManager<T extends AbstractPublisherManage
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<T extends IFluentBuilder<T,B>, B extends IFluent<B>> extends FluentBuilder<T,B>
+  public static abstract class Builder<T extends Builder<T,B>, B extends IFluent<B>> extends BaseAbstractBuilder<T,B>
   {
     private final List<String>              topicIds_        = new LinkedList<>();
     private final Map<String, List<String>> serviceTopicIds_ = new HashMap<>();
 
     private INameFactory                    nameFactory_;
 
-    protected Builder(Class<T> type, Class<B> builtType)
+    protected Builder(Class<T> type)
     {
-      super(type, builtType);
+      super(type);
       
     }
     

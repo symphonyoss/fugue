@@ -50,7 +50,7 @@ public class GlobalConfiguration extends ConfigurationDelegator implements IGlob
   
   public GlobalConfiguration(IConfiguration delegate)
   {
-    this(delegate, "");
+    this(delegate, null);
   }
   
   public GlobalConfiguration(IConfiguration delegate, String globalNamePrefix)
