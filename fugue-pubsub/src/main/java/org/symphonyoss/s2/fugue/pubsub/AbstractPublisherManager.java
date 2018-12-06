@@ -32,7 +32,6 @@ import java.util.Map.Entry;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.common.fluent.IFluent;
-import org.symphonyoss.s2.common.fluent.IFluentBuilder;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
