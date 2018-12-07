@@ -60,7 +60,7 @@ public class GitHubConfiguration extends Configuration
   
   /* package */ GitHubConfiguration(String fileName)
   {
-    this(new GitHubConfig(Fugue.getRequiredProperty(fileName)));
+    this(new GitHubConfig(fileName));
   }
   
   private GitHubConfiguration(GitHubConfig gitHubConfig)
