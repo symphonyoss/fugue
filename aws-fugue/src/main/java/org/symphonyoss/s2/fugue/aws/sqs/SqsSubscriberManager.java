@@ -101,12 +101,6 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
 
     /**
      * Constructor.
-     * 
-     * @param nameFactory                     A NameFactory.
-     * @param traceFactory                    A trace context factory.
-     * @param unprocessableMessageConsumer    Consumer for invalid messages.
-     * @param config                          Configuration
-     * @param region                          The AWS region in which to operate.
      */
     public Builder()
     {
