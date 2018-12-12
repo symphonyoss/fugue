@@ -45,8 +45,6 @@ public class BusyCounter implements IBusyCounter
     idleCycles_.set(0);
     int busyCnt = busyCycles_.incrementAndGet();
     
-    System.err.println("Busy " + busyCnt);
-    
     if(busyCnt >= busyLimit_)
       return doScaleUp();
     
@@ -58,8 +56,6 @@ public class BusyCounter implements IBusyCounter
   {
     busyCycles_.set(0);
     int idleCnt = idleCycles_.incrementAndGet();
-    
-    System.err.println("Idle " + idleCnt);
     
     if(idleCnt >= idleLimit_)
       return doScaleDown();

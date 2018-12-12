@@ -133,6 +133,23 @@
                 "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-${environmentId}-*:*",
                 "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-${environmentId}-*"
             ]
+        },
+        {
+            "Sid": "Lambda",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:CreateFunction",
+                "lambda:UpdateFunctionCode",
+                "lambda:GetFunction",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:GetFunctionConfiguration",
+                "lambda:GetPolicy",
+                "s3:GetObject"
+            ],
+            "Resource": [
+              "arn:aws:lambda:*:${awsAccountId}:function:sym-s2-${environmentType}-${environmentId}-*",
+              "arn:aws:s3:::sym-s2-fugue-${environmentType}-*-config/lambda/*"
+            ]
         }
     ]
 }

@@ -46,7 +46,6 @@ import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
-import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -83,7 +82,6 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingC
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerResult;
@@ -143,6 +141,17 @@ import com.amazonaws.services.identitymanagement.model.NoSuchEntityException;
 import com.amazonaws.services.identitymanagement.model.PolicyVersion;
 import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
+import com.amazonaws.services.lambda.AWSLambda;
+import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AWSLambdaException;
+import com.amazonaws.services.lambda.model.CreateFunctionRequest;
+import com.amazonaws.services.lambda.model.Environment;
+import com.amazonaws.services.lambda.model.FunctionCode;
+import com.amazonaws.services.lambda.model.GetFunctionRequest;
+import com.amazonaws.services.lambda.model.GetFunctionResult;
+import com.amazonaws.services.lambda.model.ResourceNotFoundException;
+import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
+import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
 import com.amazonaws.services.route53.AmazonRoute53;
@@ -200,13 +209,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   private static final String            POLICY                         = "policy";
   private static final String            GROUP                          = "group";
-  public static final String            ROLE                           = "role";
+  public static final String             ROLE                           = "role";
   private static final String            USER                           = "user";
   private static final String            ROOT                           = "root";
   private static final String            ADMIN                          = "admin";
   private static final String            SUPPORT                        = "support";
   private static final String            CICD                           = "cicd";
   private static final String            CONFIG                         = "config";
+  private static final String            LAMBDA                         = "lambda";
   @Deprecated
   public static final String            DYNAMO_AUTOSCALE               = "dynamo-autoscale";
 
@@ -280,6 +290,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private AmazonIdentityManagement       iamClient_;
   private AmazonCloudWatch               cwClient_;
   private AmazonCloudWatchEvents         cweClient_;
+  private AWSLambda                      lambdaClient_;
 
   private AmazonECS ecsClient_;
 
@@ -615,6 +626,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       cweClient_ =
           AmazonCloudWatchEventsClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      lambdaClient_ =
+          AWSLambdaClientBuilder.standard()
           .withRegion(awsClientRegion_)
           .build();
     }
@@ -1321,6 +1337,61 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       cweClient_.putTargets(request);
     }
 
+    @Override
+    protected void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables)
+    {
+      Name    functionName  = getNameFactory().getServiceItemName(name);
+      Name    roleName      = getNameFactory().getServiceItemName(roleId).append(ROLE);
+      String  bucketName    = environmentTypeConfigBuckets_.get(getAwsRegion());
+      String  key           = LAMBDA + "/" + getNameFactory().getServiceId() + "/" +
+                              name + "-" + getBuildId() + DOT_JAR;
+
+      try
+      {
+        lambdaClient_.getFunction(new GetFunctionRequest()
+            .withFunctionName(functionName.toString())
+            );
+        
+        log_.info("Lambda function " + functionName + " already exists, updating...");
+        lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
+            .withFunctionName(functionName.toString())
+            .withS3Bucket(bucketName)
+            .withS3Key(key)
+            );
+        
+        lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
+            .withFunctionName(functionName.toString())
+            .withHandler(handler)
+            .withMemorySize(memorySize)
+            .withTimeout(timeout)
+            .withEnvironment(new Environment()
+                .withVariables(variables))
+            .withRole(getRoleArn(roleName))
+            .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
+            );
+      }
+      catch(ResourceNotFoundException e)
+      {
+        log_.info("Lambda function " + functionName + " does not exist, creating...");
+        
+        lambdaClient_.createFunction(new CreateFunctionRequest()
+            .withFunctionName(functionName.toString())
+            .withHandler(handler)
+            .withMemorySize(memorySize)
+            .withTimeout(timeout)
+            .withEnvironment(new Environment()
+                .withVariables(variables))
+            .withRole(getRoleArn(roleName))
+            .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
+            .withTags(getTags())
+            .withCode(new FunctionCode()
+                .withS3Bucket(bucketName)
+                .withS3Key(key)
+                )
+            );
+      }
+    }
+
     private String getClusterArn()
     {
       return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":cluster/" + clusterName_;
@@ -1329,6 +1400,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     private String getTaskDefinitionArn(String name)
     {
       return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":task-definition/" + name;
+    }
+
+    private String getRoleArn(Name name)
+    {
+      return "arn:aws:iam::" + awsAccountId_ + ":role/" + name;
     }
 
     private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
@@ -1667,7 +1743,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       // createDnsZones();
       
-      if(!getServiceContainerMap().isEmpty())
+      if(hasDockerContainers())
       {
         loadBalancer_ = createLoadBalancer();
         
