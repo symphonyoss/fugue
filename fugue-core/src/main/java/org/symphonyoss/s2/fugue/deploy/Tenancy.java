@@ -21,41 +21,49 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.deploy;
 
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import javax.annotation.Nullable;
 
 /**
- * A payload sent or received over a pub sub channel.
+ * Tenancy for a service, either single or multi.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface IPubSubMessage
+public enum Tenancy
 {
-  static final String PAYLOAD_TYPE_ATTRIBUTE = "payloadType";
-  static final String TENANT_ID_ATTRIBUTE    = "tenantId";
-  static final String FINAL_ATTRIBUTE        = "final";
+  /** A single tenant service */
+  SINGLE,
+  
+  /** A multi-tenant service */
+  MULTI;
   
   /**
+   * Parse the given string as the name of a value of this enum.
    * 
-   * @return The message payload
-   */
-  @Nonnull String getPayload();
-  
-  /**
+   * Null or empty values are interpreted as MULTI and leading and trailing white space is ignored.
    * 
-   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
-   */
-  @Nonnull Map<String, String> getAttributes();
-
-  /**
+   * @param s A string containing the name of some element of this enum.
    * 
-   * @return The trace context.
+   * @return The enum represented by the given String.
+   * 
+   * @throws IllegalArgumentException if the given value is invalid.
    */
-  @Nonnull ITraceContext getTraceContext();
-
+  public static Tenancy parse(@Nullable String s)
+  {
+    if(s==null)
+      return MULTI;
+    
+    s = s.trim();
+    
+    if(s.length()==0)
+      return MULTI;
+    
+    for(Tenancy t : values())
+      if(s.equalsIgnoreCase(t.toString()))
+        return t;
+        
+    throw new IllegalArgumentException("\"${s}\" is not a valid Tenancy");
+  }
 }

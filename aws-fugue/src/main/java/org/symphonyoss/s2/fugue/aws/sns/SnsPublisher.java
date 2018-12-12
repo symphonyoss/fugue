@@ -24,17 +24,20 @@
 package org.symphonyoss.s2.fugue.aws.sns;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
 
 class SnsPublisher implements IPublisher
 {
+  private final String              topicName_;
   private final String              topicArn_;
-  private final SnsPublisherManager manager_;
+  private final SnsPublisherBase<?> manager_;
 
-  SnsPublisher(String topicArn, SnsPublisherManager manager)
+  SnsPublisher(TopicName topicName, String topicArn, SnsPublisherBase<?> manager)
   {
+    topicName_ = topicName.toString();
     topicArn_ = topicArn;
     manager_ = manager;
   }
@@ -42,13 +45,13 @@ class SnsPublisher implements IPublisher
   @Override
   public void consume(IPubSubMessage item, ITraceContext trace)
   {
-    manager_.send(topicArn_, item, trace);
+    manager_.send(topicName_, topicArn_, item, trace);
   }
 
   @Override
   public void consume(IPubSubMessage item)
   {
-    manager_.send(topicArn_, item, item.getTraceContext());
+    manager_.send(topicName_, topicArn_, item, item.getTraceContext());
   }
 
   @Override

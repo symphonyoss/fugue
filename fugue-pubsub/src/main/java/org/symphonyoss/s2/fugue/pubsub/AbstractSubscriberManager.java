@@ -28,11 +28,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransientTransactionFault;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.counter.Counter;
+import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
@@ -50,60 +53,133 @@ import com.google.common.cache.CacheBuilder;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberManager<P, T extends ISubscriberManager<P,T>> extends AbstractSubscriberBase<P,T> implements ISubscriberManager<P,T>
+public abstract class AbstractSubscriberManager<P, T extends AbstractSubscriberManager<P,T>> extends AbstractSubscriberBase<P,T>
+implements ISubscriberManager<P, T>
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
   protected static final long          FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
   protected static final long          MESSAGE_PROCESSED_OK          = -1;
 
-  private static final Logger          log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
-  private static final Integer FAILURE_CNT_LIMIT = 5;
+  private static final Logger                     log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
+  private static final Integer                    FAILURE_CNT_LIMIT             = 5;
 
-  private final ITraceContextTransactionFactory        traceFactory_;
-  private final IThreadSafeErrorConsumer<P> unprocessableMessageConsumer_;
+  protected final ITraceContextTransactionFactory traceFactory_;
+  protected final IThreadSafeErrorConsumer<P>     unprocessableMessageConsumer_;
+  protected final IConfiguration                  config_;
+  protected final ICounter                        counter_;
+
+  // TODO: replace this with a local topic
   private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
                                                                             .maximumSize(5000)
                                                                             .expireAfterAccess(30, TimeUnit.MINUTES)
                                                                             .build();
   
-  protected AbstractSubscriberManager(INameFactory nameFactory, Class<T> type, 
-      ITraceContextTransactionFactory traceFactory,
-      IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
+
+  protected AbstractSubscriberManager(Class<T> type, Builder<P,?,T> builder)
   {
-    super(nameFactory, type);
+    super(type, builder);
     
-    if(unprocessableMessageConsumer==null)
-      throw new NullPointerException("unprocessableMessageConsumer is required.");
-
-    traceFactory_ = traceFactory;
-    unprocessableMessageConsumer_ = unprocessableMessageConsumer;
+    traceFactory_                 = builder.traceFactory_;
+    unprocessableMessageConsumer_ = builder.unprocessableMessageConsumer_;
+    config_                       = builder.config_;
+    counter_                      = builder.counter_;
   }
 
-  @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
+  /**
+   * Builder.
+   * 
+   * @author Bruce Skingle
+   *
+   * @param <T>   The concrete type returned by fluent methods.
+   * @param <B>   The concrete type of the built object.
+   */
+  protected static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberManager<P,B>>
+  extends AbstractSubscriberBase.Builder<P,T,B>
+  implements ISubscriberManagerBuilder<P,T,B>
   {
-    return super.withSubscription(consumer, subscription);
-  }
+    private ITraceContextTransactionFactory traceFactory_;
+    private IThreadSafeErrorConsumer<P>     unprocessableMessageConsumer_;
+    private IConfiguration                  config_;
+    private ICounter                        counter_;
 
-  @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
-      String... additionalTopicIds)
-  {
-    return super.withSubscription(consumer, subscriptionId, topicId, additionalTopicIds);
-  }
+    protected Builder(Class<T> type)
+    {
+      super(type);
+    }
 
-  @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
-  {
-    return super.withSubscription(consumer, subscriptionId, topicNames);
+    @Override
+    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
+    {
+      return super.withSubscription(consumer, subscription);
+    }
+  
+    @Override
+    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
+        String... additionalTopicIds)
+    {
+      return super.withSubscription(consumer, subscriptionId, topicId, additionalTopicIds);
+    }
+  
+    @Override
+    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
+    {
+      return super.withSubscription(consumer, subscriptionId, topicNames);
+    }
+    
+    @Override
+    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicNames)
+    {
+      return super.withSubscription(consumer, subscriptionId, topicNames);
+    }
+
+    @Override
+    public T withConfig(IConfiguration config)
+    {
+      config_ = config;
+      
+      return self();
+    }
+
+    @Override
+    public T withCounter(ICounter counter)
+    {
+      counter_ = counter;
+      
+      return self();
+    }
+
+    @Override
+    public T withTraceContextTransactionFactory(ITraceContextTransactionFactory traceFactory)
+    {
+      traceFactory_ = traceFactory;
+      
+      return self();
+    }
+
+    @Override
+    public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
+    {
+      unprocessableMessageConsumer_ = unprocessableMessageConsumer;
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(traceFactory_, "traceFactory");
+      faultAccumulator.checkNotNull(unprocessableMessageConsumer_, "unprocessableMessageConsumer");
+      faultAccumulator.checkNotNull(config_, "config");
+    }
   }
   
-  @Override
-  public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicNames)
+  protected ICounter getCounter()
   {
-    return super.withSubscription(consumer, subscriptionId, topicNames);
+    return counter_;
   }
-
+  
   protected abstract void initSubscription(SubscriptionImpl<P> subscription);
   protected abstract void startSubscriptions();
   /**

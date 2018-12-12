@@ -55,6 +55,7 @@ import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.exception.InvalidValueException;
+import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 
@@ -89,7 +90,11 @@ public abstract class FugueDeploy extends CommandLineHandler
   /** The label for an action */
   public static final String   ACTION           = "action";
   /** The file name extension for a JSON document */
+  public static final String   DOT_JAR         = ".jar";
+  /** The file name extension for a Jar file */
   public static final String   DOT_JSON         = ".json";
+  /** The label for a build ID */
+  public static final String   BUILD_ID         = "buildId";
   /** The label for an ID */
   public static final String   ID               = "id";
 
@@ -107,7 +112,12 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final Logger     log_                = LoggerFactory.getLogger(FugueDeploy.class);
   private static final String     SINGLE_TENANT       = "singleTenant";
   private static final String     MULTI_TENANT        = "multiTenant";
+  private static final String     TRUST               = "trust";
   private static final String     PORT                = "port";
+  private static final String     ROLE                = "role";
+  private static final String     MEMORY              = "memory";
+  private static final String     TIMEOUT             = "timeout";
+  private static final String     HANDLER             = "handler";
   private static final String     PATHS               = "paths";
   private static final String     HEALTH_CHECK_PATH   = "healthCheckPath";
   private static final String     CONTAINERS          = "containers";
@@ -129,6 +139,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String                  region_;
   private String                  tenant_;
   private String                  instances_;
+  private String                  buildId_;
 
   private boolean                 primaryEnvironment_ = false;
   private boolean                 primaryRegion_      = false;
@@ -143,6 +154,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private DeploymentContext       multiTenantContext_;
 
   private Map<String, String>     tags_               = new HashMap<>();
+  
+  private Map<String, String> policyTrust_;
   
   protected abstract DeploymentContext  createContext(String tenantId, INameFactory nameFactory);
   
@@ -174,6 +187,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     withFlag('E',   "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",  Boolean.class,  false, false,   (v) -> primaryEnvironment_  = v);
     withFlag('G',   "primaryRegion",      "FUGUE_PRIMARY_REGION",       Boolean.class,  false, false,   (v) -> primaryRegion_       = v);
     withFlag('i',   "instances",          "FUGUE_INSTANCES",            String.class,   false, false,   (v) -> instances_           = v);
+    withFlag('b',   BUILD_ID,             "FUGUE_BUILD_ID",             String.class,   false, false,   (v) -> buildId_             = v);
     
     provider_.init(this);
     
@@ -445,17 +459,21 @@ public abstract class FugueDeploy extends CommandLineHandler
       // deploy multi-tenant containers first
       
 
-      
+      policyTrust_ = fetchPolicies(dir, TRUST);
 
       multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
       
       multiTenantContext_.processConfigAndPolicies();
       
       IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
-      Map<String, JsonObject<?>>  singleTenantInitMap     = new HashMap<>();
-      Map<String, JsonObject<?>>  multiTenantInitMap      = new HashMap<>();
-      Map<String, JsonObject<?>>  singleTenantServiceMap  = new HashMap<>();
-      Map<String, JsonObject<?>>  multiTenantServiceMap   = new HashMap<>();
+      
+      Map<ContainerType, Map<String, JsonObject<?>>>  singleTenantContainerMap     = new HashMap<>();
+      Map<ContainerType, Map<String, JsonObject<?>>>  multiTenantContainerMap      = new HashMap<>();
+      
+//      Map<String, JsonObject<?>>  singleTenantInitMap     = new HashMap<>();
+//      Map<String, JsonObject<?>>  multiTenantInitMap      = new HashMap<>();
+//      Map<String, JsonObject<?>>  singleTenantServiceMap  = new HashMap<>();
+//      Map<String, JsonObject<?>>  multiTenantServiceMap   = new HashMap<>();
       
       if(deployContainers)
       {
@@ -471,31 +489,41 @@ public abstract class FugueDeploy extends CommandLineHandler
           if(c instanceof JsonObject)
           {
             JsonObject<?> container = (JsonObject<?>)c;
+            Tenancy       tenancy   = Tenancy.parse(container.getRequiredString("tenancy"));
             
-            String tenancy = container.getRequiredString("tenancy");
+            Map<ContainerType, Map<String, JsonObject<?>>>  containerMap;
             
-            boolean singleTenant = "SINGLE".equals(tenancy);
-            
-            if("INIT".equals(container.getString("containerType", "SERVICE")))
+            switch(tenancy)
             {
-              if(singleTenant)
-                singleTenantInitMap.put(name, container);
-              else
-                multiTenantInitMap.put(name, container);
+              case SINGLE:
+                containerMap = singleTenantContainerMap;
+                break;
+                
+              case MULTI:
+                containerMap = multiTenantContainerMap;
+                break;
+                
+              default:
+                throw new CodingFault("Unknown tenancy type " + tenancy);
             }
-            else
+            
+            ContainerType containerType = ContainerType.parse(container.getString("containerType", null));
+            
+            Map<String, JsonObject<?>> map = containerMap.get(containerType);
+            
+            if(map == null)
             {
-              if(singleTenant)
-                singleTenantServiceMap.put(name, container);
-              else
-                multiTenantServiceMap.put(name, container);
+              map = new HashMap<>();
+              containerMap.put(containerType, map);
             }
+            
+            map.put(name, container);
           }
         }
         
         // Deploy multi-tenant init containers
         
-        multiTenantContext_.setContainers(multiTenantInitMap, multiTenantServiceMap);
+        multiTenantContext_.setContainers(multiTenantContainerMap);
         
         multiTenantContext_.deployInitContainers();
       }
@@ -542,7 +570,7 @@ public abstract class FugueDeploy extends CommandLineHandler
           
           context.setConfig(singleTenantConfig);
           context.processConfigAndPolicies();
-          context.setContainers(singleTenantInitMap, singleTenantServiceMap);
+          context.setContainers(singleTenantContainerMap);
           
           if(deployContainers)
           {
@@ -872,16 +900,16 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   protected abstract class DeploymentContext
   {
-    private final String               tenantId_;
-    private final INameFactory         nameFactory_;
-    
-    private Map<String, String>        policies_;
-    private ImmutableJsonObject        config_;
-    private ImmutableJsonDom           configDom_;
-    private Map<String, String>        templateVariables_;
-    private StringSubstitutor          sub_;
-    private Map<String, JsonObject<?>> initContainerMap_;
-    private Map<String, JsonObject<?>> serviceContainerMap_;
+    private final String                                   tenantId_;
+    private final INameFactory                             nameFactory_;
+
+    private Map<String, String>                            policies_;
+    private ImmutableJsonObject                            config_;
+    private ImmutableJsonDom                               configDom_;
+    private Map<String, String>                            templateVariables_;
+    private StringSubstitutor                              sub_;
+
+    private Map<ContainerType, Map<String, JsonObject<?>>> containerMap_;
 
     protected DeploymentContext(String tenantId, INameFactory nameFactory)
     {
@@ -893,7 +921,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void createEnvironment();
     
-    protected abstract void processRole(String name, String roleSpec);
+    protected abstract void processRole(String name, String roleSpec, String trustSpec);
     
     protected abstract void saveConfig();
     
@@ -904,7 +932,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances);
     
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule);
-   
+
+    protected abstract void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
+    
     protected abstract void deployService();
     
     protected INameFactory getNameFactory()
@@ -915,6 +945,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected String getTenantId()
     {
       return tenantId_;
+    }
+
+    protected String getBuildId()
+    {
+      return buildId_;
     }
 
     protected Map<String, String> getPolicies()
@@ -942,14 +977,21 @@ public abstract class FugueDeploy extends CommandLineHandler
       return config_;
     }
 
-    protected Map<String, JsonObject<?>> getInitContainerMap()
+    protected Map<ContainerType, Map<String, JsonObject<?>>> getContainerMap()
     {
-      return initContainerMap_;
+      return containerMap_;
+    }
+    
+    protected boolean hasDockerContainers()
+    {
+      return hasContainers(ContainerType.SERVICE) || hasContainers(ContainerType.SCHEDULED);
     }
 
-    protected Map<String, JsonObject<?>> getServiceContainerMap()
+    protected boolean hasContainers(ContainerType containerType)
     {
-      return serviceContainerMap_;
+      Map<String, JsonObject<?>> map = containerMap_.get(containerType);
+      
+      return map != null && !map.isEmpty();
     }
 
     protected void setConfig(ImmutableJsonObject config)
@@ -965,10 +1007,9 @@ public abstract class FugueDeploy extends CommandLineHandler
       policies_ = policies;
     }
     
-    protected void setContainers(Map<String, JsonObject<?>> initContainerMap, Map<String, JsonObject<?>> serviceContainerMap)
+    protected void setContainers(Map<ContainerType, Map<String, JsonObject<?>>> containerMap)
     {
-      initContainerMap_     = initContainerMap;
-      serviceContainerMap_  = serviceContainerMap;
+      containerMap_  = containerMap;
     }
 
     protected Map<String, String> createTemplateVariables(ImmutableJsonObject config)
@@ -1100,12 +1141,14 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         String name     = entry.getKey();
         String template = entry.getValue();
+        String trustTemplate = policyTrust_.get(name);
         
         batch.submit(() ->
         {
           String roleSpec = sub_.replace(template);
+          String trustSpec = trustTemplate == null ? null : sub_.replace(trustTemplate);
           
-          processRole(name, roleSpec);
+          processRole(name, roleSpec, trustSpec);
         });
       }
       
@@ -1114,15 +1157,17 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployInitContainers()
     {
-      if(!initContainerMap_.isEmpty())
+      Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
+      
+      if(initContainerMap != null && !initContainerMap.isEmpty())
       {
         // Deploy service level assets, load balancers, DNS zones etc
         
         deployService();
         
-        for(String name : initContainerMap_.keySet())
+        for(String name : initContainerMap.keySet())
         {
-          JsonObject<?> container = initContainerMap_.get(name);
+          JsonObject<?> container = initContainerMap.get(name);
           
           try
           {
@@ -1144,31 +1189,78 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected void deployServiceContainers(IBatch batch)
     {
       configureServiceNetwork();
+
+      deployDockerContainers(batch, ContainerType.SERVICE,    false);
+      deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
+      deployLambdaContainers(batch, ContainerType.LAMBDA);
+    }
+
+    private void deployLambdaContainers(IBatch batch, ContainerType containerType)
+    {
+      Map<String, JsonObject<?>> map = containerMap_.get(containerType);
       
-      for(String name : serviceContainerMap_.keySet())
+      if(map != null)
       {
-        JsonObject<?> container = serviceContainerMap_.get(name);
-        
-        batch.submit(() ->
+        for(String name : map.keySet())
         {
-          try
+          JsonObject<?> container = map.get(name);
+          
+          batch.submit(() ->
           {
-            IJsonDomNode        portNode = container.get(PORT);
-            int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
-            Collection<String>  paths = container.getListOf(String.class, PATHS);
-            int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
-            boolean             scheduled = "SCHEDULED".equals(container.getString("containerType", "SERVICE"));
+            Map<String, String> environment = new HashMap<>();
             
-            if(scheduled)
-              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
-            else
-              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
-          }
-          catch(InvalidValueException e)
+            IJsonObject<?> envNode = container.getObject(ENVIRONMENT);
+            
+            Iterator<String> it = envNode.getNameIterator();
+            
+            while(it.hasNext())
+            {
+              String key = it.next();
+              environment.put(key, envNode.getRequiredString(key));
+            }
+            
+            deployLambdaContainer(name,
+                container.getRequiredString(ROLE),
+                container.getRequiredString(HANDLER),
+                container.getRequiredInteger(MEMORY),
+                container.getRequiredInteger(TIMEOUT),
+                environment
+                );
+          });
+        }
+      }
+    }
+
+    private void deployDockerContainers(IBatch batch, ContainerType containerType, boolean scheduled)
+    {
+      Map<String, JsonObject<?>> map = containerMap_.get(containerType);
+      
+      if(map != null)
+      {
+        for(String name : map.keySet())
+        {
+          JsonObject<?> container = map.get(name);
+          
+          batch.submit(() ->
           {
-            throw new IllegalStateException(e);
-          }
-        });
+            try
+            {
+              IJsonDomNode        portNode = container.get(PORT);
+              int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+              Collection<String>  paths = container.getListOf(String.class, PATHS);
+              int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
+              
+              if(scheduled)
+                deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
+              else
+                deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
+            }
+            catch(InvalidValueException e)
+            {
+              throw new IllegalStateException(e);
+            }
+          });
+        }
       }
     }
   }

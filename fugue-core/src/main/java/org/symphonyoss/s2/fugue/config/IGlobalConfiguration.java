@@ -21,33 +21,32 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.counter;
+package org.symphonyoss.s2.fugue.config;
 
 /**
- * Provider of instance counts.
+ * The top level or global configuration for a process.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IInstanceCountProvider
+public interface IGlobalConfiguration extends IConfiguration
 {
-  /**
-   * Add the given listener.
-   * 
-   * @param listener A listener.
-   */
-  void addListener(IInstanceCountListener listener);
+  String getGlobalNamePrefix();
+
+  String getEnvironmentType();
+
+  String getEnvironmentId();
+
+  @Deprecated
+  String getRealmId();
+
+  String getRegionId();
+
+  String getTenantId();
+
+  String getServiceId();
+
+  String getCloudServiceProviderId();
   
-  /**
-   * Remove the given listener if it is currently registered.
-   * 
-   * @param listener A listener.
-   */
-  void removeListener(IInstanceCountListener listener);
-  
-  /**
-   * 
-   * @return The current instance count.
-   */
-  int getInstanceCount();
+  String getCloudRegionId();
 }

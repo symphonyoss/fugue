@@ -23,9 +23,7 @@
 
 package org.symphonyoss.s2.fugue;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.URL;
 import java.util.EnumSet;
@@ -58,13 +56,13 @@ import org.symphonyoss.s2.fugue.http.ui.servlet.StatusServlet;
  * @author Bruce Skingle
  *
  */
-public class FugueServer extends AbstractComponentContainer<FugueServer> implements IFugueServer
+public class FugueServer extends AbstractComponentContainer<IFugueServer> implements IFugueServer
 {
   private static final Logger                        log_              = LoggerFactory.getLogger(FugueServer.class);
 
   private static final String APP_SERVLET_ROOT = "/app/";
-  private static final long MEGABYTE = 1024L * 1024L;
   
+  private final String                               applicationName_;
   private final int                                  httpPort_;
 
   private HttpServer                                 server_;
@@ -75,7 +73,6 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
 
   // private IApplication application_;
   private boolean                                    started_;
-  private boolean                                    running_;
   private FugueComponentState                        componentState_ = FugueComponentState.OK;
   private String                                     statusMessage_ = "Initializing...";
   private String                                     serverUrl_;
@@ -84,9 +81,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
 
   private boolean localWebLogin_;
 
-  private int maxMemory_;
 
-  private String pid_;
 
   /**
    * Constructor.
@@ -106,7 +101,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
    */
   public FugueServer(String name, int httpPort)
   {
-    super(FugueServer.class);
+    super(IFugueServer.class);
 
     String configFile = System.getProperty("log4j.configurationFile");
     
@@ -120,7 +115,8 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
       System.out.println("log4j2.xml from system property = " + configFile);
     }
     
-    httpPort_   = httpPort;
+    applicationName_  = name;
+    httpPort_         = httpPort;
     
     register(new IFugueLifecycleComponent()
     {
@@ -177,6 +173,18 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   }
 
   @Override
+  public String getApplicationName()
+  {
+    return applicationName_;
+  }
+
+  @Override
+  public int getHttpPort()
+  {
+    return httpPort_;
+  }
+
+  @Override
   public FugueServer start()
   {
     super.start();
@@ -187,7 +195,7 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
   }
 
   @Override
-  public synchronized FugueServer join() throws InterruptedException
+  public synchronized IFugueServer join() throws InterruptedException
   {
     return mainLoop(0L);
 //    while(running_)
@@ -256,29 +264,6 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     register(command);
     
     return this;
-  }
-
-  /**
-   * Return true iff the server is running.
-   * 
-   * Threads may call this method in their main loop to determine if they should terminate.
-   * 
-   * @return true iff the server is running.
-   */
-  public synchronized boolean isRunning()
-  {
-    return running_;
-  }
-
-  private synchronized boolean setRunning(boolean running)
-  {
-    boolean v = running_;
-    running_ = running;
-    
-    if(!running)
-      notifyAll();
-    
-    return v;
   }
 
   private final void startFugueServer()
@@ -367,9 +352,11 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
 
   private final void stopFugueServer()
   {
-    if(!setRunning(false))
+    setRunning(false);
+    
+    if(!started_)
     {
-      log_.info("Not running, no need to stop");
+      log_.info("Not started, no need to stop");
       return;
     }
 
@@ -517,92 +504,5 @@ public class FugueServer extends AbstractComponentContainer<FugueServer> impleme
     executors_.add(fugueExec);
     
     return fugueExec;
-  }
-  
-  @Override
-  public FugueServer mainLoop(long timeout) throws InterruptedException
-  {
-    long endTime = timeout <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + timeout;
-    Runtime runtime = Runtime.getRuntime();
-    pid_ = getPid();
-    ProcessBuilder builder = new ProcessBuilder()
-        .command("ps", "-o", "pid,rss,vsz,time");
-    
-    while(isRunning() && System.currentTimeMillis() < endTime)
-    {
-      log_.info(String.format("JVM Memory: %4d used, %4d free, %4d total, %3d processors", runtime.freeMemory() / MEGABYTE, runtime.totalMemory() / MEGABYTE, runtime.maxMemory() / MEGABYTE, runtime.availableProcessors()));
-      run(builder);
-      log_.info("pid " + pid_ + " max memory " + maxMemory_);
-      
-      long bedtime = endTime - System.currentTimeMillis();
-      
-      if(bedtime > 60000)
-        bedtime = 60000;
-      
-      Thread.sleep(bedtime);
-    }
-    
-    return this;
-  }
-
-  private void run(ProcessBuilder builder)
-  {
-    try
-    {
-      Process process = builder.start();
-      
-      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream())))
-      {
-        String line = in.readLine();
-        log_.info(line);
-        while((line = in.readLine()) != null)
-        {
-          String[] words = line.trim().split(" +");
-          
-          if(pid_.equals(words[0]))
-          {
-            log_.info(line);
-            try
-            {
-              String word = words[1];
-              int mem = 0;
-              
-              if(word.endsWith("m"))
-                mem = Integer.parseInt(word.substring(0, word.length()-1));
-              else if(word.endsWith("g"))
-                  mem = (int)(1000 * Double.parseDouble(word.substring(0, word.length()-1)));
-              else
-                mem = Integer.parseInt(word);
-              
-              if(mem > maxMemory_)
-                maxMemory_ = mem;
-            }
-            catch(NumberFormatException e)
-            {
-              log_.error("Failed to parse memory", e);
-            }
-          }
-        }
-      }
-      
-      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getErrorStream())))
-      {
-        String line;
-        while((line = in.readLine()) != null)
-          log_.warn(line);
-      }
-    }
-    catch (IOException e)
-    {
-      log_.error("Unable to run command", e);
-    }
-  }
-
-  private String getPid()
-  {
-    String processName =
-        java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
-      
-    return processName.split("@")[0];
   }
 }

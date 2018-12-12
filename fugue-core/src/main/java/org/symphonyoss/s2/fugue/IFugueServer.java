@@ -36,28 +36,8 @@ import org.symphonyoss.s2.fugue.http.ui.servlet.IUIPanel;
  * @author Bruce Skingle
  *
  */
-public interface IFugueServer
+public interface IFugueServer extends IFugeComponentContainer<IFugueServer>
 {
-  /**
-   * Start the server and return.
-   * 
-   * Unless some component starts a non-daemon thread the process will terminate. If no thread
-   * exists to keep the application alive then call join() after this method returns since
-   * this method is fluent you can call <code>start().join()</code>.
-   * 
-   * @throws IllegalStateException  If the current state is not compatible with starting.
-   * 
-   * @return this (fluent method) 
-   */
-  IFugueServer start();
-
-  /**
-   * Stop the server, causes all managed components to be stopped.
-   * 
-   * @return this (Fluent method).
-   */
-  IFugueServer stop();
-
   /**
    * Join the calling thread to the server process.
    * 
@@ -205,16 +185,15 @@ public interface IFugueServer
   IFugueServer withLocalWebLogin();
 
   /**
-   * Run the main loop process for up to timeout milliseconds.
    * 
-   * This is an alternative to calling join() on this object from the main thread.
-   * This method periodically prints various debug information to the log.
-   * 
-   * @param timeout Limit in ms of time to run.
-   * @return this (Fluent method).
-   * 
-   * @throws InterruptedException IF a sleep is interrupted.
+   * @return The application name.
    */
-  FugueServer mainLoop(long timeout) throws InterruptedException;
+  String getApplicationName();
+
+  /**
+   * 
+   * @return the http port in use.
+   */
+  int getHttpPort();
 
 }

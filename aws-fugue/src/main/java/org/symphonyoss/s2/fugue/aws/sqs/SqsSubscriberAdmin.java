@@ -23,16 +23,17 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
@@ -43,6 +44,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.TagQueueRequest;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * The admin variant of SqsSubscriberManager.
@@ -50,49 +52,131 @@ import com.amazonaws.services.sqs.model.TagQueueRequest;
  * @author Bruce Skingle
  *
  */
-public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<String, SqsSubscriberAdmin>
+public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdmin>
 {
-  private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
-  private final String        region_;
-  private final String        accountId_;
+  private static final Logger                log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
+  private final String                       region_;
+  private final String                       accountId_;
+  private final ImmutableMap<String, String> tags_;
 
-  private AmazonSQS           sqsClient_;
-  private AmazonSNS           snsClient_;
-  private Map<String, String> tags_;
+  private final AmazonSQS                    sqsClient_;
+  private final AmazonSNS                    snsClient_;
   
-  /**
-   * Constructor.
-   * 
-   * @param nameFactory   A name factory.
-   * @param region        The AWS region in which to operate.
-   * @param accountId     The AWS account ID 
-   * @param traceFactory  A trace factory.
-   * @param tags          Tags to be applied to created queues.
-   */
-  public SqsSubscriberAdmin(INameFactory nameFactory, String region, String accountId,
-      ITraceContextTransactionFactory traceFactory, Map<String, String> tags)
+  private SqsSubscriberAdmin(Builder builder)
   {
-    super(nameFactory, SqsSubscriberAdmin.class);
+    super(SqsSubscriberAdmin.class, builder);
     
-    accountId_ = accountId;
-    region_ = region;
-    tags_ = tags;
+    accountId_  = builder.accountId_;
+    region_     = builder.region_;
+    tags_       = ImmutableMap.copyOf(builder.tags_);
+    
+    sqsClient_ = builder.sqsBuilder_.build();
+    snsClient_ = builder.snsBuilder_.build();
+    
+    log_.info("Starting SQSSubscriberAdmin in " + region_ + "...");
   }
   
-  @Override
-  public void start()
+  /**
+   * Builder for SqsSubscriberAdmin.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends AbstractSubscriberAdmin.Builder<Builder, SqsSubscriberAdmin>
   {
-    sqsClient_ = AmazonSQSClientBuilder.standard()
-        .withRegion(region_)
-        .build();
+    private final AmazonSQSClientBuilder sqsBuilder_;
+    private final AmazonSNSClientBuilder snsBuilder_;
     
-    snsClient_ = AmazonSNSClientBuilder.standard()
-        .withRegion(region_)
-        .build();
+    private  String                 region_;
+    private  String                 accountId_;
+    private  Map<String, String>    tags_ = new HashMap<>();
+
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+      
+      sqsBuilder_ = AmazonSQSClientBuilder.standard();
+      snsBuilder_ = AmazonSNSClientBuilder.standard();
+    }
     
-    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    /**
+     * Set the AWS region.
+     * 
+     * @param region The AWS region in which to operate.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withRegion(String region)
+    {
+      region_ = region;
+      
+      sqsBuilder_.withRegion(region_);
+      snsBuilder_.withRegion(region_);
+      
+      return self();
+    }
     
-    super.start();
+    /**
+     * Set the AWS account ID.
+     * 
+     * @param accountId The ID of the AWS account in which to operate.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withAccountId(String accountId)
+    {
+      accountId_  = accountId;
+      
+      return self();
+    }
+    
+    /**
+     * Set the AWS credentials provider.
+     * 
+     * @param credentialsProvider An AWS credentials provider.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withCredentials(AWSCredentialsProvider credentialsProvider)
+    {
+      sqsBuilder_.withCredentials(credentialsProvider);
+      snsBuilder_.withCredentials(credentialsProvider);
+      
+      return self();
+    }
+    
+    /**
+     * Add the given tags to created queues.
+     * Multiple calls to this method are cumulative.
+     * 
+     * @param tags Tags to add.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withTags(Map<String, String> tags)
+    {
+      tags_.putAll(tags);
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(region_,    "region");
+      faultAccumulator.checkNotNull(accountId_, "accountId");
+    }
+
+    @Override
+    protected SqsSubscriberAdmin construct()
+    {
+      return new SqsSubscriberAdmin(this);
+    }
   }
   
   /**

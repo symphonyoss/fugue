@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
@@ -37,6 +38,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 
@@ -74,39 +76,94 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
 {
   private static final Logger log_         = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
-  private final String        region_;
-
-  private AmazonSQS           sqsClient_;
+  private final AmazonSQS           sqsClient_;
   private List<SqsSubscriber> subscribers_ = new LinkedList<>();
 
-  /**
-   * Constructor.
-   * 
-   * @param config                          Configuration
-   * @param nameFactory                     A NameFactory.
-   * @param region                          The AWS region in which to operate.
-   * @param traceFactory                    A trace context factory.
-   * @param unprocessableMessageConsumer    Consumer for invalid messages.
-   */
-  public SqsSubscriberManager(IConfiguration config, INameFactory nameFactory, String region,
-      ITraceContextTransactionFactory traceFactory,
-      IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
+  private SqsSubscriberManager(Builder builder)
   {
-    super(config, nameFactory, SqsSubscriberManager.class, traceFactory, unprocessableMessageConsumer, "org/symphonyoss/s2/fugue/aws/sqs");
+    super(SqsSubscriberManager.class, builder);
     
-    region_ = region;
+    sqsClient_ = builder.sqsBuilder_.build();
+    
+    log_.info("Starting SQSSubscriberManager in " + builder.region_ + "...");
   }
-
-  @Override
-  public void start()
+  
+  /**
+   * Concrete builder.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends AbstractPullSubscriberManager.Builder<String, Builder, SqsSubscriberManager>
   {
-    log_.info("Starting SQSSubscriberManager in " + region_ + "...");
+    private AmazonSQSClientBuilder sqsBuilder_;
+    private String                 region_;
+
+    /**
+     * Constructor.
+     * 
+     * @param nameFactory                     A NameFactory.
+     * @param traceFactory                    A trace context factory.
+     * @param unprocessableMessageConsumer    Consumer for invalid messages.
+     * @param config                          Configuration
+     * @param region                          The AWS region in which to operate.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+      
+      sqsBuilder_ = AmazonSQSClientBuilder.standard();
+    }
     
-    sqsClient_ = AmazonSQSClientBuilder.standard()
-        .withRegion(region_)
-        .build();
+    @Override
+    protected String getConfigPath()
+    {
+      return "org/symphonyoss/s2/fugue/aws/sqs";
+    }
     
-    super.start();
+    /**
+     * Set the AWS region.
+     * 
+     * @param region The AWS region in which to operate.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withRegion(String region)
+    {
+      region_ = region;
+      
+      sqsBuilder_.withRegion(region_);
+      
+      return self();
+    }
+
+    /**
+     * Set the AWS credentials provider.
+     * 
+     * @param credentialsProvider An AWS credentials provider.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withCredentials(AWSCredentialsProvider credentialsProvider)
+    {
+      sqsBuilder_.withCredentials(credentialsProvider);
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(region_, "region");
+    }
+
+    @Override
+    protected SqsSubscriberManager construct()
+    {
+      return new SqsSubscriberManager(this);
+    }
   }
 
   @Override
@@ -116,14 +173,15 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
     {
       SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
+      log_.info("Subscribing to " + subscriptionName + "..."); 
+      
       String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
           sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
       
       SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, getTraceFactory(), subscription.getConsumer(),
           getCounter(), nameFactory_.getTenantId());
 
-      subscribers_.add(subscriber);
-      log_.info("Subscribing to " + subscriptionName + "...");  
+      subscribers_.add(subscriber); 
     }
   }
 

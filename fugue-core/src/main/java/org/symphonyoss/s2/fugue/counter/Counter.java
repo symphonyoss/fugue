@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.common.fluent.Fluent;
 import org.symphonyoss.s2.fugue.IFugueComponent;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.metrics.IMetricManager;
 
 /**
@@ -81,7 +82,7 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
   private int currentTotal_;
   
   /**
-   * Constructor.
+   * Constructor from values.
    * 
    * @param type                  The type of the concrete subclass for fluent methods.
    * @param upperLimit            The upper limit of the counter for a single period.
@@ -119,6 +120,33 @@ public abstract class Counter<T extends Counter<T>> extends Fluent<T> implements
       counter_[i] = new AtomicInteger();
     
     
+  }
+  
+  /**
+   * Constructor from configuration.
+   * 
+   * @param type                  The type of the concrete subclass for fluent methods.
+   * @param config                A configuration containing the following values:
+   *        upperLimit            The upper limit of the counter for a single period.
+   *        upperSampleCntWindow  The number of periods to consider for upper limit processing.
+   *        upperSampleCntBreak   The number of periods in the sample window which need to be above the limit for the limit to be considered broken.
+   *        upperCoolDown         The number of periods after a limit break before another break will be processed.
+   *        lowerLimit            The lower limit of the counter for a single period.
+   *        lowerSampleCntWindow  The number of periods to consider for lower limit processing.
+   *        lowerSampleCntBreak   The number of periods in the sample window which need to be below the limit for the limit to be considered broken.
+   *        lowerCoolDown         The number of periods after a limit break before another break will be processed.
+   */
+  public Counter(Class<T> type, IConfiguration config)
+  {
+    this(type,
+        config.getInt("upperLimit",           1500),
+        config.getInt("upperSampleCntWindow", 20),
+        config.getInt("upperSampleCntBreak",  16),
+        config.getInt("upperCoolDown",        600),
+        config.getInt("lowerLimit",           0),
+        config.getInt("lowerSampleCntWindow", 40),
+        config.getInt("lowerSampleCntBreak",  40),
+        config.getInt("lowerCoolDown",        300));
   }
   
   /**

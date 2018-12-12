@@ -25,17 +25,18 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import org.symphonyoss.s2.common.fluent.IFluent;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Base class for subscriber managers and admin controllers.
@@ -45,92 +46,138 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberBase<P, T extends IFluent<T>> extends FugueLifecycleComponent<T>
+public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase<P,T>> extends FugueLifecycleComponent<T>
 {
-  protected final INameFactory        nameFactory_;
-  protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
-  private   int                       totalSubscriptionCnt_;
+  protected final INameFactory                       nameFactory_;
+  protected final ImmutableList<SubscriptionImpl<P>> subscribers_;
   
-  protected AbstractSubscriberBase(INameFactory nameFactory, Class<T> type)
+  protected final int                                  totalSubscriptionCnt_;
+  
+  protected AbstractSubscriberBase(Class<T> type, Builder<P,?,T> builder)
   {
     super(type);
     
-    nameFactory_ = nameFactory;
-  }
-  
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
-  {
-    assertConfigurable();
-    
-    Collection<TopicName> topicNames = subscription.createTopicNames(nameFactory_);
-    
-    subscribers_.add(new SubscriptionImpl<P>(
-        topicNames,
-        subscription.createObsoleteTopicNames(nameFactory_),
-        subscription.getId(),
-        subscription.getObsoleteId(), consumer));
-    
-    totalSubscriptionCnt_ += topicNames.size();
-    
-    return self();
+    nameFactory_          = builder.nameFactory_;
+    subscribers_          = ImmutableList.copyOf(builder.subscribers_);
+    totalSubscriptionCnt_ = builder.totalSubscriptionCnt_;
   }
 
-  @Deprecated
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
-      String... additionalTopicIds)
+  /**
+   * Builder.
+   * 
+   * @author Bruce Skingle
+   *
+   * @param <P>   Type of payload received by subscribers.
+   * @param <T>   The concrete type returned by fluent methods.
+   * @param <B>   The concrete type of the built object.
+   */
+  public static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberBase<P,B>> extends BaseAbstractBuilder<T,B>
   {
-    assertConfigurable();
+    private INameFactory              nameFactory_;
+    private int                       totalSubscriptionCnt_;
+    private List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
+    private List<Runnable>            taskList_    = new ArrayList<>();
     
-    Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
-    
-    subscribers_.add(new SubscriptionImpl<P>(
-        topicNames,
-        nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
-        null,
-        subscriptionId, consumer));
-    
-    totalSubscriptionCnt_ += topicNames.size();
-    
-    return self();
-  }
-
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
-  {
-    assertConfigurable();
-    
-    if(topicNames.isEmpty())
-      throw new IllegalArgumentException("At least one topic name is required");
-    
-    subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
-    
-    totalSubscriptionCnt_ += topicNames.size();
-    
-    return self();
-  }
-  
-  protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicIds)
-  {
-    assertConfigurable();
-    
-    if(topicIds==null || topicIds.length==0)
-      throw new IllegalArgumentException("At least one topic name is required");
-    
-    List<TopicName> topicNameList = new ArrayList<>(topicIds.length);
-    List<TopicName> obsoleteTopicNameList = new ArrayList<>(topicIds.length);
-
-    for(String id : topicIds)
+    protected Builder(Class<T> type)
     {
-      topicNameList.add(nameFactory_.getTopicName(id));
-      obsoleteTopicNameList.add(nameFactory_.getObsoleteTopicName(id));
+      super(type);
     }
     
-    subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
-    
-    totalSubscriptionCnt_ += topicNameList.size();
-    
-    return self();
-  }
+    public T withNameFactory(INameFactory nameFactory)
+    {
+      nameFactory_ = nameFactory;
+      
+      return self();
+    }
 
+    protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
+    {
+      taskList_.add(() ->
+      {
+        Collection<TopicName> topicNames = subscription.createTopicNames(nameFactory_);
+        
+        subscribers_.add(new SubscriptionImpl<P>(
+            topicNames,
+            subscription.createObsoleteTopicNames(nameFactory_),
+            subscription.getId(),
+            subscription.getObsoleteId(), consumer));
+        
+        totalSubscriptionCnt_ += topicNames.size();
+      });
+      
+      return self();
+    }
+  
+    @Deprecated
+    protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
+        String... additionalTopicIds)
+    {
+      taskList_.add(() ->
+      {
+        Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
+        
+        subscribers_.add(new SubscriptionImpl<P>(
+            topicNames,
+            nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
+            null,
+            subscriptionId, consumer));
+        
+        totalSubscriptionCnt_ += topicNames.size();
+      });
+      
+      return self();
+    }
+  
+    protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
+    {
+      if(topicNames.isEmpty())
+        throw new IllegalArgumentException("At least one topic name is required");
+      
+      subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
+      
+      totalSubscriptionCnt_ += topicNames.size();
+      
+      return self();
+    }
+    
+    protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicIds)
+    {
+      if(topicIds==null || topicIds.length==0)
+        throw new IllegalArgumentException("At least one topic name is required");
+      
+      taskList_.add(() ->
+      {
+        List<TopicName> topicNameList = new ArrayList<>(topicIds.length);
+        List<TopicName> obsoleteTopicNameList = new ArrayList<>(topicIds.length);
+    
+        for(String id : topicIds)
+        {
+          topicNameList.add(nameFactory_.getTopicName(id));
+          obsoleteTopicNameList.add(nameFactory_.getObsoleteTopicName(id));
+        }
+        
+        subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
+        
+        totalSubscriptionCnt_ += topicNameList.size();
+      });
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(nameFactory_, "nameFactory");
+      
+      for(Runnable task : taskList_)
+      {
+        task.run();
+      }
+    }
+  }
+  
   protected List<SubscriptionImpl<P>> getSubscribers()
   {
     return subscribers_;

@@ -10,9 +10,7 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
@@ -30,33 +28,19 @@ import com.google.pubsub.v1.PushConfig;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByteArray, GoogleSubscriberAdmin>
+public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscriberAdmin>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberAdmin.class);
   
-  private final String                 projectId_;
+  private  String                 projectId_;
 
   private SubscriptionAdminClient subscriptionAdminClient_;
   
-  /**
-   * Normal constructor.
-   * 
-   * @param nameFactory                     A NameFactory.
-   * @param projectId                       The Google project ID for the pubsub service.
-   * @param traceFactory                    A trace context factory.
-   */
-  public GoogleSubscriberAdmin(INameFactory nameFactory, String projectId,
-      ITraceContextTransactionFactory traceFactory)
+  private GoogleSubscriberAdmin(Builder builder)
   {
-    super(nameFactory, GoogleSubscriberAdmin.class);
+    super(GoogleSubscriberAdmin.class, builder);
     
-    projectId_ = projectId;
-  }
-
-  @Override
-  public synchronized void start()
-  {
-    super.start();
+    projectId_ = builder.projectId_;
     
     try
     {
@@ -65,6 +49,53 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<ImmutableByte
     catch (IOException e)
     {
       throw new IllegalStateException("Unable to create SubscriptionAdminClient", e);
+    }
+  }
+  
+  /**
+   * Builder for GoogleSubscriberAdmin.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends AbstractSubscriberAdmin.Builder<Builder, GoogleSubscriberAdmin>
+  {
+    private String                 projectId_;
+
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+    }
+    
+    /**
+     * Set the Google project ID.
+     * 
+     * @param projectId The ID of the Google project in which to operate.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withProjectId(String projectId)
+    {
+      projectId_  = projectId;
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(projectId_, "projectId");
+    }
+
+    @Override
+    protected GoogleSubscriberAdmin construct()
+    {
+      return new GoogleSubscriberAdmin(this);
     }
   }
 

@@ -44,6 +44,12 @@ public class Fugue
   /** Environment variable containing the process instance ID */
   public static final String FUGUE_INSTANCE = "FUGUE_INSTANCE";
   
+  /** The service ID for fugue owned CSP assets */
+  public static final String FUGUE_SERVICE_ID   = "s2fwd";  // TODO: change to fugue
+  
+  /** The name of the topic on which trace events are published */
+  public static final String TRACE_TOPIC        = "trace";
+  
   /**
    * Get the requested value as a System Property or environment variable.
    * 

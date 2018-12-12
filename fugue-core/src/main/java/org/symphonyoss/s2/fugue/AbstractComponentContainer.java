@@ -23,6 +23,9 @@
 
 package org.symphonyoss.s2.fugue;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +44,10 @@ import org.symphonyoss.s2.fugue.http.ui.servlet.ICommand;
  *
  * @param <T> The concrete type to be returned by fluent methods.
  */
-public class AbstractComponentContainer<T extends AbstractComponentContainer<T>> extends FugueLifecycleBase<T> implements IFugeComponentContainer<T>
+public class AbstractComponentContainer<T extends IFugeComponentContainer<T>> extends FugueLifecycleBase<T> implements IFugeComponentContainer<T>
 {
+  private static final long                    MEGABYTE             = 1024L * 1024L;
+  
   private static final Logger                  log_                 = LoggerFactory.getLogger(AbstractComponentContainer.class);
 
   private final List<IFugueComponent>          components_          = new ArrayList<>();
@@ -53,6 +58,9 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
   private final List<ICommand>                 commands_            = new ArrayList<>();
 
   private ArrayDeque<IFugueComponent>          stopStack_           = new ArrayDeque<>();
+  private int                                  maxMemory_;
+  private String                               pid_;
+  private boolean                              running_;
   
   /**
    * Constructor.
@@ -149,6 +157,7 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
   {
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
     {
+      @Override
       public void run()
       {
         FugueLifecycleState state = getLifecycleState();
@@ -178,7 +187,10 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
               setLifeCycleState(FugueLifecycleState.Stopped);
               System.err.println("Attempting clean shutdown...DONE");
             }
-            // FALL THROUGH
+            break;
+            
+          case Stopped:
+            break;
               
           default:
             try
@@ -304,5 +316,117 @@ public class AbstractComponentContainer<T extends AbstractComponentContainer<T>>
     }
     
     return terminate;
+  }
+
+  
+  @Override
+  public synchronized boolean isRunning()
+  {
+    return running_;
+  }
+
+  @Override
+  public synchronized boolean setRunning(boolean running)
+  {
+    boolean v = running_;
+    running_ = running;
+    
+    if(!running)
+      notifyAll();
+    
+    return v;
+  }
+  
+  @Override
+  public T mainLoop(long timeout) throws InterruptedException
+  {
+    long endTime = timeout <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + timeout;
+    Runtime runtime = Runtime.getRuntime();
+    pid_ = getPid();
+    ProcessBuilder builder = new ProcessBuilder()
+        .command("ps", "-o", "pid,rss,vsz,time");
+    
+    while(isRunning() && System.currentTimeMillis() < endTime)
+    {
+      log_.info(String.format("JVM Memory: %4d used, %4d free, %4d total, %3d processors", runtime.freeMemory() / MEGABYTE, runtime.totalMemory() / MEGABYTE, runtime.maxMemory() / MEGABYTE, runtime.availableProcessors()));
+      run(builder);
+      log_.info("pid " + pid_ + " max memory " + maxMemory_);
+      
+      long bedtime = endTime - System.currentTimeMillis();
+      
+      if(bedtime > 60000)
+        bedtime = 60000;
+      
+      if(bedtime>0)
+      {
+        synchronized(this)
+        {
+          wait(bedtime);
+        }
+      }
+    }
+    
+    return self();
+  }
+
+  private void run(ProcessBuilder builder)
+  {
+    try
+    {
+      Process process = builder.start();
+      
+      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream())))
+      {
+        String line = in.readLine();
+        log_.info(line);
+        while((line = in.readLine()) != null)
+        {
+          String[] words = line.trim().split(" +");
+          
+          if(pid_.equals(words[0]))
+          {
+            log_.info(line);
+            try
+            {
+              String word = words[1];
+              int mem = 0;
+              
+              if(word.endsWith("m"))
+                mem = Integer.parseInt(word.substring(0, word.length()-1));
+              else if(word.endsWith("g"))
+                  mem = (int)(1000 * Double.parseDouble(word.substring(0, word.length()-1)));
+              else
+                mem = Integer.parseInt(word);
+              
+              if(mem > maxMemory_)
+                maxMemory_ = mem;
+            }
+            catch(NumberFormatException e)
+            {
+              log_.error("Failed to parse memory", e);
+            }
+          }
+        }
+      }
+      
+      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getErrorStream())))
+      {
+        String line;
+        while((line = in.readLine()) != null)
+          log_.warn(line);
+      }
+    }
+    catch (IOException e)
+    {
+      log_.error("Unable to run command", e);
+    }
+  }
+
+  private String getPid()
+  {
+    String processName =
+        java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+      
+    return processName.split("@")[0];
   }
 }

@@ -12,11 +12,11 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -26,7 +26,6 @@ import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
-import com.google.cloud.pubsub.v1.Subscriber.Builder;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.pubsub.v1.ProjectSubscriptionName;
@@ -62,45 +61,77 @@ import io.grpc.StatusRuntimeException;
  */
 public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleAsyncSubscriberManager>
 {
-  private static final Logger          log_            = LoggerFactory.getLogger(GoogleAsyncSubscriberManager.class);
+  private static final Logger log_            = LoggerFactory.getLogger(GoogleAsyncSubscriberManager.class);
 
-  /* package */ final String                 projectId_;
-  /* package */ final boolean                startSubscriptions_;
+  private final String        projectId_;
 
-  /* package */ List<Subscriber>             subscriberList_ = new LinkedList<>();
-  List<GoogleAsyncSubscriber>                receiverList_  = new LinkedList<>();
-  /* package */ int                          subscriptionErrorCnt_;
-  private final IConfiguration pubSubConfig_;
+  private List<Subscriber>    subscriberList_ = new LinkedList<>();
+  List<GoogleAsyncSubscriber> receiverList_   = new LinkedList<>();
+  private int                 subscriptionErrorCnt_;
+//  private final IConfiguration pubSubConfig_;
+//
+//  private ICounter counter_;
 
-  private ICounter counter_;
 
-
-  /**
-   * Constructor.
-   * 
-   * @param config                          Configuration
-   * @param nameFactory                     A NameFactory.
-   * @param projectId                       The Google project ID for the pubsub service.
-   * @param traceFactory                    A trace context factory.
-   * @param unprocessableMessageConsumer    Consumer for invalid messages.
-   */
-  public GoogleAsyncSubscriberManager(IConfiguration config, INameFactory nameFactory, String projectId,
-      ITraceContextTransactionFactory traceFactory,
-      IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer)
+  private GoogleAsyncSubscriberManager(Builder builder)
   {
-    super(nameFactory, GoogleAsyncSubscriberManager.class, traceFactory, unprocessableMessageConsumer);
+    super(GoogleAsyncSubscriberManager.class, builder);
     
-    projectId_ = projectId;
-    startSubscriptions_ = true;
-    
-    pubSubConfig_ = config.getConfiguration(GoogleConstants.CONFIG_PATH);
+    projectId_ = builder.projectId_;
   }
   
-  public GoogleAsyncSubscriberManager withCounter(ICounter counter)
+  /**
+   * Concrete builder.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends AbstractSubscriberManager.Builder<ImmutableByteArray, Builder, GoogleAsyncSubscriberManager>
   {
-    counter_ = counter;
+    private String                 projectId_;
+
+    /**
+     * Constructor.
+     * 
+     * @param nameFactory                     A NameFactory.
+     * @param traceFactory                    A trace context factory.
+     * @param unprocessableMessageConsumer    Consumer for invalid messages.
+     * @param config                          Configuration
+     * @param projectId                       The Google project ID for the pubsub service.
+     */
+    public Builder(INameFactory nameFactory, ITraceContextTransactionFactory traceFactory,
+        IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer, IConfiguration config, String projectId)
+    {
+      super(Builder.class);
+    }
     
-    return this;
+    /**
+     * Set the Google project ID.
+     * 
+     * @param projectId The ID of the Google project in which to operate.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withProjectId(String projectId)
+    {
+      projectId_  = projectId;
+      
+      return self();
+    }
+
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(projectId_, "projectId");
+    }
+
+    @Override
+    protected GoogleAsyncSubscriberManager construct()
+    {
+      return new GoogleAsyncSubscriberManager(this);
+    }
   }
 
   @Override
@@ -116,39 +147,37 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
       
     }
     
-    if(startSubscriptions_)
+    if(subscriptionErrorCnt_>0)
     {
-      if(subscriptionErrorCnt_>0)
-      {
-        throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
-      }
-      
-      long threadsPerSubscription = pubSubConfig_.getLong("subscriberThreadsPerSubscription", 10L);
-      int subscriberThreadPoolSize = pubSubConfig_.getInt("subscriberThreadPoolSize", 4);
-      long maxOutstandingElementCount = pubSubConfig_.getLong("maxOutstandingElementCount", threadsPerSubscription);
-      
-      threadsPerSubscription = 1L;
-      subscriberThreadPoolSize = 1;
-      maxOutstandingElementCount = 1L;
-      
-      log_.info("Starting subscriptions threadsPerSubscription=" + threadsPerSubscription +
-          " subscriberThreadPoolSize=" + subscriberThreadPoolSize +
-          " maxOutstandingElementCount=" + maxOutstandingElementCount +
-          " ...");
+      throw new IllegalStateException("There are " + subscriptionErrorCnt_ + " subscription errors.");
+    }
+    
+    long threadsPerSubscription = config_.getLong("subscriberThreadsPerSubscription", 10L);
+    int subscriberThreadPoolSize = config_.getInt("subscriberThreadPoolSize", 4);
+    long maxOutstandingElementCount = config_.getLong("maxOutstandingElementCount", threadsPerSubscription);
+    
+    threadsPerSubscription = 1L;
+    subscriberThreadPoolSize = 1;
+    maxOutstandingElementCount = 1L;
+    
+    log_.info("Starting subscriptions threadsPerSubscription=" + threadsPerSubscription +
+        " subscriberThreadPoolSize=" + subscriberThreadPoolSize +
+        " maxOutstandingElementCount=" + maxOutstandingElementCount +
+        " ...");
 
+    
+    for(TopicName topicName : subscription.getTopicNames())
+    {
+      log_.info("Subscribing to topic " + topicName + " ...");
       
-      for(TopicName topicName : subscription.getTopicNames())
-      {
-        log_.info("Subscribing to topic " + topicName + " ...");
-        
-        SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
+      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
-        validateSubcription(topicName, subscriptionName);
-        
-        GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_, nameFactory_.getTenantId());
-        ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
-        Builder                 builder                 = Subscriber.newBuilder(projectSubscriptionName, receiver);
-        
+      validateSubcription(topicName, subscriptionName);
+      
+      GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_, nameFactory_.getTenantId());
+      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
+      Subscriber.Builder      builder = Subscriber.newBuilder(projectSubscriptionName, receiver);
+      
 //        ExecutorProvider executorProvider =
 //            InstantiatingExecutorProvider.newBuilder()
 //              .setExecutorThreadCount(subscriberThreadPoolSize)
@@ -159,25 +188,24 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
 //        
 //        builder.setFlowControlSettings(FlowControlSettings.newBuilder()
 //            .setMaxOutstandingElementCount(maxOutstandingElementCount).build());
-        Subscriber              subscriber              = builder.build();
-        
-        subscriber.addListener(new Subscriber.Listener()
+      Subscriber              subscriber              = builder.build();
+      
+      subscriber.addListener(new Subscriber.Listener()
+      {
+        @Override
+        public void failed(Subscriber.State from, Throwable failure)
         {
-          @Override
-          public void failed(Subscriber.State from, Throwable failure)
-          {
-            log_.error("Error for " + projectSubscriptionName + " from " + from, failure);
-          }
-        }, MoreExecutors.directExecutor());
-        
-        synchronized (subscriberList_)
-        {
-          subscriberList_.add(subscriber);
-          receiverList_.add(receiver);
+          log_.error("Error for " + projectSubscriptionName + " from " + from, failure);
         }
-        
-        
+      }, MoreExecutors.directExecutor());
+      
+      synchronized (subscriberList_)
+      {
+        subscriberList_.add(subscriber);
+        receiverList_.add(receiver);
       }
+      
+      
     }
   }
   

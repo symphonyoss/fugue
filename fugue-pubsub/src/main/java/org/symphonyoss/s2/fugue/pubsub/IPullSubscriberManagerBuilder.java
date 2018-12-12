@@ -23,28 +23,28 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.common.fluent.IFluent;
+import org.symphonyoss.s2.fugue.counter.IBusyCounter;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 
 /**
- * A subscriber admin controller.
+ * A builder for a pull subscriber manager of payload type P.
  * 
  * @author Bruce Skingle
  *
- * @param <T> Type of concrete manager, needed for fluent methods.
+ * @param <P> The type of payload received.
+ * @param <T> Type of concrete builder, needed for fluent methods.
+ * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface ISubscriberAdmin<T extends ISubscriberAdmin<T>> extends IFluent<T>
+public interface IPullSubscriberManagerBuilder<P,T extends IPullSubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>>
+extends ISubscriberManagerBuilder<P,T,B>
 {
   /**
-   * Create all configured subscriptions.
+   * Set the IBusyCounter to use.
    * 
-   * @param dryRun If true then don't change anything
-   */
-  void createSubscriptions(boolean dryRun);
-  
-  /**
-   * Delete all configured subscriptions.
+   * @param busyCounter An IBusyCounter to use.
    * 
-   * @param dryRun If true then don't change anything
+   * @return this (fluent method)
    */
-  void deleteSubscriptions(boolean dryRun);
+  T withBusyCounter(IBusyCounter busyCounter);
+
 }

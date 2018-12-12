@@ -31,9 +31,12 @@ import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.secret.ISecretManager;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.secretsmanager.AWSSecretsManager;
 import com.amazonaws.services.secretsmanager.AWSSecretsManagerClientBuilder;
 import com.amazonaws.services.secretsmanager.model.CreateSecretRequest;
@@ -60,22 +63,67 @@ public class AwsSecretManager implements ISecretManager
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private final String              region_;
-  
   private AWSSecretsManager         secretClient_;
 
-  /**
-   * Constructor.
-   * 
-   * @param region The AWS region in which to operate.
-   */
-  public AwsSecretManager(String region)
+  private AwsSecretManager(Builder builder)
   {
-    region_ = region;
+    secretClient_ = builder.secretClientBuilder_.build();
+  }
+  
+  
+  /**
+   * Builder for AwsSecretManager.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends BaseAbstractBuilder<Builder, AwsSecretManager>
+  {
+    protected final AWSSecretsManagerClientBuilder  secretClientBuilder_;
 
-    secretClient_ = AWSSecretsManagerClientBuilder.standard()
+    protected String                            region_;
+
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+      
+      secretClientBuilder_ = AWSSecretsManagerClientBuilder.standard();
+    }
+    
+    @Override
+    protected AwsSecretManager construct()
+    {
+      return new AwsSecretManager(this);
+    }
+    
+    @Override
+    public void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(region_,      "region");
+   
+      secretClientBuilder_
         .withRegion(region_)
-        .build();
+        ;
+    }
+
+    public Builder withRegion(String region)
+    {
+      region_ = region;
+      
+      return self();
+    }
+
+    public Builder withCredentials(AWSCredentialsProvider credentials)
+    {
+      secretClientBuilder_.withCredentials(credentials);
+      
+      return self();
+    }
   }
   
   @Override

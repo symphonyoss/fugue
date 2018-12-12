@@ -139,4 +139,19 @@ public class Name
     
     throw new IllegalArgumentException(md5Name_.length() + " is the shortest abbreviated name.");
   }
+
+  @Override
+  public int hashCode()
+  {
+    return name_.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj)
+  {
+    if(getClass().equals(obj.getClass()))
+      return name_.equals(((Name)obj).toString());
+    else
+      return false;
+  }
 }

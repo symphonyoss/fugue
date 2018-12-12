@@ -24,17 +24,32 @@
 package org.symphonyoss.s2.fugue.counter;
 
 /**
- * Listener for instance counters.
+ * A counter for busy/idle cycles.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IInstanceCountListener
+public interface IBusyCounter
 {
   /**
-   * Called when the instance count changes.
+   * Indicates that the caller is busy.
    * 
-   * @param instanceCount The new instance count.
+   * This method would usually be called when the calling process has work to do without waiting or when there is a backlog.
+   * 
+   * In many cases the return value will always be false because scaling causes other instances to start or stop.
+   * 
+   * @return true iff the caller should scale up.
    */
-  void instanceCountChanged(int instanceCount);
+  boolean busy();
+  
+  /**
+   * Indicates that the caller is idle.
+   * 
+   * This method would usually be called when the calling process has no work to do of had to do a blocking request for work.
+   * 
+   * In many cases the return value will always be false because scaling causes other instances to start or stop.
+   * 
+   * @return true iff the caller should scale down.
+   */
+  boolean  idle();
 }

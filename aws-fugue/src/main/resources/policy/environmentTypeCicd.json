@@ -12,6 +12,18 @@
             ]
         },
         {
+            "Sid": "DeployLambda",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:PutObjectTagging"
+            ],
+            "Resource": [
+                "arn:aws:s3:::sym-s2-fugue-${environmentType}-*-config/lambda/*"
+            ]
+        },
+        {
             "Sid": "IAMandS3",
             "Effect": "Allow",
             "Action": [

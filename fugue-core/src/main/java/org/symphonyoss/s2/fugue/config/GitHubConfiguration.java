@@ -55,164 +55,178 @@ public class GitHubConfiguration extends Configuration
    */
   public GitHubConfiguration()
   {
-    loadConfigSpec(Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG));
+    this(new GitHubConfig(Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG)));
   }
   
   /* package */ GitHubConfiguration(String fileName)
   {
-    loadConfigSpec(fileName);
+    this(new GitHubConfig(fileName));
   }
   
-  private void loadConfigSpec(String fileName)
+  private GitHubConfiguration(GitHubConfig gitHubConfig)
   {
-    if(fileName==null || fileName.trim().length()==0)
-      throw new ProgramFault("fileName may not be null.");
-    
-    InputStream in = null;
-    
-    try
+    super(gitHubConfig.tree_);
+    setName(gitHubConfig.name_);
+  }
+
+  private static class GitHubConfig
+  {
+    private JsonNode tree_;
+    private String name_;
+
+    private GitHubConfig(String fileName)
     {
+      if(fileName==null || fileName.trim().length()==0)
+        throw new ProgramFault("fileName may not be null.");
+      
+      name_ = fileName;
+      
+      InputStream in = null;
+      
       try
       {
-        URL configUrl = new URL(fileName);
+        try
+        {
+          URL configUrl = new URL(fileName);
+          
+          log_.info("Loading config spec from {}", configUrl);
+          
+          try
+          {
+            in = configUrl.openStream();
+          }
+          catch (IOException e)
+          {
+            throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
+          }
+        }
+        catch (MalformedURLException e)
+        {
+          File file = new File(fileName);
+          
+          if(!file.isFile())
+            throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is neither a URL or a valid file name.");
+          
+          if(!file.canRead())
+            throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is an unreadable file.");
+          
+          log_.info("Loading config spec from file {}", file.getAbsolutePath());
+          try
+          {
+            in = new FileInputStream(file);
+          }
+          catch (FileNotFoundException e1)
+          {
+            // We already checked this but....
+            throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is neither a URL or a valid file name.", e1);
+          }
+        }
         
-        log_.info("Loading config spec from {}", configUrl);
+        ObjectMapper mapper = new ObjectMapper();
         
         try
         {
-          in = configUrl.openStream();
+          JsonNode configSpec = mapper.readTree(in);
+          
+          JsonNode n;
+          
+          if((n = configSpec.get("url")) != null)
+          {
+            loadDirectConfig(fileName, n);
+          }
+          else if((n = configSpec.get("config")) != null)
+          {
+            tree_ = n;
+          }
+          else
+          {
+            throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is invalid.");
+          }
         }
-        catch (IOException e)
+        catch (IOException e1)
         {
-          throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
+          throw new ProgramFault("Cannot parse config spec from FUGUE_CONFIG \"" + fileName + "\".", e1);
+        }
+      }
+      finally
+      {
+        if(in != null)
+        {
+          try
+          {
+            in.close();
+          }
+          catch (IOException e)
+          {
+            log_.error("Failed to close config", e);
+          }
+        }
+      }
+    }
+    
+    private void loadDirectConfig(String fileName, JsonNode urlNode)
+    {
+      if(!urlNode.isTextual())
+        throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" has a non-textual url.");
+  
+      try
+      {
+        URL configUrl = new URL(urlNode.asText());
+        
+        String host = configUrl.getHost();
+        
+        switch(host)
+        {
+          case "api.github.com":
+            loadFromGitHub(configUrl);
+            break;
+          
+          default:
+            // We will assume that the url just returns the raw config data
+            loadFromUrl(configUrl);
         }
       }
       catch (MalformedURLException e)
       {
-        File file = new File(fileName);
-        
-        if(!file.isFile())
-          throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is neither a URL or a valid file name.");
-        
-        if(!file.canRead())
-          throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is an unreadable file.");
-        
-        log_.info("Loading config spec from file {}", file.getAbsolutePath());
-        try
-        {
-          in = new FileInputStream(file);
-        }
-        catch (FileNotFoundException e1)
-        {
-          // We already checked this but....
-          throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is neither a URL or a valid file name.", e1);
-        }
-      }
-      
-      ObjectMapper mapper = new ObjectMapper();
-      
-      try
-      {
-        JsonNode configSpec = mapper.readTree(in);
-        
-        JsonNode n;
-        
-        if((n = configSpec.get("url")) != null)
-        {
-          loadDirectConfig(fileName, n);
-        }
-        else if((n = configSpec.get("config")) != null)
-        {
-          setTree(n);
-        }
-        else
-        {
-          throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" is invalid.");
-        }
-      }
-      catch (IOException e1)
-      {
-        throw new ProgramFault("Cannot parse config spec from FUGUE_CONFIG \"" + fileName + "\".", e1);
+        throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" has an invalid url \"" + urlNode + "\"", e);
       }
     }
-    finally
+    
+    private void loadFromUrl(URL configUrl)
     {
-      if(in != null)
+      try(InputStream in =configUrl.openStream())
       {
-        try
-        {
-          in.close();
-        }
-        catch (IOException e)
-        {
-          log_.error("Failed to close config", e);
-        }
+        ObjectMapper mapper = new ObjectMapper();
+        
+        tree_ = mapper.readTree(in);
+      }
+      catch (IOException e)
+      {
+        throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
       }
     }
-  }
   
-  private void loadDirectConfig(String fileName, JsonNode urlNode)
-  {
-    if(!urlNode.isTextual())
-      throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" has a non-textual url.");
-
-    try
+    private void loadFromGitHub(URL configUrl)
     {
-      URL configUrl = new URL(urlNode.asText());
-      
-      String host = configUrl.getHost();
-      
-      switch(host)
+      try(InputStream in =configUrl.openStream())
       {
-        case "api.github.com":
-          loadFromGitHub(configUrl);
-          break;
+        ObjectMapper mapper = new ObjectMapper();
         
-        default:
-          // We will assume that the url just returns the raw config data
-          loadFromUrl(configUrl);
+        JsonNode tree = mapper.readTree(in);
+        
+        JsonNode content = tree.get("content");
+        
+        if(content == null || !content.isTextual())
+          throw new RuntimeException("FUGUE_CONFIG is " + configUrl + " but there is no content node in the JSON there");
+        
+        byte[] bytes = Base64.decodeBase64(content.asText());
+        
+        tree_ = mapper.readTree(bytes);
       }
-    }
-    catch (MalformedURLException e)
-    {
-      throw new ProgramFault("FUGUE_CONFIG \"" + fileName + "\" has an invalid url \"" + urlNode + "\"", e);
-    }
-  }
-  
-  private void loadFromUrl(URL configUrl)
-  {
-    try(InputStream in =configUrl.openStream())
-    {
-      ObjectMapper mapper = new ObjectMapper();
-      
-      setTree(mapper.readTree(in));
-    }
-    catch (IOException e)
-    {
-      throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
-    }
-  }
-
-  private void loadFromGitHub(URL configUrl)
-  {
-    try(InputStream in =configUrl.openStream())
-    {
-      ObjectMapper mapper = new ObjectMapper();
-      
-      JsonNode tree = mapper.readTree(in);
-      
-      JsonNode content = tree.get("content");
-      
-      if(content == null || !content.isTextual())
-        throw new RuntimeException("FUGUE_CONFIG is " + configUrl + " but there is no content node in the JSON there");
-      
-      byte[] bytes = Base64.decodeBase64(content.asText());
-      
-      setTree(mapper.readTree(bytes));
-    }
-    catch (IOException e)
-    {
-      throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
+      catch (IOException e)
+      {
+        throw new ProgramFault("FUGUE_CONFIG is " + configUrl + " but this URL is not readable", e);
+      }
     }
   }
 }
