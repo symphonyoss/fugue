@@ -370,7 +370,7 @@ public class Configuration implements IConfiguration
     Configuration subConfig = new Configuration(node);
     subConfig.name_ = name_ + "/" + names[index];
     
-    subConfigMap_.put(subConfig.name_, subConfig);
+    subConfigMap_.put(names[index], subConfig);
     
     return subConfig;
   }

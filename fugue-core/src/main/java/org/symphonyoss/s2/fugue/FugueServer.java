@@ -272,7 +272,6 @@ public class FugueServer extends AbstractComponentContainer<IFugueServer> implem
       return;
     
     started_ = true;
-    setRunning(true);
     
     log_.info("FugueServer Started");
     

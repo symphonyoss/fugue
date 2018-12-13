@@ -847,7 +847,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       role = iam_.createRole(request
           ).getRole();
       
-      log_.debug("Created role " + roleName);
+      log_.debug("Created role " + roleName + ", waiting to allow role to become active...");
+      
+      try
+      {
+        Thread.sleep(10000);
+      }
+      catch (InterruptedException e1)
+      {
+        log_.warn("Interrupted", e1);
+      }
+      log_.debug("Created role " + roleName + ", waiting to allow role to become active...OK carry on.");
     }
    
     for(String policyArn : policyArnList)

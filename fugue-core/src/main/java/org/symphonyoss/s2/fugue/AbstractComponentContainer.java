@@ -234,6 +234,7 @@ public class AbstractComponentContainer<T extends IFugeComponentContainer<T>> ex
       }
     }
     setLifeCycleState(FugueLifecycleState.Running);
+    setRunning(true);
     return self();
   }
   

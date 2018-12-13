@@ -27,18 +27,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.config.IConfiguration;
 
 public class BusyCounter implements IBusyCounter
 {
-  private static final Logger               log_      = LoggerFactory.getLogger(BusyCounter.class);
+  private static final Logger log_        = LoggerFactory.getLogger(BusyCounter.class);
+
+  private AtomicInteger       busyCycles_ = new AtomicInteger();
+  private AtomicInteger       idleCycles_ = new AtomicInteger();
+  private int                 busyLimit_  = 5;
+  private int                 idleLimit_  = 3;
+  private long                coolDown_   = 20000;
+  private long                lastEvent_;
   
-  private AtomicInteger busyCycles_ = new AtomicInteger();
-  private AtomicInteger idleCycles_ = new AtomicInteger();
-  private int busyLimit_ = 5;
-  private int idleLimit_ = 2;
-  private long coolDown_ = 20000;
-  private long lastEvent_;
+  public BusyCounter(int busyLimit, int idleLimit, long coolDown)
+  {
+    busyLimit_ = busyLimit;
+    idleLimit_ = idleLimit;
+    coolDown_ = coolDown;
+  }
   
+  public BusyCounter(IConfiguration config)
+  {
+    this(
+        config.getInt("busyLimit", 5),
+        config.getInt("idleLimit", 3),
+        config.getInt("coolDown", 20000)
+        );
+  }
+
   @Override
   public boolean busy()
   {
