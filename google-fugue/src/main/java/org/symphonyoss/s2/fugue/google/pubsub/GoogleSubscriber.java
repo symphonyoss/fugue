@@ -171,6 +171,7 @@ public class GoogleSubscriber implements Runnable
   {
     // receive messages from the queue
         
+    log_.info("About to read for " + subscriptionName_ + "...");
     try (SubscriberStub subscriber = GrpcSubscriberStub.create(subscriberStubSettings_))
     {
       PullResponse pullResponse = subscriber.pullCallable().call(nonBlockingPullRequest_);
@@ -187,11 +188,11 @@ public class GoogleSubscriber implements Runnable
           }
         }
         
-        log_.info(">>>>>>>>Blocking read for " + subscriptionName_ + "...");
+        log_.info("Blocking read for " + subscriptionName_ + "...");
         
         pullResponse = subscriber.pullCallable().call(blockingPullRequest_);
         
-        log_.info(">>>>>>>>Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
+        log_.info("Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
       }
       else
       {
@@ -205,7 +206,7 @@ public class GoogleSubscriber implements Runnable
           log_.debug("Extra schedule " + subscriptionName_);
         }
         
-        log_.info(">>>>>>>>Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
+        log_.info("Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
       }
       
       List<ReceivedMessage> messages = pullResponse.getReceivedMessagesList();

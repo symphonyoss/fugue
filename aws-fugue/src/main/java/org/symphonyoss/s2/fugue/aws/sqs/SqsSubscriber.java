@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
+import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -40,6 +41,7 @@ import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 
 /**
  * An SWS SNS subscriber.
@@ -49,33 +51,46 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
  */
 /* package */ class SqsSubscriber implements Runnable
 {
-  private static final Logger log_ = LoggerFactory.getLogger(SqsSubscriber.class);
-  
+  private static final Logger                        log_              = LoggerFactory.getLogger(SqsSubscriber.class);
+
   private final SqsSubscriberManager                 manager_;
   private final AmazonSQS                            sqsClient_;
   private final String                               queueUrl_;
-  private final ITraceContextTransactionFactory                 traceFactory_;
+  private final ITraceContextTransactionFactory      traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                    nonIdleSubscriber_;
+  private final String                               subscriptionName_;
   private final ICounter                             counter_;
+  private final IBusyCounter                         busyCounter_;
   private final String                               tenantId_;
   private int                                        messageBatchSize_ = 10;
+  private boolean                                    running_          = true;
 
-  private boolean running_ = true;
+  private final ReceiveMessageRequest                blockingPullRequest_;
+  private final ReceiveMessageRequest                nonBlockingPullRequest_;
 
 
   /* package */ SqsSubscriber(SqsSubscriberManager manager, AmazonSQS sqsClient, String queueUrl,
-      ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<String> consumer, ICounter counter, String tenantId)
+      String subscriptionName, ITraceContextTransactionFactory traceFactory,
+      IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
     manager_ = manager;
     sqsClient_ = sqsClient;
     queueUrl_ = queueUrl;
+    subscriptionName_ = subscriptionName;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
     counter_ = counter;
+    busyCounter_ = busyCounter;
     tenantId_ = tenantId;
+
+    blockingPullRequest_ = new ReceiveMessageRequest(queueUrl_)
+        .withMaxNumberOfMessages(messageBatchSize_ )
+        .withWaitTimeSeconds(20);
+    
+    nonBlockingPullRequest_ = new ReceiveMessageRequest(queueUrl_)
+        .withMaxNumberOfMessages(messageBatchSize_ );
   }
   
   class NonIdleSubscriber implements Runnable
@@ -136,14 +151,45 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   {
     // receive messages from the queue
     
-    ReceiveMessageRequest request = new ReceiveMessageRequest(queueUrl_)
-        .withMaxNumberOfMessages(messageBatchSize_ )
-        .withWaitTimeSeconds(20);
+    log_.info("About to read for " + subscriptionName_ + "...");
     try
     {    
-      List<Message> messages = sqsClient_.receiveMessage(request).getMessages();
+      ReceiveMessageResult pullResponse = sqsClient_.receiveMessage(nonBlockingPullRequest_);
+      
+      
+      if(pullResponse.getMessages().isEmpty())
+      {
+        if(busyCounter_ != null)
+        {
+          if(busyCounter_.idle())
+          {
+            stop();
+            return;
+          }
+        }
+        
+        log_.info("Blocking read for " + subscriptionName_ + "...");
+        
+        pullResponse = sqsClient_.receiveMessage(blockingPullRequest_);
+        
+        log_.info("Blocking read for " + subscriptionName_ + " returned " + pullResponse.getMessages().size());
+      }
+      else
+      {
+        if(busyCounter_ != null)
+          busyCounter_.busy();
+        
+        if(isRunning())
+        {
+          manager_.submit(nonIdleSubscriber_, false);
+
+          log_.debug("Extra schedule " + subscriptionName_);
+        }
+        
+        log_.info("Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getMessages().size());
+      }
   
-      log_.info("Read " + messages.size() + " for " + queueUrl_);
+      List<Message> messages = pullResponse.getMessages();
       
       switch(messages.size())
       {

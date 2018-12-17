@@ -900,6 +900,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   protected abstract class DeploymentContext
   {
+    private static final String FUGUE_CONFIG = "FUGUE_CONFIG";
+    
     private final String                                   tenantId_;
     private final INameFactory                             nameFactory_;
 
@@ -936,6 +938,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
     
     protected abstract void deployService();
+
+    protected abstract String getFugueConfig();
     
     protected INameFactory getNameFactory()
     {
@@ -1211,12 +1215,20 @@ public abstract class FugueDeploy extends CommandLineHandler
             
             IJsonObject<?> envNode = container.getObject(ENVIRONMENT);
             
-            Iterator<String> it = envNode.getNameIterator();
-            
-            while(it.hasNext())
+            if(envNode != null)
             {
-              String key = it.next();
-              environment.put(key, envNode.getRequiredString(key));
+              Iterator<String> it = envNode.getNameIterator();
+              
+              while(it.hasNext())
+              {
+                String key = it.next();
+                environment.put(key, envNode.getRequiredString(key));
+              }
+            }
+            
+            if(!environment.containsKey(FUGUE_CONFIG))
+            {
+              environment.put(FUGUE_CONFIG, getFugueConfig());
             }
             
             deployLambdaContainer(name,

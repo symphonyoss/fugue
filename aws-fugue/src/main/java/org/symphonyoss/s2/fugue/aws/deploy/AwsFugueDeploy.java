@@ -1402,6 +1402,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
+    @Override
+    protected String getFugueConfig()
+    {
+      return "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
+          "-" + getAwsRegion() + "-config/config/" +
+          
+          getNameFactory().getServiceName() + ".json";
+    }
+
     private String getClusterArn()
     {
       return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":cluster/" + clusterName_;
