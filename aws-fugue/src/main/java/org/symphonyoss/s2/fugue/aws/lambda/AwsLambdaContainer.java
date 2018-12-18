@@ -21,19 +21,16 @@ import org.symphonyoss.s2.fugue.counter.BusyCounter;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
 
-public class AwsLambdaContainer implements RequestStreamHandler
+public abstract class AwsLambdaContainer implements RequestStreamHandler
 {
   private static final Logger log_ = LoggerFactory.getLogger(AwsLambdaContainer.class);
-  private IFugueAssemblyBuilder<?, ?> builder_;
 
-
-
-  public AwsLambdaContainer(IFugueAssemblyBuilder<?,?> builder)
+  public AwsLambdaContainer()
   {
-    builder_ = builder;
   }
 
 
+  protected abstract IFugueAssemblyBuilder<?,?> createBuilder();
 
   @Override
   public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context)
@@ -64,10 +61,12 @@ public class AwsLambdaContainer implements RequestStreamHandler
       
       FugueComponentContainer container = new FugueComponentContainer();
       
-      IFugueAssembly assembly = builder_
+      IFugueAssemblyBuilder<?, ?> builder = createBuilder();
+      
+      IFugueAssembly assembly = builder
           .withContainer(container)
           .withBusyCounter(new LambdaBusyCounter(container,
-              builder_.getConfiguration().getConfiguration("com/symphony/s2/legacy/message/forwarder/AwsForwarderComponent")))
+              builder.getConfiguration().getConfiguration("com/symphony/s2/legacy/message/forwarder/AwsForwarderComponent")))
           .build();
             
       container.start();

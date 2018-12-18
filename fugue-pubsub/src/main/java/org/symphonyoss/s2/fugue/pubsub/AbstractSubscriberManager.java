@@ -156,6 +156,11 @@ implements ISubscriberManager<P, T>
       return self();
     }
 
+    public ITraceContextTransactionFactory getTraceContextTransactionFactory()
+    {
+      return traceFactory_;
+    }
+
     @Override
     public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
     {

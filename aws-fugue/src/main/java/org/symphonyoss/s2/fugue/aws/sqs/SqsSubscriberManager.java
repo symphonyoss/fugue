@@ -98,6 +98,7 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
   {
     private AmazonSQSClientBuilder sqsBuilder_;
     private String                 region_;
+    private String configPath_ = "org/symphonyoss/s2/fugue/aws/sqs";
 
     /**
      * Constructor.
@@ -112,7 +113,21 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
     @Override
     protected String getConfigPath()
     {
-      return "org/symphonyoss/s2/fugue/aws/sqs";
+      return configPath_;
+    }
+    
+    /**
+     * Set the AWS region.
+     * 
+     * @param configPath The path in the global configuration from which to take config.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withConfigPath(String configPath)
+    {
+      configPath_ = configPath;
+      
+      return self();
     }
     
     /**
