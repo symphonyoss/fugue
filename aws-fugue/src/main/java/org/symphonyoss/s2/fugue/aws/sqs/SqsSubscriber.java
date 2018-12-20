@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -37,6 +38,7 @@ import org.symphonyoss.s2.fugue.deploy.IBatch;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
+import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriber;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
@@ -49,7 +51,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
  * @author Bruce Skingle
  *
  */
-/* package */ class SqsSubscriber implements Runnable
+/* package */ class SqsSubscriber extends AbstractPullSubscriber<Void, Message>
 {
   private static final Logger                        log_              = LoggerFactory.getLogger(SqsSubscriber.class);
 
@@ -58,13 +60,12 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
   private final String                               queueUrl_;
   private final ITraceContextTransactionFactory      traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
-  private final NonIdleSubscriber                    nonIdleSubscriber_;
+  private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                               subscriptionName_;
   private final ICounter                             counter_;
   private final IBusyCounter                         busyCounter_;
   private final String                               tenantId_;
   private int                                        messageBatchSize_ = 10;
-  private boolean                                    running_          = true;
 
   private final ReceiveMessageRequest                blockingPullRequest_;
   private final ReceiveMessageRequest                nonBlockingPullRequest_;
@@ -74,6 +75,8 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
+    super(manager, subscriptionName, counter, busyCounter);
+    
     manager_ = manager;
     sqsClient_ = sqsClient;
     queueUrl_ = queueUrl;
@@ -102,52 +105,30 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
     }
   }
 
+  @Override
+  protected NonIdleSubscriber getNonIdleSubscriber()
+  {
+    return nonIdleSubscriber_;
+  }
+
+  @Override
+  protected Collection<Message> nonBlockingPull(Void context)
+  {
+    return sqsClient_.receiveMessage(nonBlockingPullRequest_).getMessages();
+  }
+
+  @Override
+  protected Collection<Message> blockingPull(Void context)
+  {
+    return sqsClient_.receiveMessage(blockingPullRequest_).getMessages();
+  }
+
   public String getQueueUrl()
   {
     return queueUrl_;
   }
-
-  @Override
-  public void run()
-  {
-    run(true);
-  }
-
-  public void run(boolean runIfIdle)
-  {
-    if(isRunning())
-    {
-      if(runIfIdle)
-      {
-        try
-        {
-          while(isRunning())
-          {
-            getSomeMessages();
-          }
-        }
-        finally
-        {
-          if(runIfIdle && isRunning())
-          {
-            // This "can't happen"
-            log_.error("Main SQS thread returned, rescheduling...");
-            
-            manager_.submit(this, true);
-          }
-        }
-      }
-      else
-      {
-        if(isRunning())
-        {
-          getSomeMessages();
-        }
-      }
-    }
-  }
   
-  private void getSomeMessages()
+  private void OLDgetSomeMessages()
   {
     // receive messages from the queue
     
@@ -301,15 +282,5 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
         traceTransaction.aborted();
       }
     }
-  }
-
-  synchronized boolean isRunning()
-  {
-    return running_;
-  }
-  
-  public synchronized void stop()
-  {
-    running_ = false;
   }
 }

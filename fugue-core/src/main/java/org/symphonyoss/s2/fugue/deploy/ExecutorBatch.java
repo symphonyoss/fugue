@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,5 +132,45 @@ public class ExecutorBatch implements IBatch
         throw new IllegalStateException("Batch task failed", e);
       }
     }
+  }
+  
+
+
+  /**
+   * Block until all tasks have completed or the given timeout expires.
+   * 
+   * @param timeoutMillis Timeout in milliseconds.
+   * @return The number of incomplete tasks in the batch.
+   */
+  @Override
+  public synchronized int waitForAllTasks(long timeoutMillis)
+  {
+    closed_ = true;
+    
+    long expiryTime = System.currentTimeMillis() + timeoutMillis;
+
+    while(taskCnt_>0)
+    {
+      long timeout = System.currentTimeMillis() - expiryTime;
+      
+      if(timeout < 1)
+        return taskCnt_;
+      
+      try
+      {
+        Future<Void> future = completionService_.poll(timeout, TimeUnit.MILLISECONDS);
+        
+        if(future == null)
+          return taskCnt_;
+        
+        future.get();
+        taskCnt_--;
+      }
+      catch (InterruptedException | ExecutionException e)
+      {
+        throw new IllegalStateException("Batch task failed", e);
+      }
+    }
+    return taskCnt_;
   }
 }

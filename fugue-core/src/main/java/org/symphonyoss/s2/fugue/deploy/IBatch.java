@@ -42,4 +42,12 @@ public interface IBatch
    * Block until all tasks have completed.
    */
   public void waitForAllTasks();
+
+  /**
+   * Block until all tasks have completed or the given timeout expires.
+   * 
+   * @param timeoutMillis Timeout in milliseconds.
+   * @return The number of incomplete tasks in the batch.
+   */
+  int waitForAllTasks(long timeoutMillis);
 }

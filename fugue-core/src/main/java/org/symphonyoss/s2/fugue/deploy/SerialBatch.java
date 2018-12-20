@@ -59,4 +59,10 @@ public class SerialBatch implements IBatch
   public void waitForAllTasks()
   {
   }
+
+  @Override
+  public int waitForAllTasks(long timeoutMillis)
+  {
+    return 0;
+  }
 }
