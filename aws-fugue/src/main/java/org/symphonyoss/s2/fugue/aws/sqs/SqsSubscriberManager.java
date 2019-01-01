@@ -38,6 +38,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
@@ -107,7 +108,11 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
     {
       super(Builder.class);
       
-      sqsBuilder_ = AmazonSQSClientBuilder.standard();
+      sqsBuilder_ = AmazonSQSClientBuilder
+          .standard()
+          .withClientConfiguration(new ClientConfiguration()
+              .withMaxConnections(200)
+              );
     }
     
     @Override

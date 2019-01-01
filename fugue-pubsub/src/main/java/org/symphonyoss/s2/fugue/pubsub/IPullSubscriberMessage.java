@@ -21,37 +21,19 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.deploy;
-
-import java.util.Collection;
+package org.symphonyoss.s2.fugue.pubsub;
 
 /**
- * A batch of tasks which can be executed in parallel.
+ * A message returned from a pull subscriber.
  * 
- * @param <T> The type of tasks in the batch
+ * The run() method must process the message.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IBatch<T extends Runnable>
+public interface IPullSubscriberMessage extends Runnable
 {
-  /**
-   * Submit the given task.
-   * 
-   * @param task Some task to be executed as part of the batch.
-   */
-  public void submit(T task);
-  
-  /**
-   * Block until all tasks have completed.
-   */
-  public void waitForAllTasks();
+  String  getMessageId();
+  void extend();
 
-  /**
-   * Block until all tasks have completed or the given timeout expires.
-   * 
-   * @param timeoutMillis Timeout in milliseconds.
-   * @return A copy of the collection of incomplete tasks in the batch.
-   */
-  Collection<T> waitForAllTasks(long timeoutMillis);
 }

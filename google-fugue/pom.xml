@@ -44,7 +44,8 @@
     <dependency>
 	    <groupId>com.google.cloud</groupId>
 	    <artifactId>google-cloud-pubsub</artifactId>
-	    <version>1.56.0</version>
+	    <version>1.33.0</version>
+	    <!-- <version>1.56.0</version> -->
 	    <!-- <version>1.33.0</version> -->
 	    <!-- CAUTION does not work hen deployed to AWS <version>1.51.0</version> -->
 	  </dependency>

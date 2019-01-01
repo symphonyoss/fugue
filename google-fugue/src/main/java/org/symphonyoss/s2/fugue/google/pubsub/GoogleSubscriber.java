@@ -23,39 +23,34 @@
 
 package org.symphonyoss.s2.fugue.google.pubsub;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.aws.sqs.SqsSubscriber.NonIdleSubscriber;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
-import org.symphonyoss.s2.fugue.deploy.IBatch;
-import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
-import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriber;
+import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberContext;
+import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberMessage;
 
 import com.google.cloud.pubsub.v1.stub.GrpcSubscriberStub;
-import com.google.cloud.pubsub.v1.stub.SubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStubSettings;
 import com.google.protobuf.Timestamp;
 import com.google.pubsub.v1.AcknowledgeRequest;
 import com.google.pubsub.v1.ModifyAckDeadlineRequest;
 import com.google.pubsub.v1.PubsubMessage;
 import com.google.pubsub.v1.PullRequest;
-import com.google.pubsub.v1.PullResponse;
 import com.google.pubsub.v1.ReceivedMessage;
 
 /**
@@ -64,8 +59,11 @@ import com.google.pubsub.v1.ReceivedMessage;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriber extends AbstractPullSubscriber<SubscriberStub, ReceivedMessage>
+public class GoogleSubscriber extends AbstractPullSubscriber
 {
+  private static final int EXTENSION_TIMEOUT_SECONDS = 10;
+  private static final int EXTENSION_FREQUENCY_MILLIS = 5000;
+  
   private static final Logger                                    log_     = LoggerFactory
       .getLogger(GoogleSubscriber.class);
 
@@ -74,8 +72,6 @@ public class GoogleSubscriber extends AbstractPullSubscriber<SubscriberStub, Rec
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
   private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                                           subscriptionName_;
-  private final ICounter                                         counter_;
-  private final IBusyCounter                                     busyCounter_;
   private final String                                           tenantId_;
   private int                                                    batchSize_ = 10;
   private SubscriberStubSettings subscriberStubSettings_;
@@ -87,15 +83,18 @@ public class GoogleSubscriber extends AbstractPullSubscriber<SubscriberStub, Rec
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
-    super(manager, subscriptionName, counter, busyCounter);
+    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS);
+    
+    if(Fugue.isDebugSingleThread())
+    {
+      batchSize_ = 1;
+    }
     
     manager_ = manager;
     subscriptionName_ = subscriptionName;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
-    counter_ = counter;
-    busyCounter_ = busyCounter;
     tenantId_ = tenantId;
     
     try
@@ -139,375 +138,149 @@ public class GoogleSubscriber extends AbstractPullSubscriber<SubscriberStub, Rec
   }
 
   @Override
-  protected void getSomeMessages()
+  protected IPullSubscriberContext getContext() throws IOException
   {
-    // receive messages from the queue
-        
-    log_.info("About to read for " + subscriptionName_ + "...");
-    try (SubscriberStub subscriber = GrpcSubscriberStub.create(subscriberStubSettings_))
-    {
-      getSomeMessages(subscriber);
-    }
-    catch (IOException e)
-    {
-      log_.error("Unable to pull messages", e);
-    }
+    return new GooglePullSubscriberContext();
   }
   
-  @Override
-  protected Collection<ReceivedMessage> nonBlockingPull(SubscriberStub subscriber)
+  class GooglePullSubscriberContext implements IPullSubscriberContext
   {
-    return subscriber.pullCallable().call(nonBlockingPullRequest_).getReceivedMessagesList();
-  }
+    private final GrpcSubscriberStub subscriber_;
 
-  @Override
-  protected Collection<ReceivedMessage> blockingPull(SubscriberStub subscriber)
-  {
-    return subscriber.pullCallable().call(blockingPullRequest_).getReceivedMessagesList();
-  }
-
-private void OLDgetSomeMessages()
-{
-  // receive messages from the queue
-      
-  log_.info("About to read for " + subscriptionName_ + "...");
-  try (SubscriberStub subscriber = GrpcSubscriberStub.create(subscriberStubSettings_))
-  {
-    PullResponse pullResponse = subscriber.pullCallable().call(nonBlockingPullRequest_);
-    
-   
-    if(pullResponse.getReceivedMessagesList().isEmpty())
+    GooglePullSubscriberContext() throws IOException
     {
-      if(busyCounter_ != null)
+      subscriber_ = GrpcSubscriberStub.create(subscriberStubSettings_);
+    }
+    
+    @Override
+    public Collection<IPullSubscriberMessage> nonBlockingPull()
+    {
+      return pull(nonBlockingPullRequest_);
+    }
+
+    @Override
+    public Collection<IPullSubscriberMessage> blockingPull()
+    {
+      return pull(blockingPullRequest_);
+    }
+
+    private Collection<IPullSubscriberMessage> pull(PullRequest pullRequest)
+    {
+      List<IPullSubscriberMessage>result = new LinkedList<>();
+      
+      for(ReceivedMessage receivedMessage : subscriber_.pullCallable().call(pullRequest).getReceivedMessagesList())
       {
-        if(busyCounter_.idle())
+        result.add(new GooglePullSubscriberMessage(subscriber_, receivedMessage));
+      }
+      
+      return result;
+    }
+
+    @Override
+    public void close()
+    {
+      subscriber_.close();
+    }
+  }
+
+  private class GooglePullSubscriberMessage implements IPullSubscriberMessage
+  {
+    private final GrpcSubscriberStub subscriber_;
+    private final ReceivedMessage    receivedMessage_;
+    private boolean                  running_ = true;
+    
+    private GooglePullSubscriberMessage(GrpcSubscriberStub subscriber, ReceivedMessage receivedMessage)
+    {
+      subscriber_ = subscriber;
+      receivedMessage_ = receivedMessage;
+    }
+
+    @Override
+    public String getMessageId()
+    {
+      return receivedMessage_.getMessage().getMessageId();
+    }
+
+    @Override
+    public void run()
+    {
+      PubsubMessage message = receivedMessage_.getMessage();
+      Timestamp     ts      = message.getPublishTime();
+      
+      try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:Google", message.getMessageId(),
+          tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
+      {
+        ITraceContext trace = traceTransaction.open();
+        
+        trace.trace("RECEIVED");
+        ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
+        
+        long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
+        
+        synchronized(this)
         {
-          stop();
-          return;
+          // There is no point trying to extend the ack deadline now
+          running_ = false;
+        
+          if(retryTime < 0)
+          {
+            trace.trace("ABOUT_TO_ACK");
+            
+            AcknowledgeRequest acknowledgeRequest = AcknowledgeRequest
+                .newBuilder()
+                .setSubscription(subscriptionName_)
+                .addAckIds(receivedMessage_.getAckId())
+                .build();
+            
+            subscriber_.acknowledgeCallable().call(acknowledgeRequest);
+            traceTransaction.finished();
+          }
+          else
+          {
+            trace.trace("ABOUT_TO_NACK");
+            
+            int visibilityTimout = (int) (retryTime / 1000);
+            
+            ModifyAckDeadlineRequest request = ModifyAckDeadlineRequest
+              .newBuilder()
+              .setSubscription(subscriptionName_)
+              .setAckDeadlineSeconds(visibilityTimout)
+              .addAckIds(receivedMessage_.getAckId())
+              .build();
+  
+            subscriber_.modifyAckDeadlineCallable().call(request);
+            
+            traceTransaction.aborted();
+          }
         }
       }
-      
-      log_.info("Blocking read for " + subscriptionName_ + "...");
-      
-      pullResponse = subscriber.pullCallable().call(blockingPullRequest_);
-      
-      log_.info("Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
-    }
-    else
-    {
-      if(busyCounter_ != null)
-        busyCounter_.busy();
-      
-      if(isRunning())
+      catch(RuntimeException e)
       {
-        manager_.submit(nonIdleSubscriber_, false);
-
-        log_.debug("Extra schedule " + subscriptionName_);
+        log_.error("Failed to process message " + getMessageId(), e);
       }
-      
-      log_.info("Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getReceivedMessagesList().size());
     }
-    
-    List<ReceivedMessage> messages = pullResponse.getReceivedMessagesList();
-    
-    switch(messages.size())
+
+    @Override
+    public synchronized void extend()
     {
-      case 0:
-        // Nothing to do...
-        break;
-        
-      case 1:
-        // Single message, just process in the current thread
-        if(counter_ != null)
-          counter_.increment(1);
-        handleMessage(subscriber, messages.get(0));
-        break;
-        
-      default:
-        if(counter_ != null)
-          counter_.increment(messages.size());
-        
-        // Fire off all but one envelopes in its own thread, do the final one in the current thread
-        int     index = 0;
-        IBatch  batch = manager_.newBatch();
-        
+      if(running_)
+      {
         try
         {
-          while(index < messages.size() - 1)
-          {
-            final int myIndex = index++;
-            
-            batch.submit(() -> 
-            {
-              handleMessage(subscriber, messages.get(myIndex));
-            });
-          }
-          handleMessage(subscriber, messages.get(index));
-          
-          batch.waitForAllTasks();
+          ModifyAckDeadlineRequest request = ModifyAckDeadlineRequest
+            .newBuilder()
+            .setSubscription(subscriptionName_)
+            .setAckDeadlineSeconds(EXTENSION_TIMEOUT_SECONDS)
+            .addAckIds(receivedMessage_.getAckId())
+            .build();
+  
+          subscriber_.modifyAckDeadlineCallable().call(request);
         }
         catch(RuntimeException e)
         {
-          Throwable cause = e.getCause();
-          
-          if(cause instanceof ExecutionException)
-            cause = cause.getCause();
-          
-          if(cause instanceof RetryableConsumerException)
-          {
-            throw (RetryableConsumerException)cause;
-          }            
-          if(cause instanceof FatalConsumerException)
-          {
-            throw (FatalConsumerException)cause;
-          }
-          throw e;
+          log_.error("Failed to extend message " + getMessageId(), e);
         }
+      }
     }
   }
-  catch(RuntimeException e)
-  {
-    log_.error("Error processing message", e);
-  }
-  catch (Throwable e)
-  {
-    /*
-     * This method is called from an executor so I am catching Throwable because otherwise Errors will
-     * be swallowed.
-     * 
-     * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
-     * I think it's worth trying.
-     */
-    
-    try
-    {
-      log_.error("Error processing message", e);
-    }
-    finally
-    {
-      System.exit(1);
-    }
-  }
-}
-
-  private void handleMessage(SubscriberStub subscriber, ReceivedMessage receivedMessage)
-  {
-    PubsubMessage message = receivedMessage.getMessage();
-    Timestamp     ts      = message.getPublishTime();
-    String id = message.getMessageId();
-
-    System.err.println("MessageId " + id);
-    
-    long s = System.currentTimeMillis();
-    
-    if(id.equals("328895002803652"))
-    {
-      System.err.println("STOP");
-      
-      ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
-      
-      try(FileOutputStream out = new FileOutputStream("/tmp/message"))
-      {
-        InputStream in = byteArray.getInputStream();
-        
-        byte[] buf = new byte[1024];
-        int n;
-        
-        while((n=in.read(buf))>0)
-        {
-          out.write(buf, 0, n);
-        }
-        
-      }
-      catch(IOException e)
-      {
-        e.printStackTrace();
-      }
-    }
-    
-    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:Google", message.getMessageId(),
-        tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
-    {
-      ITraceContext trace = traceTransaction.open();
-      
-      trace.trace("RECEIVED");
-      ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
-      
-      long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
-      
-      if(id.equals("328895002803652"))
-      {
-        long e = System.currentTimeMillis();
-        long t = e - s;
-        
-        System.err.println("1STOP after " + t + "ms");
-      }
-      
-      if(retryTime < 0)
-      {
-        trace.trace("ABOUT_TO_ACK");
-        
-        AcknowledgeRequest acknowledgeRequest = AcknowledgeRequest
-            .newBuilder()
-            .setSubscription(subscriptionName_)
-            .addAckIds(receivedMessage.getAckId())
-            .build();
-        // use acknowledgeCallable().futureCall to asynchronously perform this
-        // operation
-        subscriber.acknowledgeCallable().call(acknowledgeRequest);
-        traceTransaction.finished();
-      }
-      else
-      {
-        trace.trace("ABOUT_TO_NACK");
-        
-        int visibilityTimout = (int) (retryTime / 1000);
-        
-        ModifyAckDeadlineRequest request = ModifyAckDeadlineRequest
-          .newBuilder()
-          .setAckDeadlineSeconds(visibilityTimout)
-          .addAckIds(receivedMessage.getAckId())
-          .build();
-
-        subscriber.modifyAckDeadlineCallable().call(request);
-        
-        traceTransaction.aborted();
-      }
-    }
-    catch(Throwable t)
-    {
-      t.printStackTrace();
-    }
-    finally
-    {
-      System.err.println("Finally!");
-    }
-  }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-//  
-//  
-//  
-//  private static final ScheduledThreadPoolExecutor  executor_ = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("google-failed-msg-ack", true));
-//  private static final int MAX_PENDING_RETRY_COUNT = 10000;
-//  
-////  static PrintStream debug_;
-////  
-////  static
-////  {
-////    try
-////    {
-////      debug_ = new PrintStream(new FileOutputStream("/tmp/goog-" + new Date()));
-////    }
-////    catch (FileNotFoundException e)
-////    {
-////      e.printStackTrace();
-////      
-////      debug_ = System.err;
-////    }
-////  }
-//  
-//
-//  
-//  /* package */ GoogleSubscriber(GoogleSubscriberManager manager, ITraceContextTransactionFactory traceFactory,
-//      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, ICounter counter)
-//  {
-//    manager_ = manager;
-//    traceFactory_ = traceFactory;
-//    consumer_ = consumer;
-//    subscriptionName_ = subscriptionName;
-//    counter_ = counter;
-//  }
-//
-//  @Override
-//  public void receiveMessage(PubsubMessage message, AckReplyConsumer consumer)
-//  {
-////    long now = System.currentTimeMillis();
-////    debug_.println(">S" + now);
-//    Timestamp ts = message.getPublishTime();
-//    
-//    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction(PubsubMessage.class.getSimpleName(), message.getMessageId(),
-//        Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
-//    {
-//      ITraceContext trace = traceTransaction.open();
-//      
-//      if(stopped_.get())
-//      {
-//        System.err.println("NAKing message");
-//        trace.trace("ABORTING_SHUTDOWN");
-//        traceTransaction.aborted();
-//        consumer.nack();
-//        return;
-//        
-//      }
-//      if(counter_ != null)
-//        counter_.increment(1);
-//      
-//      trace.trace("RECEIVED");
-//      ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
-//      
-//      long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
-//      
-//      if(retryTime < 0)
-//      {
-//        trace.trace("ABOUT_TO_ACK");
-//        consumer.ack();
-//      }
-//      else
-//      {
-//        if(executor_.getQueue().size() > MAX_PENDING_RETRY_COUNT)
-//          log_.error("We are holding " + executor_.getQueue().size() + " failed messages, this message will not be re-tried for up to 60 mins.");
-//        else
-//          executor_.schedule(() -> {consumer.nack();}, retryTime, TimeUnit.MILLISECONDS);
-//      }
-//      traceTransaction.finished();
-////      long end = System.currentTimeMillis();
-////      debug_.println(">F" + (end - now) + " " + trace.getSubjectId());
-////      debug_.flush();
-//    }
-//    catch (Throwable e)
-//    {
-//      /*
-//       * This method is called from an executor so I am catching Throwable because otherwise Errors will
-//       * cause the process to fail silently.
-//       * 
-//       * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
-//       * I think it's worth trying.
-//       */
-//      log_.error("Failed to handle message from " + subscriptionName_, e);
-//    }
-//  }
-//
-//  public void stop()
-//  {
-//    stopped_.set(true);
-//  }
 }

@@ -44,10 +44,24 @@ public class ExecutorBatchTest
       throw new IllegalStateException(e);
     }
   };
-  private static final Runnable throwUp = () ->
+  
+  private static class ThrowUp implements Runnable
   {
-    throw new IllegalStateException("Barf!");
-  };
+    @Override
+    public void run()
+    {
+      throw new IllegalStateException("Barf!");
+    }
+
+    @Override
+    public String toString()
+    {
+      return "Throw Up";
+    }
+  }
+  
+  private static final Runnable throwUp = new ThrowUp();
+  
   private static final Runnable sleep5throwUp = () ->
   {
     try
@@ -65,7 +79,7 @@ public class ExecutorBatchTest
   @Test
   public void testNormal()
   {
-    ExecutorBatch batch = new ExecutorBatch(executor_);
+    ExecutorBatch<Runnable> batch = new ExecutorBatch<>(executor_);
     
     for(int i=0 ; i<25 ; i++)
       batch.submit(sleep2);
@@ -76,10 +90,10 @@ public class ExecutorBatchTest
   @Test
   public void testFailFast()
   {
-    ExecutorBatch batch = new ExecutorBatch(executor_);
+    ExecutorBatch<Runnable> batch = new ExecutorBatch<>(executor_);
     
-    for(int i=0 ; i<5 ; i++)
-      batch.submit(sleep2);
+//    for(int i=0 ; i<5 ; i++)
+//      batch.submit(sleep2);
     
     batch.submit(throwUp);
     
@@ -110,7 +124,7 @@ public class ExecutorBatchTest
   @Test
   public void testFailSlow()
   {
-    ExecutorBatch batch = new ExecutorBatch(executor_);
+    ExecutorBatch<Runnable> batch = new ExecutorBatch<>(executor_);
     
     for(int i=0 ; i<5 ; i++)
       batch.submit(sleep2);

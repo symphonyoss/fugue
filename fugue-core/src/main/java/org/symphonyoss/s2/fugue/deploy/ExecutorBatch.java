@@ -23,6 +23,10 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -32,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.CodingFault;
 
 /**
  * An implementation of IBatch based on an Executor.
@@ -41,16 +46,19 @@ import org.slf4j.LoggerFactory;
  * 
  * We assume that any exception from any task is program fatal.
  * 
+ * @param <T> The type of tasks in the batch
+ * 
  * @author Bruce Skingle
  *
  */
-public class ExecutorBatch implements IBatch
+public class ExecutorBatch<T extends Runnable> implements IBatch<T>
 {
-  private static Logger log_ = LoggerFactory.getLogger(ExecutorBatch.class);
-  
-  private CompletionService<Void> completionService_;
-  private boolean                 closed_;
-  private int                     taskCnt_;
+  private static Logger        log_      = LoggerFactory.getLogger(ExecutorBatch.class);
+
+  private CompletionService<T> completionService_;
+  private boolean              closed_;
+  private List<T>              taskList_ = new LinkedList<>();
+  private int                  taskCnt_;
   
   /**
    * Constructor.
@@ -61,7 +69,7 @@ public class ExecutorBatch implements IBatch
   {
 //    executor_ = executor;
     
-    completionService_ = new ExecutorCompletionService<Void>(executor);
+    completionService_ = new ExecutorCompletionService<>(executor);
   }
   
   /**
@@ -70,42 +78,58 @@ public class ExecutorBatch implements IBatch
    * @param task Some task to be executed as part of the batch.
    */
   @Override
-  public void submit(Runnable task)
+  public void submit(T task)
   {
-    Future<Void> future;
+    T completedTask;
     
-    while((future = poll()) != null)
+    while((completedTask = poll()) != null)
     {
-      try
-      {
-        future.get();
-      }
-      catch (InterruptedException | ExecutionException e)
-      {
-        throw new IllegalStateException("Batch task failed", e);
-      }
+      log_.debug("Task completed: " + completedTask);
     }
     
     doSubmit(task);
   }
   
-  private synchronized Future<Void> poll()
+  private synchronized T poll()
   {
-    Future<Void> future = completionService_.poll();
+    Future<T> future = completionService_.poll();
     
-    if(future != null)
-      taskCnt_--;
+    if(future == null)
+      return null;
     
-    return future;
+
+    taskCnt_--;
+    return remove(future);
   }
   
-  private synchronized void doSubmit(Runnable task)
+  private T remove(Future<T> future)
+  {
+    try
+    {
+      T task = future.get();
+      
+      if(!taskList_.remove(task))
+      {
+        throw new CodingFault("Unrecognized task returned: " + task);
+      }
+      
+      return task;
+    }
+    catch (InterruptedException | ExecutionException e)
+    {
+      throw new IllegalStateException("Batch task failed", e);
+    }
+  }
+
+  private synchronized void doSubmit(T task)
   {
     if(closed_)
       throw new IllegalStateException("waitForAllTasks() has already been called");
     
+    taskList_.add(task);
     taskCnt_++;
-    completionService_.submit(task, null);
+    
+    completionService_.submit(task, task);
   }
 
   /**
@@ -122,12 +146,14 @@ public class ExecutorBatch implements IBatch
     while(taskCnt_>0)
     {
 //      log_.info("Waiting for " + taskCnt_ + " tasks...");
+
+      taskCnt_--;
+      
       try
       {
-        completionService_.take().get();
-        taskCnt_--;
+        remove(completionService_.take());
       }
-      catch (InterruptedException | ExecutionException e)
+      catch (InterruptedException e)
       {
         throw new IllegalStateException("Batch task failed", e);
       }
@@ -143,34 +169,44 @@ public class ExecutorBatch implements IBatch
    * @return The number of incomplete tasks in the batch.
    */
   @Override
-  public synchronized int waitForAllTasks(long timeoutMillis)
+  public synchronized Collection<T> waitForAllTasks(long timeoutMillis)
   {
+    log_.debug("Wait for " + timeoutMillis + ", taskCnt_=" + taskCnt_);
     closed_ = true;
     
     long expiryTime = System.currentTimeMillis() + timeoutMillis;
 
     while(taskCnt_>0)
     {
-      long timeout = System.currentTimeMillis() - expiryTime;
+      long timeout = expiryTime - System.currentTimeMillis();
       
       if(timeout < 1)
-        return taskCnt_;
+      {
+        log_.debug("Time is up, taskCnt=" + taskCnt_);
+        return new ArrayList<T>(taskList_);
+      }
       
       try
       {
-        Future<Void> future = completionService_.poll(timeout, TimeUnit.MILLISECONDS);
+        Future<T> future = completionService_.poll(timeout, TimeUnit.MILLISECONDS);
         
         if(future == null)
-          return taskCnt_;
-        
-        future.get();
+        {
+          log_.debug("All done, taskCnt=" + taskCnt_);
+          return new ArrayList<T>(taskList_);
+        }
+
         taskCnt_--;
+        
+        remove(future);
       }
-      catch (InterruptedException | ExecutionException e)
+      catch (InterruptedException e)
       {
         throw new IllegalStateException("Batch task failed", e);
       }
     }
-    return taskCnt_;
+    log_.debug("All done2, taskCnt_=" + taskCnt_);
+    
+    return new ArrayList<T>(taskList_);
   }
 }
