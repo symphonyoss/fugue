@@ -23,25 +23,26 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
-import org.symphonyoss.s2.fugue.deploy.IBatch;
-import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
-import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
+import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriber;
+import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberContext;
+import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberMessage;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
-import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 
 /**
  * An SWS SNS subscriber.
@@ -49,8 +50,11 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
  * @author Bruce Skingle
  *
  */
-/* package */ class SqsSubscriber implements Runnable
+/* package */ class SqsSubscriber extends AbstractPullSubscriber
 {
+  private static final int EXTENSION_TIMEOUT_SECONDS = 30;
+  private static final int EXTENSION_FREQUENCY_MILLIS = 15000;
+  
   private static final Logger                        log_              = LoggerFactory.getLogger(SqsSubscriber.class);
 
   private final SqsSubscriberManager                 manager_;
@@ -58,13 +62,9 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
   private final String                               queueUrl_;
   private final ITraceContextTransactionFactory      traceFactory_;
   private final IThreadSafeRetryableConsumer<String> consumer_;
-  private final NonIdleSubscriber                    nonIdleSubscriber_;
-  private final String                               subscriptionName_;
-  private final ICounter                             counter_;
-  private final IBusyCounter                         busyCounter_;
+  private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                               tenantId_;
   private int                                        messageBatchSize_ = 10;
-  private boolean                                    running_          = true;
 
   private final ReceiveMessageRequest                blockingPullRequest_;
   private final ReceiveMessageRequest                nonBlockingPullRequest_;
@@ -74,15 +74,19 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
+    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS);
+    
+    if(Fugue.isDebugSingleThread())
+    {
+      messageBatchSize_ = 1;
+    }
+    
     manager_ = manager;
     sqsClient_ = sqsClient;
     queueUrl_ = queueUrl;
-    subscriptionName_ = subscriptionName;
     traceFactory_ = traceFactory;
     consumer_ = consumer;
     nonIdleSubscriber_ = new NonIdleSubscriber();
-    counter_ = counter;
-    busyCounter_ = busyCounter;
     tenantId_ = tenantId;
 
     blockingPullRequest_ = new ReceiveMessageRequest(queueUrl_)
@@ -102,214 +106,123 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
     }
   }
 
+  @Override
+  protected NonIdleSubscriber getNonIdleSubscriber()
+  {
+    return nonIdleSubscriber_;
+  }
+
   public String getQueueUrl()
   {
     return queueUrl_;
   }
-
+  
   @Override
-  public void run()
+  protected IPullSubscriberContext getContext()
   {
-    run(true);
+    return new SqsPullSubscriberContext();
   }
 
-  public void run(boolean runIfIdle)
+  private class SqsPullSubscriberContext implements IPullSubscriberContext
   {
-    if(isRunning())
+    @Override
+    public Collection<IPullSubscriberMessage> nonBlockingPull()
     {
-      if(runIfIdle)
+      return pull(nonBlockingPullRequest_);
+    }
+
+    @Override
+    public Collection<IPullSubscriberMessage> blockingPull()
+    {
+      return pull(blockingPullRequest_);
+    }
+
+    private Collection<IPullSubscriberMessage> pull(ReceiveMessageRequest pullRequest)
+    {
+      List<IPullSubscriberMessage>result = new LinkedList<>();
+      
+      for(Message receivedMessage : sqsClient_.receiveMessage(pullRequest).getMessages())
+      {
+        result.add(new SqsPullSubscriberMessage(receivedMessage));
+      }
+      
+      return result;
+    }
+
+    @Override
+    public void close()
+    {
+      // Nothing
+    }
+  }
+
+  private class SqsPullSubscriberMessage implements IPullSubscriberMessage
+  {
+    private final Message message_;
+    private boolean       running_ = true;
+    
+    private SqsPullSubscriberMessage(Message message)
+    {
+      message_ = message;
+    }
+
+    @Override
+    public String getMessageId()
+    {
+      return message_.getMessageId();
+    }
+
+    @Override
+    public void run()
+    {
+      try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message_.getMessageId(), tenantId_))
+      {
+        ITraceContext trace = traceTransaction.open();
+        
+        long retryTime = manager_.handleMessage(consumer_, message_.getBody(), trace, message_.getMessageId());
+        
+        synchronized(this)
+        {
+          // There is no point trying to extend the ack deadline now
+          running_ = false;
+
+          if(retryTime < 0)
+          {
+            trace.trace("ABOUT_TO_ACK");
+            sqsClient_.deleteMessage(queueUrl_, message_.getReceiptHandle());
+            traceTransaction.finished();
+          }
+          else
+          {
+            trace.trace("ABOUT_TO_NACK");
+            
+            int visibilityTimout = (int) (retryTime / 1000);
+            
+            sqsClient_.changeMessageVisibility(queueUrl_, message_.getReceiptHandle(), visibilityTimout);
+            traceTransaction.aborted();
+          }
+        }
+      }
+      catch(RuntimeException e)
+      {
+        log_.error("Failed to process message " + getMessageId(), e);
+      }
+    }
+
+    @Override
+    public synchronized void extend()
+    {
+      if(running_)
       {
         try
         {
-          while(isRunning())
-          {
-            getSomeMessages();
-          }
+          sqsClient_.changeMessageVisibility(queueUrl_, message_.getReceiptHandle(), EXTENSION_TIMEOUT_SECONDS);
         }
-        finally
+        catch(RuntimeException e)
         {
-          if(runIfIdle && isRunning())
-          {
-            // This "can't happen"
-            log_.error("Main SQS thread returned, rescheduling...");
-            
-            manager_.submit(this, true);
-          }
-        }
-      }
-      else
-      {
-        if(isRunning())
-        {
-          getSomeMessages();
+          log_.error("Failed to extend message " + getMessageId(), e);
         }
       }
     }
-  }
-  
-  private void getSomeMessages()
-  {
-    // receive messages from the queue
-    
-    log_.info("About to read for " + subscriptionName_ + "...");
-    try
-    {    
-      ReceiveMessageResult pullResponse = sqsClient_.receiveMessage(nonBlockingPullRequest_);
-      
-      
-      if(pullResponse.getMessages().isEmpty())
-      {
-        if(busyCounter_ != null)
-        {
-          if(busyCounter_.idle())
-          {
-            stop();
-            return;
-          }
-        }
-        
-        log_.info("Blocking read for " + subscriptionName_ + "...");
-        
-        pullResponse = sqsClient_.receiveMessage(blockingPullRequest_);
-        
-        log_.info("Blocking read for " + subscriptionName_ + " returned " + pullResponse.getMessages().size());
-      }
-      else
-      {
-        if(busyCounter_ != null)
-          busyCounter_.busy();
-        
-        if(isRunning())
-        {
-          manager_.submit(nonIdleSubscriber_, false);
-
-          log_.debug("Extra schedule " + subscriptionName_);
-        }
-        
-        log_.info("Non-Blocking read for " + subscriptionName_ + " returned " + pullResponse.getMessages().size());
-      }
-  
-      List<Message> messages = pullResponse.getMessages();
-      
-      switch(messages.size())
-      {
-        case 0:
-          // Nothing to do...
-          break;
-          
-        case 1:
-          // Single message, just process in the current thread
-          if(counter_ != null)
-            counter_.increment(1);
-          handleMessage(messages.get(0));
-          break;
-          
-        default:
-          if(counter_ != null)
-            counter_.increment(messages.size());
-          if(messages.size() > 2 && isRunning())
-          {
-            manager_.submit(nonIdleSubscriber_, false);
-
-            log_.debug("Extra schedule " + queueUrl_);
-          }
-          
-          // Fire off all but one envelopes in its own thread, do the final one in the current thread
-          int     index = 0;
-          IBatch  batch = manager_.newBatch();
-          
-          try
-          {
-            while(index < messages.size() - 1)
-            {
-              final int myIndex = index++;
-              
-              batch.submit(() -> 
-              {
-                handleMessage(messages.get(myIndex));
-              });
-            }
-            handleMessage(messages.get(index));
-            
-            batch.waitForAllTasks();
-          }
-          catch(RuntimeException e)
-          {
-            Throwable cause = e.getCause();
-            
-            if(cause instanceof ExecutionException)
-              cause = cause.getCause();
-            
-            if(cause instanceof RetryableConsumerException)
-            {
-              throw (RetryableConsumerException)cause;
-            }            
-            if(cause instanceof FatalConsumerException)
-            {
-              throw (FatalConsumerException)cause;
-            }
-            throw e;
-          }
-      }
-    }
-    catch(RuntimeException e)
-    {
-      log_.error("Error processing message", e);
-    }
-    catch (Throwable e)
-    {
-      /*
-       * This method is called from an executor so I am catching Throwable because otherwise Errors will
-       * be swallowed.
-       * 
-       * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
-       * I think it's worth trying.
-       */
-      
-      try
-      {
-        log_.error("Error processing message", e);
-      }
-      finally
-      {
-        System.exit(1);
-      }
-    }
-  }
-
-  private void handleMessage(Message message)
-  {
-    try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message.getMessageId(), tenantId_))
-    {
-      ITraceContext trace = traceTransaction.open();
-      
-      long retryTime = manager_.handleMessage(consumer_, message.getBody(), trace, message.getMessageId());
-      
-      if(retryTime < 0)
-      {
-        trace.trace("ABOUT_TO_ACK");
-        sqsClient_.deleteMessage(queueUrl_, message.getReceiptHandle());
-        traceTransaction.finished();
-      }
-      else
-      {
-        trace.trace("ABOUT_TO_NACK");
-        
-        int visibilityTimout = (int) (retryTime / 1000);
-        
-        sqsClient_.changeMessageVisibility(queueUrl_, message.getReceiptHandle(), visibilityTimout);
-        traceTransaction.aborted();
-      }
-    }
-  }
-
-  synchronized boolean isRunning()
-  {
-    return running_;
-  }
-  
-  public synchronized void stop()
-  {
-    running_ = false;
   }
 }

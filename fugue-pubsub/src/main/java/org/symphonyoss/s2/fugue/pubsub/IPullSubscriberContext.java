@@ -21,37 +21,13 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.deploy;
+package org.symphonyoss.s2.fugue.pubsub;
 
+import java.io.Closeable;
 import java.util.Collection;
 
-/**
- * A batch of tasks which can be executed in parallel.
- * 
- * @param <T> The type of tasks in the batch
- * 
- * @author Bruce Skingle
- *
- */
-public interface IBatch<T extends Runnable>
+public interface IPullSubscriberContext extends Closeable
 {
-  /**
-   * Submit the given task.
-   * 
-   * @param task Some task to be executed as part of the batch.
-   */
-  public void submit(T task);
-  
-  /**
-   * Block until all tasks have completed.
-   */
-  public void waitForAllTasks();
-
-  /**
-   * Block until all tasks have completed or the given timeout expires.
-   * 
-   * @param timeoutMillis Timeout in milliseconds.
-   * @return A copy of the collection of incomplete tasks in the batch.
-   */
-  Collection<T> waitForAllTasks(long timeoutMillis);
+  Collection<IPullSubscriberMessage> nonBlockingPull();
+  Collection<IPullSubscriberMessage> blockingPull();
 }

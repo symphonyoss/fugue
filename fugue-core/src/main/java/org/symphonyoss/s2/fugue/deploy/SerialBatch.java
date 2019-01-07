@@ -23,15 +23,20 @@
 
 package org.symphonyoss.s2.fugue.deploy;
 
+import java.util.ArrayList;
+import java.util.Collection;
+
 /**
  * A serial implementation of IBatch which just executes tasks in the submitting thread.
  * 
  * This is useful for debugging.
  * 
+ * @param <T> The type of tasks in the batch
+ * 
  * @author Bruce Skingle
  *
  */
-public class SerialBatch implements IBatch
+public class SerialBatch<T extends Runnable> implements IBatch<T>
 {
   /**
    * Constructor.
@@ -47,7 +52,7 @@ public class SerialBatch implements IBatch
    * @param task Some task to be executed as part of the batch.
    */
   @Override
-  public void submit(Runnable task)
+  public void submit(T task)
   {
     task.run();
   }
@@ -58,5 +63,11 @@ public class SerialBatch implements IBatch
   @Override
   public void waitForAllTasks()
   {
+  }
+
+  @Override
+  public Collection<T> waitForAllTasks(long timeoutMillis)
+  {
+    return new ArrayList<T>();
   }
 }

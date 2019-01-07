@@ -122,4 +122,9 @@ public class Fugue
     
     return value;
   }
+
+  public static boolean isDebugSingleThread()
+  {
+    return getBooleanProperty("FUGUE_DEBUG_SINGLE_THREAD", false);
+  }
 }

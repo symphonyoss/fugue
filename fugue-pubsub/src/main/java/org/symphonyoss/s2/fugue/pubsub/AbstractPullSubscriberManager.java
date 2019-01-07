@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
@@ -110,25 +111,33 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
   @Override
   public void start()
   {
-    int min = getTotalSubscriptionCnt() * 2;
-    
-    if(subscriberThreadPoolSize_ < min)
-    { 
-      log_.warn("Configured for " + subscriberThreadPoolSize_ +
-        " subscriber threads for a total of " +
-        getTotalSubscriptionCnt() + " subscriptions, using " + min + " subscriber threads");
-      
-      subscriberThreadPoolSize_ = min;
+    if(Fugue.isDebugSingleThread())
+    {
+      subscriberThreadPoolSize_ = 1;
+      handlerThreadPoolSize_ = 1;
     }
-    
-    min = subscriberThreadPoolSize_ * 2;
-    
-    if(handlerThreadPoolSize_ < min)
-    { 
-      log_.warn("Configured for " + handlerThreadPoolSize_ + " handler threads for " +
-        subscriberThreadPoolSize_ + " subscriber treads, using " + min + " handler threads");
+    else
+    {
+      int min = getTotalSubscriptionCnt() * 2;
       
-      handlerThreadPoolSize_ = min;
+      if(subscriberThreadPoolSize_ < min)
+      { 
+        log_.warn("Configured for " + subscriberThreadPoolSize_ +
+          " subscriber threads for a total of " +
+          getTotalSubscriptionCnt() + " subscriptions, using " + min + " subscriber threads");
+        
+        subscriberThreadPoolSize_ = min;
+      }
+      
+      min = subscriberThreadPoolSize_ * 2;
+      
+      if(handlerThreadPoolSize_ < min)
+      { 
+        log_.warn("Configured for " + handlerThreadPoolSize_ + " handler threads for " +
+          subscriberThreadPoolSize_ + " subscriber treads, using " + min + " handler threads");
+        
+        handlerThreadPoolSize_ = min;
+      }
     }
     
     log_.info("Starting AbstractPullSubscriberManager with " + subscriberThreadPoolSize_ +
@@ -136,11 +145,11 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
         getTotalSubscriptionCnt() + " subscriptions...");
 
     subscriberExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, subscriberThreadPoolSize_,
-        0L, TimeUnit.MILLISECONDS,
+        10000L, TimeUnit.MILLISECONDS,
         executorQueue_, new NamedThreadFactory("PubSub-subscriber"));
     
-    handlerExecutor_ = new ThreadPoolExecutor(subscriberThreadPoolSize_, handlerThreadPoolSize_,
-        0L, TimeUnit.MILLISECONDS,
+    handlerExecutor_ = new ThreadPoolExecutor(handlerThreadPoolSize_, handlerThreadPoolSize_,
+        10000L, TimeUnit.MILLISECONDS,
         handlerQueue_, new NamedThreadFactory("PubSub-handler", true));
       
     super.start();
@@ -167,7 +176,7 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
     }
   }
 
-  public void submit(Runnable subscriber, boolean force)
+  protected void submit(Runnable subscriber, boolean force)
   {
     if(force || executorQueue_.size() < subscriberThreadPoolSize_)
       subscriberExecutor_.submit(subscriber);
@@ -178,8 +187,13 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
     log_.debug("Queue size " + executorQueue_.size());
   }
   
-  public IBatch newBatch()
+//  public IBatch newBatch()
+//  {
+//    return new ExecutorBatch(handlerExecutor_);
+//  }
+
+  ThreadPoolExecutor getHandlerExecutor()
   {
-    return new ExecutorBatch(handlerExecutor_);
+    return handlerExecutor_;
   }
 }
