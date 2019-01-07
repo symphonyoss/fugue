@@ -34,6 +34,15 @@
       <fileMode>0755</fileMode>
       <filtered>true</filtered>
     </fileSet>
+    <fileSet>
+      <directory>${project.basedir}/target/runtime</directory>
+      <outputDirectory>.</outputDirectory>
+      <includes>
+        <include>log4j2.xml</include>
+      </includes>
+      <fileMode>0644</fileMode>
+      <filtered>true</filtered>
+    </fileSet>
     <!-- <fileSet>
       <directory>src/main/resources</directory>
       <outputDirectory>.</outputDirectory>

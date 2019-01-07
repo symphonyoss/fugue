@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <!--
     ~
-    ~ Copyright 2018 Symphony Communication Services, LLC.
+    ~ Copyright 2018-2019 Symphony Communication Services, LLC.
     ~
     ~ Licensed to The Symphony Software Foundation (SSF) under one
     ~ or more contributor license agreements.  See the NOTICE file
@@ -44,10 +44,7 @@
     <dependency>
 	    <groupId>com.google.cloud</groupId>
 	    <artifactId>google-cloud-pubsub</artifactId>
-	    <version>1.33.0</version>
-	    <!-- <version>1.56.0</version> -->
-	    <!-- <version>1.33.0</version> -->
-	    <!-- CAUTION does not work hen deployed to AWS <version>1.51.0</version> -->
+	    <version>1.56.0</version>
 	  </dependency>
   </dependencies>
 </project>

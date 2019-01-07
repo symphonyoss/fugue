@@ -43,6 +43,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriber;
 import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberContext;
 import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberMessage;
+import org.threeten.bp.Duration;
 
 import com.google.cloud.pubsub.v1.stub.GrpcSubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStubSettings;
@@ -99,7 +100,11 @@ public class GoogleSubscriber extends AbstractPullSubscriber
     
     try
     {
-      subscriberStubSettings_ = SubscriberStubSettings.newBuilder().build();
+      // Set the timeout to 60 seconds, needed to overcome https://github.com/googleapis/google-cloud-java/issues/4246
+      
+      SubscriberStubSettings.Builder settingsBuilder = SubscriberStubSettings.newBuilder();
+      settingsBuilder.pullSettings().setSimpleTimeoutNoRetries(Duration.ofSeconds(60));
+      subscriberStubSettings_ = settingsBuilder.build();
     }
     catch (IOException e)
     {
