@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
+import org.symphonyoss.s2.fugue.counter.ScaleAction;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
@@ -98,7 +99,7 @@ public abstract class AbstractPullSubscriber implements Runnable
       {
         if(busyCounter_ != null)
         {
-          if(busyCounter_.idle())
+          if(busyCounter_.busy(0) == ScaleAction.ScaleDown)
           {
             stop();
             return;
@@ -114,7 +115,7 @@ public abstract class AbstractPullSubscriber implements Runnable
       else
       {
         if(busyCounter_ != null)
-          busyCounter_.busy();
+          busyCounter_.busy(messages.size());
         
         if(isRunning())
         {

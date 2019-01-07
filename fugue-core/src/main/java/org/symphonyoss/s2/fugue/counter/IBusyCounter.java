@@ -32,24 +32,32 @@ package org.symphonyoss.s2.fugue.counter;
 public interface IBusyCounter
 {
   /**
-   * Indicates that the caller is busy.
+   * Indicates how busy the caller is for a single cycle.
    * 
-   * This method would usually be called when the calling process has work to do without waiting or when there is a backlog.
-   * 
-   * In many cases the return value will always be false because scaling causes other instances to start or stop.
-   * 
-   * @return true iff the caller should scale up.
+   * @param count The number of work units done in the current cycle.
+   * @return The action the caller should take, this may be DoNothing if action has already been taken.
    */
-  boolean busy();
+  ScaleAction busy(int count);
   
-  /**
-   * Indicates that the caller is idle.
-   * 
-   * This method would usually be called when the calling process has no work to do of had to do a blocking request for work.
-   * 
-   * In many cases the return value will always be false because scaling causes other instances to start or stop.
-   * 
-   * @return true iff the caller should scale down.
-   */
-  boolean  idle();
+//  /**
+//   * Indicates that the caller is busy.
+//   * 
+//   * This method would usually be called when the calling process has work to do without waiting or when there is a backlog.
+//   * 
+//   * In many cases the return value will always be false because scaling causes other instances to start or stop.
+//   * 
+//   * @return true iff the caller should scale up.
+//   */
+//  boolean busy();
+//  
+//  /**
+//   * Indicates that the caller is idle.
+//   * 
+//   * This method would usually be called when the calling process has no work to do of had to do a blocking request for work.
+//   * 
+//   * In many cases the return value will always be false because scaling causes other instances to start or stop.
+//   * 
+//   * @return true iff the caller should scale down.
+//   */
+//  boolean  idle();
 }

@@ -35,13 +35,17 @@ public class BusyCounter implements IBusyCounter
 
   private AtomicInteger       busyCycles_ = new AtomicInteger();
   private AtomicInteger       idleCycles_ = new AtomicInteger();
-  private int                 busyLimit_  = 5;
-  private int                 idleLimit_  = 3;
-  private long                coolDown_   = 20000;
+
+  private int                 busyLevel_;
+  private int                 busyLimit_;
+  private int                 idleLimit_;
+  private long                coolDown_;
   private long                lastEvent_;
+
   
-  public BusyCounter(int busyLimit, int idleLimit, long coolDown)
+  public BusyCounter(int busyLevel, int busyLimit, int idleLimit, long coolDown)
   {
+    busyLevel_ = busyLevel;
     busyLimit_ = busyLimit;
     idleLimit_ = idleLimit;
     coolDown_ = coolDown;
@@ -50,6 +54,7 @@ public class BusyCounter implements IBusyCounter
   public BusyCounter(IConfiguration config)
   {
     this(
+        config.getInt("busyLevel", 5),
         config.getInt("busyLimit", 5),
         config.getInt("idleLimit", 3),
         config.getInt("coolDown", 20000)
@@ -57,7 +62,15 @@ public class BusyCounter implements IBusyCounter
   }
 
   @Override
-  public boolean busy()
+  public ScaleAction busy(int count)
+  {
+    if(count >= busyLevel_)
+      return busy() ? ScaleAction.ScaleUp : ScaleAction.DoNothing;
+    else
+      return idle() ? ScaleAction.ScaleDown : ScaleAction.DoNothing;
+  }
+
+  private boolean busy()
   {
     idleCycles_.set(0);
     int busyCnt = busyCycles_.incrementAndGet();
@@ -68,8 +81,7 @@ public class BusyCounter implements IBusyCounter
     return false;
   }
 
-  @Override
-  public boolean idle()
+  private boolean idle()
   {
     busyCycles_.set(0);
     int idleCnt = idleCycles_.incrementAndGet();
