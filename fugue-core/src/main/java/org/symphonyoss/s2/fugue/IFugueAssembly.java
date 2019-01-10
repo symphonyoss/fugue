@@ -23,6 +23,13 @@
 
 package org.symphonyoss.s2.fugue;
 
+/**
+ * An Assembly is a set of pre-assembled components which represents a building block
+ * for a larger service, task or application.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface IFugueAssembly
 {
 

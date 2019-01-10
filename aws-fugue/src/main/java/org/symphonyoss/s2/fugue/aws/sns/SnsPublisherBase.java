@@ -48,6 +48,7 @@ import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.MessageAttributeValue;
 import com.amazonaws.services.sns.model.PublishRequest;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Amazon SNS implementation of PublisherManager.
@@ -70,6 +71,8 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
   protected final String                       accountId_;
   protected final AmazonSNS                    snsClient_;
 
+  protected final ImmutableList<String>       subscriberAccountIds_;
+
   
   protected SnsPublisherBase(Class<T> type, Builder<?,T> builder)
   {
@@ -78,6 +81,9 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
     region_    = builder.region_;
     accountId_ = builder.accountId_;
     snsClient_ = builder.snsBuilder_.build();
+    
+    subscriberAccountIds_ =  ImmutableList.copyOf(
+        builder.config_.getConfiguration("amazon").getListOfString("subscriberAccountIds", new ArrayList<>()));
     
     int errorCnt = 0;
     

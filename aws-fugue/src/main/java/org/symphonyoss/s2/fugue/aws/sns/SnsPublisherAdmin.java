@@ -39,6 +39,7 @@ import com.amazonaws.services.sns.model.CreateTopicResult;
 import com.amazonaws.services.sns.model.GetTopicAttributesResult;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
 import com.amazonaws.services.sns.model.NotFoundException;
+import com.amazonaws.services.sns.model.SetTopicAttributesRequest;
 import com.amazonaws.services.sns.model.Subscription;
 
 /**
@@ -51,8 +52,11 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
 {
   private static final Logger log_            = LoggerFactory.getLogger(SnsPublisherAdmin.class);
 
+  private static final Object POLICY = "Policy";
+
   private Set<TopicName>      obsoleteTopics_ = new HashSet<>();
   private Set<TopicName>      topics_         = new HashSet<>();
+  
 //  /**
 //   * Constructor.
 //   * 
@@ -130,6 +134,78 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
     
     return super.getPublisherByName(topicName);
   }
+  
+  private String getTopicPolicy(String topicArn)
+  {
+    StringBuilder s = new StringBuilder("{" + 
+          "\"Version\":\"2008-10-17\"," + 
+          "\"Id\":\"__default_policy_ID\"," + 
+          "\"Statement\":[" + 
+            "{" + 
+              "\"Sid\":\"__default_statement_ID\"," + 
+              "\"Effect\":\"Allow\"," + 
+              "\"Principal\":{" + 
+                "\"AWS\":\"*\"" + 
+              "}," + 
+              "\"Action\":[" + 
+                "\"SNS:GetTopicAttributes\"," + 
+                "\"SNS:SetTopicAttributes\"," + 
+                "\"SNS:AddPermission\"," + 
+                "\"SNS:RemovePermission\"," + 
+                "\"SNS:DeleteTopic\"," +
+                "\"SNS:Subscribe\"," + 
+                "\"SNS:ListSubscriptionsByTopic\"," + 
+                "\"SNS:Publish\"," +  
+                "\"SNS:Receive\"" + 
+              "]," + 
+              "\"Resource\":\"" + topicArn + "\"," + 
+              "\"Condition\":{" + 
+                "\"StringEquals\":{" + 
+                  "\"AWS:SourceOwner\":\"" + accountId_ + "\"" + 
+                "}" + 
+              "}" + 
+            "}");
+    
+    if(subscriberAccountIds_.size() > 0)
+    {
+      s.append( 
+            ",{" + 
+            "\"Sid\":\"__console_sub_0\"," + 
+            "\"Effect\":\"Allow\"," + 
+            "\"Principal\":{" + 
+              "\"AWS\":[");
+    
+      boolean first = true;
+      
+      for(String subscriberAccountId : subscriberAccountIds_)
+      {
+        if(first)
+          first = false;
+        else
+          s.append(",");
+        
+        s.append("\"");
+        s.append(subscriberAccountId);
+        s.append("\"");
+      }
+      
+      s.append( 
+          "]" + 
+              "}," +
+              "\"Action\":[" + 
+                "\"SNS:Subscribe\"," + 
+                "\"SNS:Receive\"" + 
+              "]," + 
+              "\"Resource\":\"" + topicArn + "\"" + 
+            "}");
+    }
+    
+    s.append( 
+          "]" + 
+        "}");
+    
+    return s.toString();
+  }
 
   @Override
   public void createTopics(boolean dryRun)
@@ -145,6 +221,17 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
           GetTopicAttributesResult topicAttributes = snsClient_.getTopicAttributes(topicArn);
           
           log_.info("Topic " + topicName + " exists as " + topicArn + " with attributes " + topicAttributes.getAttributes());
+
+          String topicPolicy = getTopicPolicy(topicArn);
+          
+          if(topicPolicy.equals(topicAttributes.getAttributes().get(POLICY)))
+          {
+            log_.info("Topic policy is OK");
+          }
+          else
+          {
+            updateTopicPolicy(topicArn, topicPolicy);
+          }
         }
         catch(NotFoundException e)
         {
@@ -158,6 +245,8 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
             CreateTopicResult createTopicResult = snsClient_.createTopic(createTopicRequest);
 
             log_.info("Created topic " + topicName + " as " + createTopicResult.getTopicArn());
+            
+            updateTopicPolicy(topicArn, getTopicPolicy(topicArn));
           }
         }
       }
@@ -168,6 +257,19 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
     }
     
     deleteTopics(dryRun, obsoleteTopics_);
+  }
+
+  private void updateTopicPolicy(String topicArn, String topicPolicy)
+  {
+    log_.info("Updating topic policy...");
+    
+    snsClient_.setTopicAttributes(new SetTopicAttributesRequest()
+        .withTopicArn(topicArn)
+        .withAttributeName("Policy")
+        .withAttributeValue(topicPolicy)
+        );
+    
+    log_.info("Updating topic policy...Done.");
   }
 
 //  @Override

@@ -1192,11 +1192,14 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployServiceContainers(IBatch batch)
     {
-      configureServiceNetwork();
-
-      deployDockerContainers(batch, ContainerType.SERVICE,    false);
-      deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
-      deployLambdaContainers(batch, ContainerType.LAMBDA);
+      if(!getContainerMap().isEmpty())
+      {
+        configureServiceNetwork();
+  
+        deployDockerContainers(batch, ContainerType.SERVICE,    false);
+        deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
+        deployLambdaContainers(batch, ContainerType.LAMBDA);
+      }
     }
 
     private void deployLambdaContainers(IBatch batch, ContainerType containerType)
