@@ -39,6 +39,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.IStringProvider;
@@ -113,6 +115,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundEx
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
+import com.amazonaws.services.identitymanagement.model.AccessKeyMetadata;
 import com.amazonaws.services.identitymanagement.model.AddUserToGroupRequest;
 import com.amazonaws.services.identitymanagement.model.AttachGroupPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.AttachRolePolicyRequest;
@@ -124,6 +127,7 @@ import com.amazonaws.services.identitymanagement.model.CreatePolicyResult;
 import com.amazonaws.services.identitymanagement.model.CreatePolicyVersionRequest;
 import com.amazonaws.services.identitymanagement.model.CreateRoleRequest;
 import com.amazonaws.services.identitymanagement.model.CreateUserRequest;
+import com.amazonaws.services.identitymanagement.model.DeleteAccessKeyRequest;
 import com.amazonaws.services.identitymanagement.model.DeletePolicyVersionRequest;
 import com.amazonaws.services.identitymanagement.model.GetGroupRequest;
 import com.amazonaws.services.identitymanagement.model.GetPolicyRequest;
@@ -132,6 +136,8 @@ import com.amazonaws.services.identitymanagement.model.GetPolicyVersionRequest;
 import com.amazonaws.services.identitymanagement.model.GetRoleRequest;
 import com.amazonaws.services.identitymanagement.model.GetUserRequest;
 import com.amazonaws.services.identitymanagement.model.Group;
+import com.amazonaws.services.identitymanagement.model.ListAccessKeysRequest;
+import com.amazonaws.services.identitymanagement.model.ListAccessKeysResult;
 import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListAttachedRolePoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListGroupsForUserRequest;
@@ -143,12 +149,10 @@ import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
-import com.amazonaws.services.lambda.model.AWSLambdaException;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
-import com.amazonaws.services.lambda.model.GetFunctionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
@@ -684,10 +688,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
   // returns an access key if one was created.
-  private void createUser(Name name, String groupName, List<String> keys)
+  private void createUser(Name name, @Nullable String groupName, List<String> keys)
   {
     String  userName      = name.append(USER).toString();
-    String  accessKeyJson = null;
     
     try
     {
@@ -695,15 +698,24 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .withUserName(userName))
         .getUser();
       
-      List<Group> groups = iam_.listGroupsForUser(new ListGroupsForUserRequest()
-          .withUserName(userName)).getGroups();
+      checkAccessKey(name, userName, keys);
       
-      for(Group group : groups)
+      if(groupName == null)
       {
-        if(group.getGroupName().equals(groupName))
+        return;
+      }
+      else
+      {
+        List<Group> groups = iam_.listGroupsForUser(new ListGroupsForUserRequest()
+            .withUserName(userName)).getGroups();
+        
+        for(Group group : groups)
         {
-          log_.debug("User \"" + userName + "\" is already a member of group \"" + groupName + "\"");
-          return;
+          if(group.getGroupName().equals(groupName))
+          {
+            log_.debug("User \"" + userName + "\" is already a member of group \"" + groupName + "\"");
+            return;
+          }
         }
       }
     }
@@ -716,25 +728,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       log_.debug("Created user \"" + userName + "\"");
       
-      AccessKey accessKey = iam_.createAccessKey(new CreateAccessKeyRequest()
-          .withUserName(userName)).getAccessKey();
-        
-//        secret.println("#######################################################");
-//        secret.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
-//        secret.println("#######################################################");
-//        secret.format("[%s]%n", userName);
-//        secret.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
-//        secret.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
-//        secret.println("#######################################################");
-        
-
-
-      accessKeyJson = "  \"" + name + "\": {\n" +
-        "    \"accessKeyId\": \"" + accessKey.getAccessKeyId() + "\",\n" +
-        "    \"secretAccessKey\": \"" + accessKey.getSecretAccessKey() + "\"\n" +
-        "  }";
+      createAccessKey(name, userName, keys);
       
-      keys.add(accessKeyJson);
     }
     
     log_.debug("Adding user \"" + userName + "\" to group \"" + groupName + "\"");
@@ -742,6 +737,92 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     iam_.addUserToGroup(new AddUserToGroupRequest()
         .withUserName(userName)
         .withGroupName(groupName));
+  }
+
+  private void createAccessKey(Name name, String userName, List<String> keys)
+  {
+    AccessKey accessKey = iam_.createAccessKey(new CreateAccessKeyRequest()
+        .withUserName(userName)).getAccessKey();
+      
+//      secret.println("#######################################################");
+//      secret.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
+//      secret.println("#######################################################");
+//      secret.format("[%s]%n", userName);
+//      secret.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
+//      secret.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
+//      secret.println("#######################################################");
+      
+
+
+    String accessKeyJson = "  \"" + name + "\": {\n" +
+      "    \"accessKeyId\": \"" + accessKey.getAccessKeyId() + "\",\n" +
+      "    \"secretAccessKey\": \"" + accessKey.getSecretAccessKey() + "\"\n" +
+      "  }";
+    
+    keys.add(accessKeyJson);
+  }
+
+  private void checkAccessKey(Name name, String userName, List<String> keys)
+  {
+    AccessKeyMetadata       latestKey = null;
+    List<AccessKeyMetadata> oldKeys = new ArrayList<>();
+    ListAccessKeysResult    accessKeys = iam_.listAccessKeys(new ListAccessKeysRequest()
+        .withUserName(userName)
+        );
+    
+    for(AccessKeyMetadata meta : accessKeys.getAccessKeyMetadata())
+    {
+      if(latestKey == null)
+      {
+        latestKey = meta;
+      }
+      else if(latestKey.getCreateDate().before(meta.getCreateDate()))
+      {
+        oldKeys.add(latestKey);
+        latestKey = meta;
+      }
+      else
+      {
+        oldKeys.add(meta);
+      }
+    }
+    
+    if(latestKey == null)
+    {
+      log_.info("We have no access keys");
+
+      createAccessKey(name, userName, keys);
+    }
+    else
+    {
+      int age = (int)Math.ceil((System.currentTimeMillis() - latestKey.getCreateDate().getTime()) / (1000.0*60*60*24));
+      
+      log_.info("We have " + oldKeys.size() + " older access keys and the latest key is " + age + " days old");
+      
+      if(age > 30)
+      {
+        log_.info("Rolling access keys...");
+        
+        for(AccessKeyMetadata meta : oldKeys)
+        {
+          log_.info("Deleting access key " + meta.getAccessKeyId() + " created on " + meta.getCreateDate());
+          
+          try
+          {
+            iam_.deleteAccessKey(new DeleteAccessKeyRequest()
+              .withAccessKeyId(meta.getAccessKeyId())
+              .withUserName(userName)
+              );
+          }
+          catch(RuntimeException e)
+          {
+            log_.error("Failed to delete access key " + meta.getAccessKeyId() + " created on " + meta.getCreateDate(), e);
+          }
+        }
+        
+        createAccessKey(name, userName, keys);
+      }
+    }
   }
 
   private String createGroup(Name name, String policyArn)
@@ -1068,6 +1149,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           //FUGUE_PREFIX + getEnvironmentType();
       List<String>  keys = new LinkedList<>();
 
+      createEnvironmentTypeRootUser(baseName, keys);
       createEnvironmentTypeAdminUser(baseName, keys);
       createEnvironmentTypeCicdUser(baseName, keys);
       createEnvironmentTypeSupportUser(baseName, keys);
@@ -1139,6 +1221,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, assumeRolePolicy, infraPolicyArn, appPolicyArn, fuguePolicyArn);
     }
     
+    private void createEnvironmentTypeRootUser(Name baseName, List<String> keys)
+    {
+      Name name = baseName.append(ROOT);
+      
+      createUser(name, null, keys);
+    }
+    
     private void createEnvironmentTypeCicdUser(Name baseName, List<String> keys)
     {
       Name name = baseName.append(CICD);
@@ -1149,6 +1238,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
 //      createRole(name, policyArn);
     }
+    
     @Override
     protected void populateTemplateVariables(ImmutableJsonObject config, Map<String, String> templateVariables)
     {

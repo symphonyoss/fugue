@@ -58,6 +58,11 @@ public class AwsFugueAssembly implements IFugueAssembly
     stsManager_               = builder.stsManager_;
   }
   
+  protected <C> C register(C component)
+  {
+    return container_.register(component);
+  }
+  
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AwsFugueAssembly>
   extends BaseAbstractBuilder<T, B>
   {
