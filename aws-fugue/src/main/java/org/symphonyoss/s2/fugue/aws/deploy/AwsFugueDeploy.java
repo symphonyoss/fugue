@@ -687,8 +687,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
   
   
-  // returns an access key if one was created.
-  private void createUser(Name name, @Nullable String groupName, List<String> keys)
+  private void createUser(Name name, @Nullable String groupName, List<String> keys, List<Name> nonKeyUsers)
   {
     String  userName      = name.append(USER).toString();
     
@@ -698,7 +697,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .withUserName(userName))
         .getUser();
       
-      checkAccessKey(name, userName, keys);
+      checkAccessKey(name, userName, keys, nonKeyUsers, false);
       
       if(groupName == null)
       {
@@ -729,7 +728,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.debug("Created user \"" + userName + "\"");
       
       createAccessKey(name, userName, keys);
-      
     }
     
     log_.debug("Adding user \"" + userName + "\" to group \"" + groupName + "\"");
@@ -762,7 +760,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     keys.add(accessKeyJson);
   }
 
-  private void checkAccessKey(Name name, String userName, List<String> keys)
+  private void checkAccessKey(Name name, String userName, List<String> keys, List<Name> nonKeyUsers, boolean force)
   {
     AccessKeyMetadata       latestKey = null;
     List<AccessKeyMetadata> oldKeys = new ArrayList<>();
@@ -799,7 +797,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       log_.info("We have " + oldKeys.size() + " older access keys and the latest key is " + age + " days old");
       
-      if(age > 30)
+      if(force || age > 30)
       {
         log_.info("Rolling access keys...");
         
@@ -821,6 +819,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         }
         
         createAccessKey(name, userName, keys);
+      }
+      else
+      {
+        nonKeyUsers.add(name);
       }
     }
   }
@@ -1148,11 +1150,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           //FUGUE_PREFIX + getEnvironmentType();
       List<String>  keys = new LinkedList<>();
+      List<Name>    nonKeyUsers = new LinkedList<>();
 
-      createEnvironmentTypeRootUser(baseName, keys);
-      createEnvironmentTypeAdminUser(baseName, keys);
-      createEnvironmentTypeCicdUser(baseName, keys);
-      createEnvironmentTypeSupportUser(baseName, keys);
+      createEnvironmentTypeRootUser(baseName, keys, nonKeyUsers);
+      createEnvironmentTypeAdminUser(baseName, keys, nonKeyUsers);
+      createEnvironmentTypeCicdUser(baseName, keys, nonKeyUsers);
+      createEnvironmentTypeSupportUser(baseName, keys, nonKeyUsers);
       
       createEnvironmentTypeRoles(baseName);
 
@@ -1162,6 +1165,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
+        for(Name name : nonKeyUsers)
+        {
+          String  userName      = name.append(USER).toString();
+          
+          checkAccessKey(name, userName, keys, null, true);
+        }
 //        CredentialName  name = 
 //            getNameFactory().getCredentialName(tenantId, owner)
 //            new CredentialName("fugue-" + getEnvironmentType(),
@@ -1194,7 +1203,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, assumeRolePolicy, policyArn);
     }
 
-    private void createEnvironmentTypeAdminUser(Name baseName, List<String> keys)
+    private void createEnvironmentTypeAdminUser(Name baseName, List<String> keys, List<Name> nonKeyUsers)
     {
       Name name = baseName.append(ADMIN);
       
@@ -1205,7 +1214,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
     
-    private void createEnvironmentTypeSupportUser(Name baseName, List<String> keys)
+    private void createEnvironmentTypeSupportUser(Name baseName, List<String> keys, List<Name> nonKeyUsers)
     {
       Name name = baseName.append(SUPPORT);
       
@@ -1221,20 +1230,20 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createRole(name, assumeRolePolicy, infraPolicyArn, appPolicyArn, fuguePolicyArn);
     }
     
-    private void createEnvironmentTypeRootUser(Name baseName, List<String> keys)
+    private void createEnvironmentTypeRootUser(Name baseName, List<String> keys, List<Name> nonKeyUsers)
     {
       Name name = baseName.append(ROOT);
       
-      createUser(name, null, keys);
+      createUser(name, null, keys, nonKeyUsers);
     }
     
-    private void createEnvironmentTypeCicdUser(Name baseName, List<String> keys)
+    private void createEnvironmentTypeCicdUser(Name baseName, List<String> keys, List<Name> nonKeyUsers)
     {
       Name name = baseName.append(CICD);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
       String groupName = createGroup(name, policyArn);
-      createUser(name, groupName, keys);
+      createUser(name, groupName, keys, nonKeyUsers);
       
 //      createRole(name, policyArn);
     }
