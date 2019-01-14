@@ -730,11 +730,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createAccessKey(name, userName, keys);
     }
     
-    log_.debug("Adding user \"" + userName + "\" to group \"" + groupName + "\"");
-    
-    iam_.addUserToGroup(new AddUserToGroupRequest()
-        .withUserName(userName)
-        .withGroupName(groupName));
+    if(groupName != null)
+    {
+      log_.debug("Adding user \"" + userName + "\" to group \"" + groupName + "\"");
+      
+      iam_.addUserToGroup(new AddUserToGroupRequest()
+          .withUserName(userName)
+          .withGroupName(groupName));
+    }
   }
 
   private void createAccessKey(Name name, String userName, List<String> keys)
