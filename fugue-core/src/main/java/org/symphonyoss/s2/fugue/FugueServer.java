@@ -369,7 +369,7 @@ public class FugueServer extends AbstractComponentContainer<IFugueServer> implem
       thread.interrupt();
     
     server_.stop();
-    log_.info("FugueServer Stopped");
+    log_.info("FugueServer Stopping...");
     
     waitForAllExecutors(5000);
     
@@ -402,11 +402,54 @@ public class FugueServer extends AbstractComponentContainer<IFugueServer> implem
 
     setLifeCycleState(FugueLifecycleState.Stopped);
     statusMessage_ = "Stopped cleanly.";
+
+    log_.info("FugueServer Stopped cleanly");
+    
+    /* The kill thread is a daemon thread which sleeps for 5 minutes and then calls System.exit. If
+     * everything is working it will never take effect because at this point all non-daemon threads should
+     * have terminated.
+     * 
+     * This is a fail safe to ensure that if any thread is left running in error that the JVM will eventually
+     * terminate, but if this happens it is an ERROR as all threads should exit cleanly.
+     */
+    startKillThread();
+    
+    log_.info("Started daemon killThread, let's hope it does not take effect...");
   }
   
+  private void startKillThread()
+  {
+    Thread killThread = new Thread()
+    {
+
+      @Override
+      public void run()
+      {
+        try
+        {
+          Thread.sleep(300000);
+        }
+        catch (InterruptedException e)
+        {
+          log_.error("Kill thread was interrupted", e);
+        }
+        
+        log_.error("Kill thread is still alive, calling System.exit()");
+        System.exit(1);
+        log_.error("OMG!!! Kill thread is still alive AFTER calling System.exit()!!!!");
+      }
+  
+    };
+    
+    killThread.setDaemon(true);
+    killThread.start();
+  }
+
   private void waitForAllExecutors(int delayMillis)
   {
     long timeout = System.currentTimeMillis() + delayMillis;
+    
+    log_.info("Waiting up to " + delayMillis + "ms for all executors...");
     
     for(FugueExecutorService exec : executors_)
     {
@@ -424,6 +467,8 @@ public class FugueServer extends AbstractComponentContainer<IFugueServer> implem
         }
       }
     }
+    
+    log_.info("Waiting up to " + delayMillis + "ms for all executors...Done");
   }
   
   /**
