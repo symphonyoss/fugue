@@ -84,6 +84,7 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingC
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
+import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerResult;
@@ -93,6 +94,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupResult;
+import com.amazonaws.services.elasticloadbalancingv2.model.DeleteLoadBalancerRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DeleteRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersResult;
@@ -105,6 +107,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsR
 import com.amazonaws.services.elasticloadbalancingv2.model.Listener;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerNotFoundException;
+import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerSchemeEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
@@ -186,6 +189,7 @@ import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
+import com.amazonaws.waiters.WaiterParameters;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -2048,44 +2052,62 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           boolean ok = true;
           
-//          // So the LB exists, check that it has the correct security groups and subnets
-//          int     cnt = awsLoadBalancerSecurityGroups_.size();
-//          
-//          for(String sg : loadBalancer.getSecurityGroups())
-//          {
-//            if(awsLoadBalancerSecurityGroups_.contains(sg))
-//            {
-//              cnt--;
-//            }
-//            else
-//            {
-//              ok = false;
-//              break;
-//            }
-//          }
-//          
-//          if(cnt > 0)
-//            ok = false;
-//          
-//          if(ok)
-//          {
-//            cnt = awsLoadBalancerSubnets_.size();
-//            for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
-//            {
-//              if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
-//              {
-//                cnt--;
-//              }
-//              else
-//              {
-//                ok = false;
-//                break;
-//              }
-//            }
-//            
-//            if(cnt > 0)
-//              ok = false;
-//          }
+          if(!loadBalancer.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
+          {
+            log_.info("Load balancer is not Internal but " + loadBalancer.getScheme());
+            ok = false;
+          }
+          
+          if(ok)
+          {
+            // So the LB exists, check that it has the correct security groups and subnets
+            int     cnt = awsLoadBalancerSecurityGroups_.size();
+            
+            for(String sg : loadBalancer.getSecurityGroups())
+            {
+              if(awsLoadBalancerSecurityGroups_.contains(sg))
+              {
+                cnt--;
+              }
+              else
+              {
+                log_.info("Load balancer is missing security group " + sg);
+                ok = false;
+                break;
+              }
+            }
+            
+            if(cnt > 0)
+            {
+              log_.info("Load balancer has additional security groups");
+              ok = false;
+            }
+            
+            if(ok)
+            {
+              cnt = awsLoadBalancerSubnets_.size();
+              for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
+              {
+                if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
+                {
+                  cnt--;
+                }
+                else
+                {
+                  log_.info("Load balancer has additional subnet " + az.getSubnetId());
+                  ok = false;
+                  break;
+                }
+              }
+              
+              if(cnt > 0)
+              {
+
+                log_.info("Load balancer is missing subnets");
+                ok = false;
+              }
+            }
+          }
           
           if(ok)
           {
@@ -2097,8 +2119,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           {
             log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
             
-            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
-            throw new IllegalStateException("Loadbalancer needs to be updated");
+//            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
+//            throw new IllegalStateException("Loadbalancer needs to be updated");
+            
+            
+            
+            // disabled for testing
+            elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
+                .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+                );
+            
+
+            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " waiting for deletion...");
+            
+            elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
+                new DescribeLoadBalancersRequest()
+                  .withLoadBalancerArns(loadBalancer.getLoadBalancerArn())
+                )
+                );
+            
+
+            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " deleted.");
+            
+            // TODO: delete this return when we delete the load balancer
+            //return loadBalancer;
           }
         }
       }
@@ -2111,6 +2155,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .withName(name)
           .withSecurityGroups(awsLoadBalancerSecurityGroups_)
           .withSubnets(awsLoadBalancerSubnets_)
+          .withScheme(LoadBalancerSchemeEnum.Internal)
           );
       
       LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
