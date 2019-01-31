@@ -33,10 +33,15 @@
             "Effect": "Allow",
             "Action": [
                 "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:DeleteListener",
                 "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:DeleteLoadBalancer",
                 "elasticloadbalancing:AddTags"
             ],
-            "Resource": "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+            "Resource": [
+              "arn:aws:elasticloadbalancing:*:*:listener/sym-s2-${environmentType}-${environmentId}-*/*/*",
+              "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/sym-s2-${environmentType}-${environmentId}-*/*"
+              ]
         },
         {
             "Sid": "ElbWrite",
