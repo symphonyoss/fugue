@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.counter.ScaleAction;
@@ -117,7 +118,7 @@ public abstract class AbstractPullSubscriber implements Runnable
         if(busyCounter_ != null)
           busyCounter_.busy(messages.size());
         
-        if(isRunning())
+        if(isRunning() && !Fugue.isDebugSingleThread())
         {
           manager_.submit(getNonIdleSubscriber(), false);
 

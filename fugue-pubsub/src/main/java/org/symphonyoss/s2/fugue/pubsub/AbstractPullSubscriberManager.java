@@ -33,8 +33,6 @@ import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
-import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
-import org.symphonyoss.s2.fugue.deploy.IBatch;
 
 /**
  * Base class for synchronous pull type implementations.
@@ -113,7 +111,7 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
   {
     if(Fugue.isDebugSingleThread())
     {
-      subscriberThreadPoolSize_ = 1;
+      subscriberThreadPoolSize_ = totalSubscriptionCnt_ == 0 ? 1 : totalSubscriptionCnt_;
       handlerThreadPoolSize_ = 1;
     }
     else

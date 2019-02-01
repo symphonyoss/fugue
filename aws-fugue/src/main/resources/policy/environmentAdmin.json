@@ -39,8 +39,8 @@
                 "elasticloadbalancing:AddTags"
             ],
             "Resource": [
-              "arn:aws:elasticloadbalancing:*:*:listener/sym-s2-${environmentType}-${environmentId}-*/*/*",
-              "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/sym-s2-${environmentType}-${environmentId}-*/*"
+              "arn:aws:elasticloadbalancing:*:*:listener/*/*/*",
+              "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
               ]
         },
         {
