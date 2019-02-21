@@ -54,7 +54,6 @@ import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
 import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
-import org.symphonyoss.s2.common.exception.InvalidValueException;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
@@ -1173,19 +1172,12 @@ public abstract class FugueDeploy extends CommandLineHandler
         {
           JsonObject<?> container = initContainerMap.get(name);
           
-          try
-          {
-            IJsonDomNode        portNode = container.get(PORT);
-            int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
-            Collection<String>  paths = container.getListOf(String.class, PATHS);
-            String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
-            
-            deployInitContainer(name, port, paths, healthCheckPath);
-          }
-          catch(InvalidValueException e)
-          {
-            throw new IllegalStateException(e);
-          }
+          IJsonDomNode        portNode = container.get(PORT);
+          int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+          Collection<String>  paths = container.getListOf(String.class, PATHS);
+          String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+          
+          deployInitContainer(name, port, paths, healthCheckPath);
         }
       }
     }
@@ -1258,22 +1250,15 @@ public abstract class FugueDeploy extends CommandLineHandler
           
           batch.submit(() ->
           {
-            try
-            {
-              IJsonDomNode        portNode = container.get(PORT);
-              int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
-              Collection<String>  paths = container.getListOf(String.class, PATHS);
-              int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
-              
-              if(scheduled)
-                deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
-              else
-                deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
-            }
-            catch(InvalidValueException e)
-            {
-              throw new IllegalStateException(e);
-            }
+            IJsonDomNode        portNode = container.get(PORT);
+            int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+            Collection<String>  paths = container.getListOf(String.class, PATHS);
+            int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
+            
+            if(scheduled)
+              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
+            else
+              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
           });
         }
       }
