@@ -1,7 +1,5 @@
 /*
- *
- *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,20 +19,15 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.secret;
+package org.symphonyoss.s2.fugue.store;
 
-import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
-import org.symphonyoss.s2.common.exception.NoSuchObjectException;
-import org.symphonyoss.s2.fugue.naming.CredentialName;
-
-public interface ISecretManager
+/**
+ * The payload of an IFugueObject.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public interface IFugueObjectPayload
 {
-
-  IImmutableJsonDomNode getSecret(CredentialName secretName) throws NoSuchObjectException;
-
-  void putSecret(CredentialName name, IImmutableJsonDomNode secret);
-  
-  @Deprecated
-  void putSecret(CredentialName name, String secret);
 
 }
