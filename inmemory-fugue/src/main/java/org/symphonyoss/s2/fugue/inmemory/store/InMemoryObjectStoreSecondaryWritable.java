@@ -26,8 +26,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.TreeMap;
 
-import javax.annotation.Nullable;
-
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -70,7 +68,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, Instant createdDate, @Nullable ImmutableByteArray payload, List<Hash> sequenceHashes, ITraceContext trace)
+  public void saveToSecondaryStorage(Hash absoluteHash, Hash baseHash, Instant createdDate, ImmutableByteArray payload,
+      List<Hash> absoluteSequenceHashes, List<Hash> currentSequenceHashes, ITraceContext trace)
   {
     byte[] payloadBytes;
     
@@ -91,30 +90,37 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
       
       payloadBytes = payload.toByteArray();
     }
+    
+    if(!absoluteSequenceHashes.isEmpty())
+      processSequences(ImmutableByteArray.newInstance(generateRangeKey(absoluteHash, createdDate)), payloadBytes, absoluteSequenceHashes);
 
-    if(!sequenceHashes.isEmpty())
+    if(!currentSequenceHashes.isEmpty())
+      processSequences(baseHash.toImmutableByteArray(), payloadBytes, currentSequenceHashes);
+    
+  }
+  
+  private void processSequences(ImmutableByteArray rangeKey, byte[] payloadBytes, List<Hash> sequenceHashes)
+  {
+    synchronized (sequenceMap_)
     {
-      ImmutableByteArray      rangeKey          = ImmutableByteArray.newInstance(generateRangeKey(absoluteHash, createdDate));
-      
-      synchronized (sequenceMap_)
+      for(Hash sequenceHash : sequenceHashes)
       {
-        for(Hash sequenceHash : sequenceHashes)
+        TreeMap<ImmutableByteArray, byte[]> sequence = sequenceMap_.get(sequenceHash);
+        
+        if(sequence == null)
         {
-          TreeMap<ImmutableByteArray, byte[]> sequence = sequenceMap_.get(sequenceHash);
+          sequence = new TreeMap<>();
           
-          if(sequence == null)
-          {
-            sequence = new TreeMap<>();
-            
-            sequenceMap_.put(sequenceHash, sequence);
-          }
-          
-          sequence.put(rangeKey, payloadBytes);
+          sequenceMap_.put(sequenceHash, sequence);
         }
+        
+        sequence.put(rangeKey, payloadBytes);
+        
+        //System.err.println("put " + hash + " to " + rangeKey.toBase64String());
       }
     }
   }
-  
+
   private byte[] generateRangeKey(Hash absoluteHash, Instant createdDate)
   {
     ByteBuffer b = ByteBuffer.allocate(absoluteHash.toByteString().size() + 8 + 4);

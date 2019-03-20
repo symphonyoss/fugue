@@ -26,8 +26,6 @@ package org.symphonyoss.s2.fugue.store;
 import java.time.Instant;
 import java.util.List;
 
-import javax.annotation.Nullable;
-
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
@@ -44,13 +42,14 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
   /**
    * Save the given object to secondary storage.
    * 
-   * @param absoluteHash    The absolute hash of the object to store.
-   * @param createdDate     The created date of the object for sequencing.
-   * @param payload         The payload (if available).
-   * @param sequenceHashes  The list of sequences to which the object should be added.
-   * 
-   * @param notification  A Notification referring to the object to be stored.
-   * @param trace         A trace context.
+   * @param absoluteHash            The absolute hash of the object to store.
+   * @param baseHash                The base hash of the object to store.
+   * @param createdDate             The created date of the object for sequencing.
+   * @param payload                 The payload (if available).
+   * @param absoluteSequenceHashes  The list of absolute sequences to which the object should be added.
+   * @param currentSequenceHashes   The list of current sequences to which the object should be added.
+   * @param trace                   A trace context.
    */
-  void saveToSecondaryStorage(Hash absoluteHash, Instant createdDate, @Nullable ImmutableByteArray payload, List<Hash> sequenceHashes, ITraceContext trace);
+  void saveToSecondaryStorage(Hash absoluteHash, Hash baseHash, Instant createdDate, ImmutableByteArray payload,
+      List<Hash> absoluteSequenceHashes, List<Hash> currentSequenceHashes, ITraceContext trace);
 }
