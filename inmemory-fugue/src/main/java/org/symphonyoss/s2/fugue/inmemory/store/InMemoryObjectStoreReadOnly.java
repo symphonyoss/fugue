@@ -129,6 +129,44 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
   }
   
   @Override
+  public String fetchVersions(Hash baseHash, @Nullable Integer pLimit, @Nullable String after, Consumer<byte[]> consumer)
+  {
+    TreeMap<ImmutableByteArray, byte[]> sequence          = currentMap_.get(baseHash);
+    int                                 limit             = pLimit == null ? Integer.MAX_VALUE : pLimit;
+    ImmutableByteArray                  afterBytes        = after == null ? null : ImmutableByteArray.newInstance(Base64.decodeBase64(after));
+    ImmutableByteArray                  lastEvaluatedKey  = null;
+    
+    if(sequence != null)
+    {
+      for(Entry<ImmutableByteArray, byte[]> entry : sequence.entrySet())
+      {
+        if(afterBytes != null)
+        {
+          if(entry.getKey().equals(afterBytes))
+            afterBytes = null;
+        }
+        else
+        {
+          consumer.accept(entry.getValue());
+          limit--;
+        }
+        lastEvaluatedKey = entry.getKey();
+        
+        if(limit < 0)
+          break;
+      }
+    }
+    
+    
+    if(lastEvaluatedKey != null)
+    {
+      return lastEvaluatedKey.toBase64String();
+    }
+    
+    return null;
+  }
+  
+  @Override
   public @Nonnull String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer pLimit, @Nullable String after, Consumer<byte[]> consumer)
   {
     TreeMap<ImmutableByteArray, byte[]> sequence          = sequenceMap_.get(sequenceHash);

@@ -22,6 +22,7 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 
+import java.util.List;
 import java.util.TreeMap;
 
 import org.symphonyoss.s2.common.hash.Hash;
@@ -78,7 +79,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   
   @Override
   public byte[] saveIfNotExists(IFugueObject idObject, ITraceContext trace,
-      IFugueObject... additionalObjects)
+      List<? extends IFugueObject> additionalObjects)
   {
     synchronized(absoluteMap_)
     {

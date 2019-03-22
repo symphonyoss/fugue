@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.store;
 
+import java.util.List;
+
 import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
@@ -54,5 +56,5 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
    * @return The existing ID object or null.
    */
   @Nullable byte[] saveIfNotExists(IFugueObject idObject, ITraceContext trace,
-      IFugueObject ...additionalObjects);
+      List<? extends IFugueObject> additionalObjects);
 }
