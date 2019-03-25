@@ -574,7 +574,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       IJsonDomNode regionsNode = amazon.get(REGIONS);
       if(regionsNode instanceof IJsonObject)
       {
-        INameFactory nameFactory = createNameFactory(getEnvironmentType(), null, null, null, null, null);
+        INameFactory nameFactory = createNameFactory(getEnvironmentType(), null, null, null, null);
         IJsonObject<?> regionsObject = (IJsonObject<?>)regionsNode;
         
         Iterator<String> it = regionsObject.getNameIterator();

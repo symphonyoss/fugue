@@ -106,8 +106,6 @@ public interface IConfiguration
    * @param name          The name of the required property.
    * @param defaultValue  The value to be returned if it is absent from the config.
    * @return              The value of the given property name.
-   * 
-   * @throws IllegalStateException  If the property is not defined in the current configuration.
    */
   long getLong(String name, long defaultValue);
   
@@ -129,10 +127,17 @@ public interface IConfiguration
    * @param name          The name of the required property.
    * @param defaultValue  The value to be returned if it is absent from the config.
    * @return              The value of the given property name.
-   * 
-   * @throws IllegalStateException  If the property is not defined in the current configuration.
    */
   int getInt(String name, int defaultValue);
+  
+  /**
+   * Return the value of the given configuration property as an integer.
+   * 
+   * @param name          The name of the required property.
+   * @param defaultValue  The value to be returned if it is absent from the config.
+   * @return              The value of the given property name.
+   */
+  Integer getInteger(String name, Integer defaultValue);
 
   /**
    * Return the value of the given configuration property as a boolean.

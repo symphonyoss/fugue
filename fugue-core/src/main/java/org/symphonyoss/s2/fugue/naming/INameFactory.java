@@ -133,12 +133,9 @@ public interface INameFactory
   
   String getEnvironmentId();
 
-  String getTenantId();
+  String getPodName();
   
   String getServiceId();
-
-  @Deprecated
-  String getRealmId();
   
   String getRegionId();
   
@@ -149,8 +146,6 @@ public interface INameFactory
   String getRequiredTenantId();
   
   String getRequiredServiceId();
-
-  String getRequiredRealmId();
   
   String getRequiredRegionId();
 

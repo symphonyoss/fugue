@@ -66,16 +66,16 @@ public class PubSubMessage implements IPubSubMessage
    * @param payload       The payload
    * @param traceContext  A trace context
    * @param payloadType   The payload type attribute
-   * @param tenantId 
+   * @param podId         The pod from which the message originates
    */
-  public PubSubMessage(String payload, ITraceContext traceContext, String payloadType, String tenantId)
+  public PubSubMessage(String payload, ITraceContext traceContext, String payloadType, String podId)
   {
     payload_ = payload;
     traceContext_ = traceContext;
     attributes_ = new HashMap<>();
     
     attributes_.put(PAYLOAD_TYPE_ATTRIBUTE, payloadType);
-    attributes_.put(TENANT_ID_ATTRIBUTE, tenantId);
+    attributes_.put(POD_ID_ATTRIBUTE, podId);
   }
   
   /**

@@ -53,21 +53,21 @@ public class GlobalConfigurationDelegator extends ConfigurationDelegator impleme
   }
 
   @Override
-  public String getRealmId()
-  {
-    return delegate_.getRealmId();
-  }
-
-  @Override
   public String getRegionId()
   {
     return delegate_.getRegionId();
   }
 
   @Override
-  public String getTenantId()
+  public String getPodName()
   {
-    return delegate_.getTenantId();
+    return delegate_.getPodName();
+  }
+
+  @Override
+  public Integer getPodId()
+  {
+    return delegate_.getPodId();
   }
 
   @Override

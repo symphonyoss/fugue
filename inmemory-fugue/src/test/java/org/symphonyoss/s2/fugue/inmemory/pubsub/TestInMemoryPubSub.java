@@ -42,7 +42,7 @@ public class TestInMemoryPubSub
 {
   private static final String TEST_TOPIC = "TestTopic";
   
-  private INameFactory nameFactory_ = new NameFactory("sym-s2-", "test", "s2test1", "realm", "us-east-1", "testTenant", "testService");
+  private INameFactory nameFactory_ = new NameFactory("sym-s2-", "test", "s2test1", "us-east-1", "testTenant", "testService");
 
   /**
    * Test publishing.

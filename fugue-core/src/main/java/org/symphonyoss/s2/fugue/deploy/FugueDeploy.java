@@ -55,6 +55,7 @@ import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 
@@ -72,8 +73,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   public static final String   ENVIRONMENT      = "environment";
   /** The label for an environment type */
   public static final String   ENVIRONMENT_TYPE = "environmentType";
-  /** The label for a realm */
-  public static final String   REALM            = "realm";
+  /** The label for a cloud */
+  public static final String   CLOUD            = "cloud";
   /** The label for a region */
   public static final String   REGION           = "region";
   /** The label for a track */
@@ -84,8 +85,12 @@ public abstract class FugueDeploy extends CommandLineHandler
   public static final String   SERVICE          = "service";
   /** The label for a policy / role */
   public static final String   POLICY           = "policy";
-  /** The label for a tenant */
-  public static final String   TENANT           = "tenant";
+  /** The label for a pod */
+  public static final String   POD              = "pod";
+  /** The label for a podName */
+  public static final String   POD_NAME           = "podName";
+  /** The label for a podId */
+  public static final String   POD_ID           = "podId";
   /** The label for an action */
   public static final String   ACTION           = "action";
   /** The file name extension for a JSON document */
@@ -134,9 +139,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private String                  service_;
   private String                  environment_;
   private String                  environmentType_;
-  private String                  realm_;
   private String                  region_;
-  private String                  tenant_;
+  private String                  podName_;
   private String                  instances_;
   private String                  buildId_;
 
@@ -179,9 +183,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     withFlag('s',   SERVICE,              "FUGUE_SERVICE",              String.class,   false, false,   (v) -> service_             = v);
     withFlag('v',   ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE",     String.class,   false, false,   (v) -> environmentType_     = v);
     withFlag('e',   ENVIRONMENT,          "FUGUE_ENVIRONMENT",          String.class,   false, false,   (v) -> environment_         = v);
-    withFlag('r',   REALM,                "FUGUE_REALM",                String.class,   false, false,   (v) -> realm_               = v);
     withFlag('g',   REGION,               "FUGUE_REGION",               String.class,   false, false,   (v) -> region_              = v);
-    withFlag('t',   TENANT,               "FUGUE_TENANT",               String.class,   false, false,   (v) -> tenant_              = v);
+    withFlag('p',   POD_NAME,             "FUGUE_POD_NAME",             String.class,   false, false,   (v) -> podName_              = v);
     withFlag('a',   ACTION,               "FUGUE_ACTION",               String.class,   false, true,    (v) -> setAction(v));
     withFlag('E',   "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",  Boolean.class,  false, false,   (v) -> primaryEnvironment_  = v);
     withFlag('G',   "primaryRegion",      "FUGUE_PRIMARY_REGION",       Boolean.class,  false, false,   (v) -> primaryRegion_       = v);
@@ -194,7 +197,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       helper.init(this);
   }
   
-  protected abstract INameFactory createNameFactory(String environmentType, String environmentId, String realmId, String regionId,
+  protected abstract INameFactory createNameFactory(String environmentType, String environmentId, String regionId,
       String tenantId, String serviceId);
 
   private void setAction(String v)
@@ -259,15 +262,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     return require(ENVIRONMENT, environment_);
   }
-
-  /**
-   * 
-   * @return The realm ID
-   */
-  public @Nonnull String getRealm()
-  {
-    return require(REALM, realm_);
-  }
   
   /**
    * 
@@ -326,7 +320,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     tagIfNotNull("FUGUE_ENVIRONMENT_TYPE",  environmentType_);
     tagIfNotNull("FUGUE_ENVIRONMENT",       environment_);
-    tagIfNotNull("FUGUE_REALM",             realm_);
     tagIfNotNull("FUGUE_REGION",            region_);
     tagIfNotNull("FUGUE_SERVICE",           service_);
   }
@@ -353,15 +346,14 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
     else
     {
-      if(tenant_ != null)
-        tenantContextList_.add(createContext(tenant_, createNameFactory(environmentType_, environment_, realm_, region_, tenant_, service_)));
+      if(podName_ != null)
+        tenantContextList_.add(createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, service_)));
     }
 
     log_.info("FugueDeploy v1.1");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
-    log_.info("REALM            = " + realm_);
     log_.info("REGION           = " + region_);
     
     for(int i=0 ; i<tenantContextList_.size() ; i++)
@@ -395,7 +387,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployContainers = false;
         log_.info("Creating environment type \"" + environmentType_ + "\"");
         
-        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null, null));
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null));
         multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironmentType();
         break;
@@ -405,7 +397,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployContainers = false;
         log_.info("Creating environment \"" + environment_ + "\"");
         
-        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null, null));
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null));
         multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironment();
         break;
@@ -434,7 +426,7 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     if(deployConfig)
     {    
-      multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, realm_, region_, null, service_));
+      multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, service_));
       multiTenantContext_.setConfig(multiTenantConfig);
       
       ImmutableJsonObject serviceJson;
@@ -530,7 +522,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       // Now we can do all the single tenant processes in parallel
       
       
-      IBatch              batch                 = createBatch();
+      IBatch<Runnable>    batch                 = createBatch();
       Map<String, String> singleTenantPolicies  = fetchPolicies(dir, SINGLE_TENANT);
       
       for(DeploymentContext context : tenantContextList_)
@@ -584,7 +576,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         // Now launch all the service containers in parallel
         
-        IBatch containerBatch = createBatch();
+        IBatch<Runnable> containerBatch = createBatch();
             
         
         multiTenantContext_.deployServiceContainers(containerBatch);
@@ -603,18 +595,20 @@ public abstract class FugueDeploy extends CommandLineHandler
   
 
 
-  private IBatch createBatch()
+  private IBatch<Runnable> createBatch()
   {
-    return new ExecutorBatch(executor_);
-//    return new SerialBatch();
+    if(Fugue.isDebugSingleThread())
+      return new SerialBatch<Runnable>();
+    
+    return new ExecutorBatch<Runnable>(executor_); 
   }
 
   private ImmutableJsonObject fetchTenantConfig(String tenantId)
   {
-    String  dir = CONFIG + "/" + TENANT + "/" + tenantId;
+    String  dir = CONFIG + "/" + POD + "/" + tenantId;
     try
     {
-      MutableJsonObject tenantConfig = provider_.fetchConfig(dir, FUGUE_PREFIX + TENANT + DOT_JSON);
+      MutableJsonObject tenantConfig = fetchSpecificTenantConfig(dir);
       
       try
       {
@@ -632,12 +626,22 @@ public abstract class FugueDeploy extends CommandLineHandler
       throw new IllegalStateException("Unable to read tenant config", e);
     }
   }
+  
+  private MutableJsonObject fetchSpecificTenantConfig(String dir) throws IOException
+  {
+    try
+    {
+      return provider_.fetchConfig(dir, FUGUE_PREFIX + POD + DOT_JSON);
+    }
+    catch(FileNotFoundException e)
+    {
+      log_.info("No tenant specific config");
+      
+      return new MutableJsonObject();
+    }
+  }
 
-  
-  
-  
-  
-  private ImmutableJsonObject createIdConfig(String tenantId)
+  private ImmutableJsonObject createIdConfig(String podName)
   {
     MutableJsonObject idConfig = new MutableJsonObject();
     MutableJsonObject id = new MutableJsonObject();
@@ -646,10 +650,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     id.addIfNotNull(ENVIRONMENT + ID_SUFFIX,  environment_);
     id.addIfNotNull(ENVIRONMENT_TYPE,         environmentType_);
-    id.addIfNotNull(REALM + ID_SUFFIX,        realm_);
     id.addIfNotNull(REGION + ID_SUFFIX,       region_);
     id.addIfNotNull(SERVICE + ID_SUFFIX,      service_);
-    id.addIfNotNull(TENANT + ID_SUFFIX,       tenantId);
+    id.addIfNotNull(POD_NAME,                 podName);
     
     return idConfig.immutify();
   }
@@ -711,12 +714,9 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       fetch(true, json, dir, ENVIRONMENT, service_, "environment", environment_);
       
-      if(realm_ == null)
-        return json.immutify();
+      dir = dir + "/" + cloudServiceProvider_;
       
-      dir = dir + "/" + realm_;
-      
-      fetch(true, json, dir, REALM, service_, "realm", realm_);
+      fetch(true, json, dir, CLOUD, service_, "cloud", cloudServiceProvider_);
       
       if(region_ == null)
         return json.immutify();
@@ -793,11 +793,10 @@ public abstract class FugueDeploy extends CommandLineHandler
           
           String name = station.getRequiredString("name");
           
-          if(getStation().equals(name))
+          if(getStation().equals(name) && cloudServiceProvider_.equals(station.getRequiredString(CLOUD)))
           {
             environmentType_  = station.getRequiredString(ENVIRONMENT_TYPE);
             environment_      = station.getRequiredString(ENVIRONMENT);
-            realm_            = station.getRequiredString(REALM);
             region_           = station.getRequiredString(REGION);
             
             IJsonDomNode tenantsNode = station.get("tenants");
@@ -810,10 +809,10 @@ public abstract class FugueDeploy extends CommandLineHandler
                 {
                   if(tenantNode instanceof IStringProvider)
                   {
-                    String tenantId = ((IStringProvider)tenantNode).asString();
-                    
-                    tenantContextList_.add(createContext(tenantId,
-                        createNameFactory(environmentType_, environment_, realm_, region_, tenantId, service_)));
+                     String tenantId = ((IStringProvider)tenantNode).asString();
+                   
+                     tenantContextList_.add(createContext(tenantId,
+                        createNameFactory(environmentType_, environment_, region_, tenantId, service_)));
                   }
                   else
                   {
@@ -947,8 +946,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     protected String getTenantId()
     {
-      return tenantId_;
-    }
+       return tenantId_;
+   }
 
     protected String getBuildId()
     {
@@ -1133,7 +1132,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     private void processConfigAndPolicies()
     {
-      IBatch batch = createBatch();
+      IBatch<Runnable> batch = createBatch();
       
       batch.submit(() ->
       { 
@@ -1182,7 +1181,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
     }
     
-    protected void deployServiceContainers(IBatch batch)
+    protected void deployServiceContainers(IBatch<Runnable> batch)
     {
       if(!getContainerMap().isEmpty())
       {
@@ -1194,7 +1193,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
     }
 
-    private void deployLambdaContainers(IBatch batch, ContainerType containerType)
+    private void deployLambdaContainers(IBatch<Runnable> batch, ContainerType containerType)
     {
       Map<String, JsonObject<?>> map = containerMap_.get(containerType);
       
@@ -1238,7 +1237,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
     }
 
-    private void deployDockerContainers(IBatch batch, ContainerType containerType, boolean scheduled)
+    private void deployDockerContainers(IBatch<Runnable> batch, ContainerType containerType, boolean scheduled)
     {
       Map<String, JsonObject<?>> map = containerMap_.get(containerType);
       
