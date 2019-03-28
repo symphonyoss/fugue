@@ -55,6 +55,6 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
    * 
    * @return The existing ID object or null.
    */
-  @Nullable byte[] saveIfNotExists(IFugueObject idObject, ITraceContext trace,
+  @Nullable String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
       List<? extends IFugueObject> additionalObjects);
 }

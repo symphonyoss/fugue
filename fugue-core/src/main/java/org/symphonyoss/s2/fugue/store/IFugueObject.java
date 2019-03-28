@@ -21,6 +21,8 @@
 
 package org.symphonyoss.s2.fugue.store;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 
@@ -63,11 +65,17 @@ public interface IFugueObject
    * 
    * @return The range key for this object.
    */
-  ImmutableByteArray  getRangeKey();
+  String  getRangeKey();
   
   /**
    * 
    * @return The payload of this object.
    */
   IFugueObjectPayload getPayload();
+
+  /**
+   * 
+   * @return The pod which owns this object, if any.
+   */
+  @Nullable IFuguePodId getPodId();
 }

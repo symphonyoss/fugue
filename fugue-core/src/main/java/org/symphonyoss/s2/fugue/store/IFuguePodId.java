@@ -1,4 +1,6 @@
 /*
+ *
+ *
  * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
@@ -21,30 +23,12 @@
 
 package org.symphonyoss.s2.fugue.store;
 
-import javax.annotation.Nullable;
-
-/**
- * The payload of an IFugueObject.
- * 
- * @author Bruce Skingle
- *
- */
-public interface IFugueObjectPayload
+public interface IFuguePodId
 {
-
-  /**
-   * Return a short textual description of this object.
-   * 
-   * Open objects should indicate their internal type, for example an OpenBlob should indicate the
-   * type of the enclosed application payload.
-   * 
-   * @return a short textual description of this object.
-   */
-  String getDescription();
-
   /**
    * 
-   * @return The pod which owns this object, if any.
+   * @return The value of this pod ID as an Integer.
    */
-  @Nullable IFuguePodId getPodId();
+  Integer getValue();
+
 }

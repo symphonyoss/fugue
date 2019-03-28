@@ -30,12 +30,11 @@ import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.apache.commons.codec.binary.Base64;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.common.hash.Hash;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.IFugueComponent;
+import org.symphonyoss.s2.fugue.store.AbstractFugueObjectStore;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreReadOnly;
 
 /**
@@ -44,11 +43,11 @@ import org.symphonyoss.s2.fugue.store.IFugueObjectStoreReadOnly;
  * @author Bruce Skingle
  *
  */
-public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, IFugueComponent
+public class InMemoryObjectStoreReadOnly extends AbstractFugueObjectStore implements IFugueObjectStoreReadOnly
 {
-  protected Map<Hash, byte[]>                     absoluteMap_ = new HashMap<>();
-  protected Map<Hash, TreeMap<ImmutableByteArray, byte[]>>    currentMap_ = new HashMap<>();
-  protected Map<Hash, TreeMap<ImmutableByteArray, byte[]>>    sequenceMap_ = new HashMap<>();
+  protected Map<Hash, String>                     absoluteMap_ = new HashMap<>();
+  protected Map<Hash, TreeMap<String, String>>    currentMap_ = new HashMap<>();
+  protected Map<Hash, TreeMap<String, String>>    sequenceMap_ = new HashMap<>();
   
   /**
    * Constructor.
@@ -99,12 +98,12 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
   {}
   
   @Override
-  public @Nonnull byte[] fetchAbsolute(Hash absoluteHash)
+  public @Nonnull String fetchAbsolute(Hash absoluteHash)
       throws NoSuchObjectException
   {
     synchronized(absoluteMap_)
     {
-      byte[] result = absoluteMap_.get(absoluteHash);
+      String result = absoluteMap_.get(absoluteHash);
       
       if(result == null)
         throw new NoSuchObjectException(absoluteHash + " not found");
@@ -114,12 +113,12 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
   }
   
   @Override
-  public @Nonnull byte[] fetchCurrent(Hash baseHash)
+  public @Nonnull String fetchCurrent(Hash baseHash)
       throws NoSuchObjectException
   {
     synchronized(currentMap_)
     {
-      TreeMap<ImmutableByteArray, byte[]> versions = currentMap_.get(baseHash);
+      TreeMap<String, String> versions = currentMap_.get(baseHash);
       
       if(versions == null || versions.isEmpty())
         throw new NoSuchObjectException(baseHash + " not found");
@@ -129,21 +128,20 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
   }
   
   @Override
-  public String fetchVersions(Hash baseHash, @Nullable Integer pLimit, @Nullable String after, Consumer<byte[]> consumer)
+  public String fetchVersions(Hash baseHash, @Nullable Integer pLimit, @Nullable String after, Consumer<String> consumer)
   {
-    TreeMap<ImmutableByteArray, byte[]> sequence          = currentMap_.get(baseHash);
-    int                                 limit             = pLimit == null ? Integer.MAX_VALUE : pLimit;
-    ImmutableByteArray                  afterBytes        = after == null ? null : ImmutableByteArray.newInstance(Base64.decodeBase64(after));
-    ImmutableByteArray                  lastEvaluatedKey  = null;
+    TreeMap<String, String> sequence          = currentMap_.get(baseHash);
+    int                     limit             = pLimit == null ? Integer.MAX_VALUE : pLimit;
+    String                  lastEvaluatedKey  = null;
     
     if(sequence != null)
     {
-      for(Entry<ImmutableByteArray, byte[]> entry : sequence.entrySet())
+      for(Entry<String, String> entry : sequence.entrySet())
       {
-        if(afterBytes != null)
+        if(after != null)
         {
-          if(entry.getKey().equals(afterBytes))
-            afterBytes = null;
+          if(entry.getKey().equals(after))
+            after = null;
         }
         else
         {
@@ -157,31 +155,24 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
       }
     }
     
-    
-    if(lastEvaluatedKey != null)
-    {
-      return lastEvaluatedKey.toBase64String();
-    }
-    
-    return null;
+    return lastEvaluatedKey;
   }
   
   @Override
-  public @Nonnull String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer pLimit, @Nullable String after, Consumer<byte[]> consumer)
+  public @Nonnull String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer pLimit, @Nullable String after, Consumer<String> consumer)
   {
-    TreeMap<ImmutableByteArray, byte[]> sequence          = sequenceMap_.get(sequenceHash);
+    TreeMap<String, String>             sequence          = sequenceMap_.get(sequenceHash);
     int                                 limit             = pLimit == null ? Integer.MAX_VALUE : pLimit;
-    ImmutableByteArray                  afterBytes        = after == null ? null : ImmutableByteArray.newInstance(Base64.decodeBase64(after));
-    ImmutableByteArray                  lastEvaluatedKey  = null;
+    String                              lastEvaluatedKey  = null;
     
     if(sequence != null)
     {
-      for(Entry<ImmutableByteArray, byte[]> entry : sequence.entrySet())
+      for(Entry<String, String> entry : sequence.entrySet())
       {
-        if(afterBytes != null)
+        if(after != null)
         {
-          if(entry.getKey().equals(afterBytes))
-            afterBytes = null;
+          if(entry.getKey().equals(after))
+            after = null;
         }
         else
         {
@@ -195,12 +186,6 @@ public class InMemoryObjectStoreReadOnly implements IFugueObjectStoreReadOnly, I
       }
     }
     
-    
-    if(lastEvaluatedKey != null)
-    {
-      return lastEvaluatedKey.toBase64String();
-    }
-    
-    return null;
+    return lastEvaluatedKey;
   }
 }

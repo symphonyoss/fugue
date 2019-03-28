@@ -22,7 +22,6 @@
 package org.symphonyoss.s2.fugue.store;
 
 import org.symphonyoss.s2.common.hash.Hash;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 
 /**
  * A versioned Fugue Object.
@@ -64,5 +63,5 @@ public interface IFugueVersionedObject extends IFugueObjectPayload
    * 
    * @return The range key for this object.
    */
-  ImmutableByteArray  getRangeKey();
+  String  getRangeKey();
 }

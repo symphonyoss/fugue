@@ -31,6 +31,7 @@ import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectPayload;
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
  * Unit test for in memory object store.
@@ -57,28 +58,29 @@ public class TestInMemoryObjectStore
     objectStore_.save(objectOne, NoOpTraceContext.INSTANCE);
     objectStore_.save(objectTwo, NoOpTraceContext.INSTANCE);
     
-    byte[] retOne = objectStore_.fetchAbsolute(objectOne.getAbsoluteHash());
-    byte[] retTwo = objectStore_.fetchAbsolute(objectTwo.getAbsoluteHash());
+    String retOne = objectStore_.fetchAbsolute(objectOne.getAbsoluteHash());
+    String retTwo = objectStore_.fetchAbsolute(objectTwo.getAbsoluteHash());
     
-    assertEquals(objectOne.serialize(), ImmutableByteArray.newInstance(retOne));
-    assertEquals(objectTwo.serialize(), ImmutableByteArray.newInstance(retTwo));
+    assertEquals(objectOne.toString(), retOne);
+    assertEquals(objectTwo.toString(), retTwo);
   }
   
   class FugueObject implements IFugueObject
   {
-    private ImmutableByteArray value_;
+    private final String value_;
+    private final ImmutableByteArray serialized_;
     private String description_;
     private Hash absoluteHash_;
     private IFugueObjectPayload payload_;
 
     FugueObject(String value)
     {
-      value_= ImmutableByteArray.newInstance(value);
+      value_= value;
+      serialized_ = ImmutableByteArray.newInstance(value);
       description_ = "FugueObject(" + value + ")";
-      absoluteHash_ = HashProvider.getHashOf(value_);
+      absoluteHash_ = HashProvider.getHashOf(serialized_);
       payload_ = new IFugueObjectPayload()
       {
-
         @Override
         public int hashCode()
         {
@@ -96,7 +98,31 @@ public class TestInMemoryObjectStore
         {
           return value_.toString();
         }
-        
+
+        @Override
+        public String getDescription()
+        {
+          return "Test object";
+        }
+
+        @Override
+        public IFuguePodId getPodId()
+        {
+          return new IFuguePodId()
+              {
+                @Override
+                public String toString()
+                {
+                  return "101";
+                }
+                
+                @Override
+                public Integer getValue()
+                {
+                  return 101;
+                }
+              };
+        }
       };
     }
     
@@ -109,7 +135,7 @@ public class TestInMemoryObjectStore
     @Override
     public ImmutableByteArray serialize()
     {
-      return value_;
+      return serialized_;
     }
 
     @Override
@@ -119,7 +145,7 @@ public class TestInMemoryObjectStore
     }
 
     @Override
-    public ImmutableByteArray getRangeKey()
+    public String getRangeKey()
     {
       return value_;
     }
@@ -129,6 +155,11 @@ public class TestInMemoryObjectStore
     {
       return payload_;
     }
-    
+
+    @Override
+    public IFuguePodId getPodId()
+    {
+      return payload_.getPodId();
+    }
   }
 }

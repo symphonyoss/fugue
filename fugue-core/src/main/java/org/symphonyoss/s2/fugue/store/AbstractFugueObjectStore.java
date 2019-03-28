@@ -1,4 +1,6 @@
 /*
+ *
+ *
  * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
@@ -21,30 +23,23 @@
 
 package org.symphonyoss.s2.fugue.store;
 
-import javax.annotation.Nullable;
+import java.time.Instant;
 
-/**
- * The payload of an IFugueObject.
- * 
- * @author Bruce Skingle
- *
- */
-public interface IFugueObjectPayload
+import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.IFugueComponent;
+
+public abstract class AbstractFugueObjectStore implements IFugueObjectStoreReadOnly, IFugueComponent
 {
+  protected static final String              Separator                = "#";
+  protected static final String              AbsoluteHashPrefix       = "A" + Separator;
+  protected static final String              BaseHashPrefix           = "B" + Separator;
+  protected static final String              SequencePrefix           = "S" + Separator;
 
-  /**
-   * Return a short textual description of this object.
-   * 
-   * Open objects should indicate their internal type, for example an OpenBlob should indicate the
-   * type of the enclosed application payload.
-   * 
-   * @return a short textual description of this object.
-   */
-  String getDescription();
-
-  /**
-   * 
-   * @return The pod which owns this object, if any.
-   */
-  @Nullable IFuguePodId getPodId();
+  protected String generateRangeKey(Hash absoluteHash, Instant createdDate)
+  {
+    if(createdDate == null)
+      return Separator + absoluteHash;
+    
+    return createdDate + Separator + absoluteHash;
+  }
 }

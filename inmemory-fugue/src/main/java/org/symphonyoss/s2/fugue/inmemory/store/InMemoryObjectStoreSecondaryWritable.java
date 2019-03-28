@@ -21,7 +21,6 @@
 
 package org.symphonyoss.s2.fugue.inmemory.store;
 
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.TreeMap;
@@ -30,6 +29,7 @@ import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
 
 /**
@@ -68,16 +68,53 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, Hash baseHash, Instant createdDate, ImmutableByteArray payload,
-      List<Hash> absoluteSequenceHashes, List<Hash> currentSequenceHashes, ITraceContext trace)
+  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace)
   {
-    byte[] payloadBytes;
+    doSaveToSecondaryStorage(absoluteHash, payload, trace,
+        null, null,
+        null, null, null);
+  }
+  
+  @Override
+  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace,
+      List<Hash> absoluteSequenceHashes, Instant createdDate)
+  {
+    doSaveToSecondaryStorage(absoluteHash, payload, trace,
+        absoluteSequenceHashes, createdDate,
+        null, null, null);
+  }
+
+  @Override
+  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace,
+      List<Hash> currentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    doSaveToSecondaryStorage(absoluteHash, payload, trace,
+        null, null,
+        currentSequenceHashes, baseHash, baseCreatedDate);
+  }
+  
+  @Override
+  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace,
+      List<Hash> absoluteSequenceHashes, Instant createdDate,
+      List<Hash> currentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    doSaveToSecondaryStorage(absoluteHash, payload, trace,
+        absoluteSequenceHashes, createdDate,
+        currentSequenceHashes, baseHash, baseCreatedDate);
+  }
+
+  private void doSaveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace,
+      List<Hash> absoluteSequenceHashes, Instant createdDate,
+      List<Hash> currentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    String  payloadString;
     
     if(payload == null)
     {
       try
       {
-        payloadBytes = fetchAbsolute(absoluteHash);
+        payloadString = fetchAbsolute(absoluteHash);
+        //payloadBytes = ImmutableByteArray.newInstance(payload);
       }
       catch (NoSuchObjectException e)
       {
@@ -86,26 +123,25 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
     }
     else
     {
+      payloadString = payload.toString();
       trace.trace("READ_PAYLOAD_NOTIFICATION");
-      
-      payloadBytes = payload.toByteArray();
     }
     
-    if(!absoluteSequenceHashes.isEmpty())
-      processSequences(ImmutableByteArray.newInstance(generateRangeKey(absoluteHash, createdDate)), payloadBytes, absoluteSequenceHashes);
+    if(absoluteSequenceHashes != null)
+      processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, absoluteSequenceHashes);
 
-    if(!currentSequenceHashes.isEmpty())
-      processSequences(baseHash.toImmutableByteArray(), payloadBytes, currentSequenceHashes);
+    if(currentSequenceHashes != null)
+      processSequences(generateRangeKey(baseHash, baseCreatedDate), payloadString, currentSequenceHashes);
     
   }
   
-  private void processSequences(ImmutableByteArray rangeKey, byte[] payloadBytes, List<Hash> sequenceHashes)
+  private void processSequences(String rangeKey, String payload, List<Hash> sequenceHashes)
   {
     synchronized (sequenceMap_)
     {
       for(Hash sequenceHash : sequenceHashes)
       {
-        TreeMap<ImmutableByteArray, byte[]> sequence = sequenceMap_.get(sequenceHash);
+        TreeMap<String, String> sequence = sequenceMap_.get(sequenceHash);
         
         if(sequence == null)
         {
@@ -114,21 +150,10 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
           sequenceMap_.put(sequenceHash, sequence);
         }
         
-        sequence.put(rangeKey, payloadBytes);
+        sequence.put(rangeKey, payload);
         
         //System.err.println("put " + hash + " to " + rangeKey.toBase64String());
       }
     }
   }
-
-  private byte[] generateRangeKey(Hash absoluteHash, Instant createdDate)
-  {
-    ByteBuffer b = ByteBuffer.allocate(absoluteHash.toByteString().size() + 8 + 4);
-    b.putLong(Long.MAX_VALUE - createdDate.getEpochSecond());
-    b.putInt(Integer.MAX_VALUE - createdDate.getNano());
-    b.put(absoluteHash.toByteString().toByteArray());
-    
-    return b.array();
-  }
-  
 }

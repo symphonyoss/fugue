@@ -32,7 +32,7 @@ import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 
 /**
- * A low level database within which Fugue can be stored.
+ * A low level database within which Fugue objects can be stored.
  * 
  * @author Bruce Skingle
  *
@@ -47,7 +47,7 @@ public interface IFugueObjectStoreReadOnly
    * 
    * @throws NoSuchObjectException  If there is no object with the given absoluteHash.
    */
-  @Nonnull byte[] fetchAbsolute(Hash absoluteHash) throws NoSuchObjectException;
+  @Nonnull String fetchAbsolute(Hash absoluteHash) throws NoSuchObjectException;
 
   /**
    * Fetch the current (latest) version of the object with the given baseHash.
@@ -57,7 +57,7 @@ public interface IFugueObjectStoreReadOnly
    * 
    * @throws NoSuchObjectException  If there is no object with the given baseHash.
    */
-  @Nonnull byte[] fetchCurrent(Hash baseHash) throws NoSuchObjectException;
+  @Nonnull String fetchCurrent(Hash baseHash) throws NoSuchObjectException;
 
   /**
    * Return objects from the given sequence, with more recent objects before older ones.
@@ -68,7 +68,7 @@ public interface IFugueObjectStoreReadOnly
    * @param consumer      A consumer to receive the retrieved objects.
    * @return              A new after token to allow a continuation query to be made.
    */
-  String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer limit, @Nullable String after, Consumer<byte[]> consumer);
+  String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
 
   /**
    * Return versions of the given object, with more recent versions before older ones.
@@ -79,5 +79,5 @@ public interface IFugueObjectStoreReadOnly
    * @param consumer      A consumer to receive the retrieved objects.
    * @return              A new after token to allow a continuation query to be made.
    */
-  String fetchVersions(Hash baseHash, @Nullable Integer limit, @Nullable String after, Consumer<byte[]> consumer);
+  String fetchVersions(Hash baseHash, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
 }

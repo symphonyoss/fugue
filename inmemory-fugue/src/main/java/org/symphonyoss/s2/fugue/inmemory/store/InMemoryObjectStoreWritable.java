@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.TreeMap;
 
 import org.symphonyoss.s2.common.hash.Hash;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
@@ -78,12 +77,12 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public byte[] saveIfNotExists(IFugueObject idObject, ITraceContext trace,
+  public String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
       List<? extends IFugueObject> additionalObjects)
   {
     synchronized(absoluteMap_)
     {
-      byte[] current = absoluteMap_.get(idObject.getAbsoluteHash());
+      String current = absoluteMap_.get(idObject.getAbsoluteHash());
       
       if(current == null)
       {
@@ -103,7 +102,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   
   private void doSave(IFugueObject fundamentalObject)
   {
-    byte[] blob = fundamentalObject.serialize().toByteArray();
+    String blob = fundamentalObject.toString();
     
     absoluteMap_.put(fundamentalObject.getAbsoluteHash(), blob);
     
@@ -115,11 +114,11 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
     }
   }
 
-  private void doSaveCurrent(Hash baseHash, ImmutableByteArray rangeKey, byte[] blob)
+  private void doSaveCurrent(Hash baseHash, String rangeKey, String blob)
   {
     synchronized(currentMap_)
     {
-      TreeMap<ImmutableByteArray, byte[]> versions = currentMap_.get(baseHash);
+      TreeMap<String, String> versions = currentMap_.get(baseHash);
       
       if(versions == null)
       {
@@ -134,35 +133,33 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   @Override
   public void save(IFugueObject fundamentalObject, ITraceContext trace)
   {
-    ImmutableByteArray bytes = fundamentalObject.serialize();
+    String blob = fundamentalObject.toString();
     
     if(fundamentalObject.getPayload() instanceof IFugueVersionedObject)
     {
       IFugueVersionedObject versionedObject = (IFugueVersionedObject) fundamentalObject.getPayload();
       
-      save(versionedObject.getAbsoluteHash(), bytes,
+      save(versionedObject.getAbsoluteHash(), blob,
           versionedObject.getBaseHash(), versionedObject.getRangeKey());
     }
     else
     {
-      save(fundamentalObject.getAbsoluteHash(), bytes); 
+      save(fundamentalObject.getAbsoluteHash(), blob); 
     }
   }
 
-  private void save(Hash absoluteHash, ImmutableByteArray bytes)
+  private void save(Hash absoluteHash, String blob)
   {
     synchronized(absoluteMap_)
     {
-      absoluteMap_.put(absoluteHash, bytes.toByteArray());
+      absoluteMap_.put(absoluteHash, blob);
     }
   }
 
-  private void save( Hash absoluteHash, ImmutableByteArray bytes, Hash baseHash, ImmutableByteArray rangeKey)
+  private void save( Hash absoluteHash, String blob, Hash baseHash, String rangeKey)
   {
     if(Hash.NIL_HASH.equals(baseHash))
       baseHash = absoluteHash;
-    
-    byte[] blob = bytes.toByteArray();
     
     synchronized(absoluteMap_)
     {
