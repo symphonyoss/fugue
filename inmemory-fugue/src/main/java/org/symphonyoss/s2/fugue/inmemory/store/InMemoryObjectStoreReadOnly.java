@@ -123,7 +123,8 @@ public class InMemoryObjectStoreReadOnly extends AbstractFugueObjectStore implem
       if(versions == null || versions.isEmpty())
         throw new NoSuchObjectException(baseHash + " not found");
       
-      return versions.values().iterator().next();
+      return versions.lastEntry().getValue();
+      //return versions.values().iterator().next();
     }
   }
   

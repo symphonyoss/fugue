@@ -106,9 +106,9 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
     
     absoluteMap_.put(fundamentalObject.getAbsoluteHash(), blob);
     
-    if(fundamentalObject instanceof IFugueVersionedObject)
+    if(fundamentalObject.getPayload() instanceof IFugueVersionedObject)
     {
-      IFugueVersionedObject versionedObject = (IFugueVersionedObject)fundamentalObject;
+      IFugueVersionedObject versionedObject = (IFugueVersionedObject)fundamentalObject.getPayload();
       
       doSaveCurrent(versionedObject.getBaseHash(), versionedObject.getRangeKey(), blob);
     }
