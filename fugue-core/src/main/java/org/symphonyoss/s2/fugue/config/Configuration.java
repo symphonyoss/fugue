@@ -201,6 +201,27 @@ public class Configuration implements IConfiguration
       throw new IllegalStateException("Required int property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
     }
   }
+  
+  @Override
+  public Integer getInteger(String name, Integer defaultValue)
+  {
+    String s = null;
+    
+    try
+    {
+      s = getString(name);
+      
+      return Integer.parseInt(s);
+    }
+    catch (NotFoundException e)
+    {
+      return defaultValue;
+    }
+    catch(NumberFormatException e)
+    {
+      throw new IllegalStateException("Required int property  \"" + name + "\" has the value \"" + s + "\" in " + name_, e);
+    }
+  }
 
   @Override
   public boolean getBoolean(@Nonnull String name)

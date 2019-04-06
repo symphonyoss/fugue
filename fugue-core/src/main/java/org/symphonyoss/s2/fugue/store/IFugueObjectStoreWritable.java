@@ -21,41 +21,40 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.store;
 
-import java.util.Map;
+import java.util.List;
 
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
- * A payload sent or received over a pub sub channel.
+ * A low level database within which Fugue can be stored.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface IPubSubMessage
+public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWritable
 {
-  static final String PAYLOAD_TYPE_ATTRIBUTE  = "payloadType";
-  static final String POD_ID_ATTRIBUTE        = "podId";
-  static final String FINAL_ATTRIBUTE         = "final";
-  
   /**
+   * Save the given object.
    * 
-   * @return The message payload
+   * @param object An object to be stored.
+   * @param trace  A trace context.
    */
-  @Nonnull String getPayload();
-  
-  /**
-   * 
-   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
-   */
-  @Nonnull Map<String, String> getAttributes();
+  void save(IFugueObject object, ITraceContext trace);
 
   /**
+   * If the given ID object does not exist then save it and all of the additional objects in a single transaction and return null,
+   * otherwise return the existing object.
    * 
-   * @return The trace context.
+   * @param idObject          An ID object.
+   * @param trace             A trace context.
+   * @param additionalObjects Additional objects to be stored if the given ID obejct does not already exist.
+   * 
+   * @return The existing ID object or null.
    */
-  @Nonnull ITraceContext getTraceContext();
-
+  @Nullable String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
+      List<? extends IFugueObject> additionalObjects);
 }

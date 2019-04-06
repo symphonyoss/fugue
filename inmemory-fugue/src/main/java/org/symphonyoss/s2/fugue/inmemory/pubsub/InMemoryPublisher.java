@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,41 +21,43 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
-
-import java.util.Map;
-
-import javax.annotation.Nonnull;
+package org.symphonyoss.s2.fugue.inmemory.pubsub;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
+import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 
-/**
- * A payload sent or received over a pub sub channel.
- * 
- * @author Bruce Skingle
- */
-public interface IPubSubMessage
+
+class InMemoryPublisher implements IPublisher
 {
-  static final String PAYLOAD_TYPE_ATTRIBUTE  = "payloadType";
-  static final String POD_ID_ATTRIBUTE        = "podId";
-  static final String FINAL_ATTRIBUTE         = "final";
-  
-  /**
-   * 
-   * @return The message payload
-   */
-  @Nonnull String getPayload();
-  
-  /**
-   * 
-   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
-   */
-  @Nonnull Map<String, String> getAttributes();
+  private final TopicName              topicName_;
 
-  /**
-   * 
-   * @return The trace context.
-   */
-  @Nonnull ITraceContext getTraceContext();
+  InMemoryPublisher(TopicName topicName)
+  {
+    topicName_ = topicName;
+  }
 
+  @Override
+  public void consume(IPubSubMessage item, ITraceContext trace)
+  {
+    InMemoryPubSub.send(topicName_, item);
+  }
+
+  @Override
+  public void consume(IPubSubMessage item)
+  {
+    InMemoryPubSub.send(topicName_, item);
+  }
+
+  @Override
+  public void close()
+  {
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return InMemoryPublisherManager.MAX_MESSAGE_SIZE;
+  }
 }

@@ -29,12 +29,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.fugue.config.IConfiguration;
-import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
 
@@ -193,7 +189,7 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
           sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
       
       SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, subscriptionName.toString(), getTraceFactory(), subscription.getConsumer(),
-          getCounter(), getBusyCounter(), nameFactory_.getTenantId());
+          getCounter(), getBusyCounter(), nameFactory_.getPodName());
 
       subscribers_.add(subscriber); 
     }

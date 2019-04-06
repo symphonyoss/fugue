@@ -109,11 +109,6 @@ public class ConfigHelper
     return fugueDeploy_.getEnvironment();
   }
 
-  protected String getRealm()
-  {
-    return fugueDeploy_.getRealm();
-  }
-
   protected String getRegion()
   {
     return fugueDeploy_.getRegion();

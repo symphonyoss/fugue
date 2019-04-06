@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,41 +21,48 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.inmemory.pubsub;
 
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 
 /**
- * A payload sent or received over a pub sub channel.
+ * In memory implementation of PublisherManager.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface IPubSubMessage
+public class InMemoryPublisherManager extends InMemoryPublisherBase<InMemoryPublisherManager>
 {
-  static final String PAYLOAD_TYPE_ATTRIBUTE  = "payloadType";
-  static final String POD_ID_ATTRIBUTE        = "podId";
-  static final String FINAL_ATTRIBUTE         = "final";
+
+  private InMemoryPublisherManager(Builder builder)
+  {
+    super(InMemoryPublisherManager.class, builder);
+  }
   
   /**
+   * Concrete builder.
    * 
-   * @return The message payload
+   * @author Bruce Skingle
+   *
    */
-  @Nonnull String getPayload();
-  
-  /**
-   * 
-   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
-   */
-  @Nonnull Map<String, String> getAttributes();
+  public static class Builder extends InMemoryPublisherBase.Builder<Builder, InMemoryPublisherManager>
+  {
+    /** Constructor. */
+    public Builder()
+    {
+      super(Builder.class);
+    }
 
-  /**
-   * 
-   * @return The trace context.
-   */
-  @Nonnull ITraceContext getTraceContext();
+    @Override
+    protected InMemoryPublisherManager construct()
+    {
+      return new InMemoryPublisherManager(this);
+    }
+  }
 
+  @Override
+  public boolean validateTopic(TopicName topicName)
+  {
+    return true;
+  }
 }

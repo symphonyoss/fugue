@@ -137,6 +137,12 @@ public class ConfigurationDelegator implements IConfiguration
   }
 
   @Override
+  public Integer getInteger(String name, Integer defaultValue)
+  {
+    return delegate_.getInteger(name, defaultValue);
+  }
+
+  @Override
   public List<String> getListOfString(String name, List<String> defaultValue)
   {
     return delegate_.getListOfString(name, defaultValue);

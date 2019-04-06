@@ -1,6 +1,4 @@
 /*
- *
- *
  * Copyright 2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
@@ -21,20 +19,27 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.secret;
+package org.symphonyoss.s2.fugue.store;
 
-import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
-import org.symphonyoss.s2.common.exception.NoSuchObjectException;
-import org.symphonyoss.s2.fugue.naming.CredentialName;
-
-public interface ISecretManager
+/**
+ * Admin variation of IFugueObjectStore which can be used to bootstrap an environment.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public interface IFugueObjectStoreAdmin extends IFugueObjectStoreWritable
 {
-
-  IImmutableJsonDomNode getSecret(CredentialName secretName) throws NoSuchObjectException;
-
-  void putSecret(CredentialName name, IImmutableJsonDomNode secret);
+  /**
+   * Create all tables.
+   * 
+   * @param dryRun If true then don't change anything
+   */
+  void createTables(boolean dryRun);
   
-  @Deprecated
-  void putSecret(CredentialName name, String secret);
-
+  /**
+   * Delete all tables.
+   * 
+   * @param dryRun If true then don't change anything
+   */
+  void deleteTables(boolean dryRun);
 }

@@ -35,33 +35,30 @@ import com.google.common.collect.ImmutableMap.Builder;
 
 public class NameFactory implements INameFactory
 {
-  protected final String CONFIG = "config";
-  protected final String FUGUE  = "fugue";
-  
+  protected final String                     CONFIG = "config";
+  protected final String                     FUGUE  = "fugue";
 
-  private final String globalNamePrefix_;
-  private final String environmentType_;
-  private final String environmentId_;
-  private final String realmId_;
-  private final String regionId_;
-  private final String tenantId_;
-  private final String serviceId_;
-  private final ImmutableMap<String, String>  tags_;
+  private final String                       globalNamePrefix_;
+  private final String                       environmentType_;
+  private final String                       environmentId_;
+  private final String                       regionId_;
+  private final String                       podName_;
+  private final String                       serviceId_;
+  private final ImmutableMap<String, String> tags_;
   
   
   public NameFactory(IGlobalConfiguration config)
   {
-    this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRealmId(), config.getRegionId(), config.getTenantId(), config.getServiceId());
+    this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRegionId(), config.getPodName(), config.getServiceId());
   }
 
-  public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String realmId, String regionId, String tenantId, String serviceId)
+  public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String regionId, String podName, String serviceId)
   {
     globalNamePrefix_ = globalNamePrefix;
     environmentType_ = environmentType;
     environmentId_ = environmentId;
-    realmId_ = realmId;
     regionId_ = regionId;
-    tenantId_ = tenantId;
+    podName_ = podName;
     serviceId_ = serviceId;
     tags_ = createTags();
   }
@@ -71,9 +68,8 @@ public class NameFactory implements INameFactory
     globalNamePrefix_ = nameFactory.getGlobalNamePrefix();
     environmentType_ = nameFactory.getEnvironmentType();
     environmentId_ = nameFactory.getEnvironmentId();
-    realmId_ = nameFactory.getRealmId();
     regionId_ = nameFactory.getRegionId();
-    tenantId_ = nameFactory.getTenantId();
+    podName_ = nameFactory.getPodName();
     serviceId_ = nameFactory.getServiceId();
     tags_ = createTags();
   }
@@ -81,19 +77,19 @@ public class NameFactory implements INameFactory
   @Override
   public INameFactory withRegionId(String regionId)
   {
-    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, realmId_, regionId, tenantId_, serviceId_);
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId, podName_, serviceId_);
   }
   
   @Override
   public INameFactory withTenantId(String tenantId)
   {
-    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, realmId_, regionId_, tenantId, serviceId_);
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, tenantId, serviceId_);
   }
   
   @Override
   public INameFactory withGlobalNamePrefix(String globalNamePrefix)
   {
-    return new NameFactory(globalNamePrefix, environmentType_, environmentId_, realmId_, regionId_, tenantId_, serviceId_);
+    return new NameFactory(globalNamePrefix, environmentType_, environmentId_, regionId_, podName_, serviceId_);
   }
 
   private ImmutableMap<String, String> createTags()
@@ -102,9 +98,8 @@ public class NameFactory implements INameFactory
     
     putIfNotNull(builder, "FUGUE_ENVIRONMENT_TYPE", environmentType_);
     putIfNotNull(builder, "FUGUE_ENVIRONMENT",      environmentId_);
-    putIfNotNull(builder, "FUGUE_REALM",            realmId_);
     putIfNotNull(builder, "FUGUE_REGION",           regionId_);
-    putIfNotNull(builder, "FUGUE_TENANT",           tenantId_);
+    putIfNotNull(builder, "FUGUE_TENANT",           podName_);
     
     return builder.build();
   }
@@ -113,6 +108,12 @@ public class NameFactory implements INameFactory
   {
       if(value != null)
         builder.put(name, value);
+  }
+
+  private void putIfNotNull(Builder<String, String> builder, String name, Integer value)
+  {
+      if(value != null)
+        builder.put(name, value.toString());
   }
 
   @Override
@@ -134,30 +135,24 @@ public class NameFactory implements INameFactory
   }
   
   @Override
-  public String getRealmId()
-  {
-    return realmId_;
-  }
-  
-  @Override
   public String getRegionId()
   {
     return regionId_;
   }
   
   @Override
-  public String getTenantId()
+  public String getPodName()
   {
-    return tenantId_;
+    return podName_;
   }
-  
+
   @Override
   public String getServiceId()
   {
     return serviceId_;
   }
 
-  private @Nonnull String require(String value, String name)
+  private @Nonnull <T> T require(T value, String name)
   {
     if(value == null)
       throw new IllegalStateException(name + " is not present.");
@@ -178,12 +173,6 @@ public class NameFactory implements INameFactory
   }
   
   @Override
-  public String getRequiredRealmId()
-  {
-    return require(realmId_, "realmId");
-  }
-  
-  @Override
   public String getRequiredRegionId()
   {
     return require(regionId_, "regionId");
@@ -192,7 +181,7 @@ public class NameFactory implements INameFactory
   @Override
   public String getRequiredTenantId()
   {
-    return require(tenantId_, "tenantId");
+    return require(podName_, "tenantId");
   }
   
   @Override
@@ -216,15 +205,15 @@ public class NameFactory implements INameFactory
   @Override
   public ServiceName  getServiceName()
   {
-    return createServiceName(serviceId_, tenantId_, 
-        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getRequiredServiceId());
+    return createServiceName(serviceId_, podName_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getRequiredServiceId());
   }
   
   @Override
   public ServiceName  getRegionalServiceName()
   {
-    return createServiceName(serviceId_, tenantId_, 
-        getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, tenantId_, getRequiredServiceId());
+    return createServiceName(serviceId_, podName_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, podName_, getRequiredServiceId());
   }
   
   @Override
@@ -237,8 +226,8 @@ public class NameFactory implements INameFactory
   @Override
   public ServiceName  getServiceItemName(String name)
   {
-    return createServiceName(serviceId_, tenantId_, 
-        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getRequiredServiceId(), name);
+    return createServiceName(serviceId_, podName_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getRequiredServiceId(), name);
   }
   
   @Override
@@ -251,14 +240,14 @@ public class NameFactory implements INameFactory
   @Deprecated
   public TableName  getObsoleteTableName(String tableId)
   {
-    return createTableName(serviceId_, tableId, environmentType_, environmentId_, realmId_, tableId);
+    return createTableName(serviceId_, tableId, environmentType_, environmentId_, tableId);
   }
   
   @Override
   @Deprecated
   public TopicName  getObsoleteTopicName(String topicId)
   {
-    return createTopicName(getServiceId(), true, topicId, environmentType_, environmentId_, realmId_, topicId);
+    return createTopicName(getServiceId(), true, topicId, environmentType_, environmentId_, topicId);
   }
   
   @Override
@@ -291,7 +280,7 @@ public class NameFactory implements INameFactory
   {
     return createTopicName(getServiceId(), true, topicId, 
         getGlobalNamePrefix(), environmentType_, environmentId_,
-        getServiceId(), getTenantId(),
+        getServiceId(), getPodName(),
         topicId);
   }
 
@@ -377,7 +366,7 @@ public class NameFactory implements INameFactory
   public SubscriptionName getSubscriptionName(TopicName topicName, String subscriptionId)
   {
     return createSubscriptionName(topicName, getServiceId(), subscriptionId,
-        getGlobalNamePrefix(), environmentType_, environmentId_, tenantId_, getServiceId(), subscriptionId, topicName.getTopicId(), topicName.getServiceId());
+        getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getServiceId(), subscriptionId, topicName.getTopicId(), topicName.getServiceId());
   }
 
   @Override

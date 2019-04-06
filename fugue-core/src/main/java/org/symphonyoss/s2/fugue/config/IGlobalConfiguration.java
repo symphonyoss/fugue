@@ -37,12 +37,11 @@ public interface IGlobalConfiguration extends IConfiguration
 
   String getEnvironmentId();
 
-  @Deprecated
-  String getRealmId();
-
   String getRegionId();
 
-  String getTenantId();
+  String getPodName();
+  
+  Integer getPodId();
 
   String getServiceId();
 
