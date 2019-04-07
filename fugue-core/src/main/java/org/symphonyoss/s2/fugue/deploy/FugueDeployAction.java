@@ -32,5 +32,5 @@ package org.symphonyoss.s2.fugue.deploy;
 @SuppressWarnings("javadoc")
 public enum FugueDeployAction
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRealm, CreateRegion, DeployConfig, Deploy, DeployStation;
+  CreateEnvironmentType, CreateEnvironment, CreateRegion, DeployConfig, Deploy, DeployStation;
 }

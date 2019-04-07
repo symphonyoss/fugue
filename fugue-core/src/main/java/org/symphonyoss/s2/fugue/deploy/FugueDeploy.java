@@ -160,7 +160,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   private Map<String, String> policyTrust_;
   
-  protected abstract DeploymentContext  createContext(String tenantId, INameFactory nameFactory);
+  protected abstract DeploymentContext  createContext(String podName, INameFactory nameFactory);
   
   protected abstract void validateAccount(IJsonObject<?> config);
   
@@ -198,7 +198,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   }
   
   protected abstract INameFactory createNameFactory(String environmentType, String environmentId, String regionId,
-      String tenantId, String serviceId);
+      String podName, String serviceId);
 
   private void setAction(String v)
   {
@@ -357,7 +357,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     log_.info("REGION           = " + region_);
     
     for(int i=0 ; i<tenantContextList_.size() ; i++)
-      log_.info(String.format("TENANT[%3d]      = %s", i, tenantContextList_.get(i).getTenantId()));
+      log_.info(String.format("TENANT[%3d]      = %s", i, tenantContextList_.get(i).getPodName()));
     
     populateTags(tags_);
     
@@ -529,21 +529,21 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         context.setPolicies(singleTenantPolicies);
         
-        String tenantId = context.getTenantId();
+        String podName = context.getPodName();
         
         batch.submit(() ->
         {
           
-          ImmutableJsonObject tenantIdConfig         = createIdConfig(tenantId);
-          ImmutableJsonObject tenantConfig           = fetchTenantConfig(tenantId);
+          ImmutableJsonObject tenantIdConfig         = createIdConfig(podName);
+          ImmutableJsonObject tenantConfig           = fetchTenantConfig(podName);
           ImmutableJsonObject singleTenantIdConfig   = overlay(
               multiTenantDefaults,
               environmentConfig,
               tenantConfig,
               multiTenantOverrides,
               tenantIdConfig);
-          ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, tenantId);
-          ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, tenantId);
+          ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, podName);
+          ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, podName);
           
           /*
            * At this point the defaults and environment config have all been merged in, we now just need to overlay the 
@@ -603,9 +603,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     return new ExecutorBatch<Runnable>(executor_); 
   }
 
-  private ImmutableJsonObject fetchTenantConfig(String tenantId)
+  private ImmutableJsonObject fetchTenantConfig(String podName)
   {
-    String  dir = CONFIG + "/" + POD + "/" + tenantId;
+    String  dir = CONFIG + "/" + POD + "/" + podName;
     try
     {
       MutableJsonObject tenantConfig = fetchSpecificTenantConfig(dir);
@@ -733,26 +733,26 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
 
-  private ImmutableJsonObject fetchSingleTenantDefaults(IJsonObject<?> idConfig, String tenantId)
+  private ImmutableJsonObject fetchSingleTenantDefaults(IJsonObject<?> idConfig, String podName)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayDefaults(tenantId, config);
+    provider_.overlayDefaults(podName, config);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayDefaults(tenantId, config);
+      helper.overlayDefaults(podName, config);
     
     return config.immutify();
   }
   
-  private ImmutableJsonObject fetchSingleTenantOverrides(IJsonObject<?> idConfig, String tenantId)
+  private ImmutableJsonObject fetchSingleTenantOverrides(IJsonObject<?> idConfig, String podName)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayOverrides(tenantId, config);
+    provider_.overlayOverrides(podName, config);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayOverrides(tenantId, config);
+      helper.overlayOverrides(podName, config);
     
     return config.immutify();
   }
@@ -799,7 +799,7 @@ public abstract class FugueDeploy extends CommandLineHandler
             environment_      = station.getRequiredString(ENVIRONMENT);
             region_           = station.getRequiredString(REGION);
             
-            IJsonDomNode tenantsNode = station.get("tenants");
+            IJsonDomNode tenantsNode = station.get("podNames");
             
             if(tenantsNode != null)
             {
@@ -809,10 +809,10 @@ public abstract class FugueDeploy extends CommandLineHandler
                 {
                   if(tenantNode instanceof IStringProvider)
                   {
-                     String tenantId = ((IStringProvider)tenantNode).asString();
+                     String podName = ((IStringProvider)tenantNode).asString();
                    
-                     tenantContextList_.add(createContext(tenantId,
-                        createNameFactory(environmentType_, environment_, region_, tenantId, service_)));
+                     tenantContextList_.add(createContext(podName,
+                        createNameFactory(environmentType_, environment_, region_, podName, service_)));
                   }
                   else
                   {
@@ -900,7 +900,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     private static final String FUGUE_CONFIG = "FUGUE_CONFIG";
     
-    private final String                                   tenantId_;
+    private final String                                   podName_;
     private final INameFactory                             nameFactory_;
 
     private Map<String, String>                            policies_;
@@ -911,9 +911,9 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     private Map<ContainerType, Map<String, JsonObject<?>>> containerMap_;
 
-    protected DeploymentContext(String tenantId, INameFactory nameFactory)
+    protected DeploymentContext(String podName, INameFactory nameFactory)
     {
-      tenantId_ = tenantId;
+      podName_ = podName;
       nameFactory_ = nameFactory;
     }
 
@@ -944,9 +944,9 @@ public abstract class FugueDeploy extends CommandLineHandler
       return nameFactory_;
     }
 
-    protected String getTenantId()
+    protected String getPodName()
     {
-       return tenantId_;
+       return podName_;
    }
 
     protected String getBuildId()

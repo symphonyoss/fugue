@@ -324,9 +324,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
   @Override
-  protected DeploymentContext createContext(String tenantId, INameFactory nameFactory)
+  protected DeploymentContext createContext(String podName, INameFactory nameFactory)
   {
-    return new AwsDeploymentContext(tenantId, nameFactory);
+    return new AwsDeploymentContext(podName, nameFactory);
   }
 
   private String getAwsRegion()
@@ -1091,9 +1091,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
     private String listenerArn_;
     
-    protected AwsDeploymentContext(String tenantId, INameFactory nameFactory)
+    protected AwsDeploymentContext(String podName, INameFactory nameFactory)
     {
-      super(tenantId, nameFactory);
+      super(podName, nameFactory);
     }
 
     @Override
@@ -1346,24 +1346,21 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       try
       {
-        String  tenantId        = getTenantId();
-//        Name    targetGroupName = getNameFactory().getServiceItemName(name);
-        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
-        
-//        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-        
-        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+        String hostName;
+
+        if(isPrimaryEnvironment() && getPodName() != null)
+        {
+          String  tenantId        = getConfig().getRequiredObject("id").getRequiredString("podId"); 
+
+          hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+        }
+        else
+        {
+          hostName = null;
+        }
         
         String regionalHostName = getNameFactory()
             .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-//        String wildCardHostName = getNameFactory()
-//            .withRegionId("*")
-//            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-        
-//        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
         
         createR53RecordSet(hostName, regionalHostName, loadBalancer_);
         
@@ -1700,7 +1697,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
       }
       
-      tagIfNotNull(tags, "FUGUE_TENANT", getTenantId());
+      tagIfNotNull(tags, "FUGUE_TENANT", getPodName());
       
       if(!tags.isEmpty())
       {
@@ -1848,7 +1845,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                 .withTargetGroupArn(targetGroupArn)
                 .withType(ActionTypeEnum.Forward)
                 )
-            .withPriority(priority)
+            .withPriority(priority++)
             );
         
         log_.info("Created rule " + createRuleResult.getRules().get(0).getRuleArn() + " for host " + host + " for non-existant path " + path);
@@ -2167,5 +2164,4 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return loadBalancer;
     }
   }
-
 }
