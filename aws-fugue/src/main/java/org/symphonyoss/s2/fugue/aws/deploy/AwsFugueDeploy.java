@@ -359,9 +359,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
   // Need to figure out how to do templates for this...
-//  private void registerTaskDef(String name, int port, String healthCheckPath, String tenantId)
+//  private void registerTaskDef(String name, int port, String healthCheckPath, String podId)
 //  {
-//    Name logGroupName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), tenantId, getService());
+//    Name logGroupName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), podId, getService());
 //    
 //    createLogGroupIfNecessary(logGroupName.toString());
 //    
@@ -396,13 +396,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    log_.info("LogGroup " + logGroupName + " created.");
 //  }
 
-  private String getServiceHostName(String tenantId)
+  private String getServiceHostName(String podId)
   {
-//    return new Name(getEnvironmentType(), getEnvironment(), "any", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-    if(tenantId == null)
+//    return new Name(getEnvironmentType(), getEnvironment(), "any", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+    if(podId == null)
       return getService().toLowerCase() + "." + getDnsSuffix();
     else
-      return (tenantId + "-" + getService()).toString().toLowerCase() + "." + getDnsSuffix();
+      return (podId + "-" + getService()).toString().toLowerCase() + "." + getDnsSuffix();
   }
 
   private void getOrCreateCluster()
@@ -1179,7 +1179,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           checkAccessKey(name, userName, keys, null, true);
         }
 //        CredentialName  name = 
-//            getNameFactory().getCredentialName(tenantId, owner)
+//            getNameFactory().getCredentialName(podId, owner)
 //            new CredentialName("fugue-" + getEnvironmentType(),
 //          null, // environment
 //          null, // realm
@@ -1350,9 +1350,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
         if(isPrimaryEnvironment() && getPodName() != null)
         {
-          String  tenantId        = getConfig().getRequiredObject("id").getRequiredString("podId"); 
+          String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
 
-          hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+          hostName = isPrimaryEnvironment() ? getServiceHostName(podId) : null;
         }
         else
         {
@@ -1380,13 +1380,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       try
       {
-//        String  tenantId        = getTenantId();
+//        String  podId        = getTenantId();
         Name    targetGroupName = getNameFactory().getServiceItemName(name);
-//        //new Name(getEnvironmentType(), getEnvironment(), tenantId, getService(), name);
+//        //new Name(getEnvironmentType(), getEnvironment(), podId, getService(), name);
 //        
         String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
 //        
-//        String hostName = isPrimaryEnvironment() ? getServiceHostName(tenantId) : null;
+//        String hostName = isPrimaryEnvironment() ? getServiceHostName(podId) : null;
 //        
         String regionalHostName = getNameFactory()
             .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
@@ -1395,7 +1395,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withRegionId("*")
             .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
         
-//        //new Name(getEnvironmentType(), getEnvironment(), "*", tenantId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+//        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
 //        
         configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
 //        
@@ -1403,7 +1403,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         getOrCreateCluster();
         
-  //      registerTaskDef(name, port, healthCheckPath, tenantId);
+  //      registerTaskDef(name, port, healthCheckPath, podId);
         
         createService(regionalHostName, targetGroupArn, name, port, instances, paths);
       }
@@ -1941,7 +1941,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void createTaskDef(String name, int port, Collection<String> paths, String healthCheckPath)
     {
-//      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
+//      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
 //      boolean create      = true;
 //      
 //      ContainerDefinition containerDefinition = new ContainerDefinition()
@@ -1957,7 +1957,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       log_.info("Cluster name is " + clusterName_);
       
-      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), tenantId, name);
+      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
       boolean create      = true;
       
       DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
