@@ -32,5 +32,26 @@ package org.symphonyoss.s2.fugue.deploy;
 @SuppressWarnings("javadoc")
 public enum FugueDeployAction
 {
-  CreateEnvironmentType, CreateEnvironment, CreateRegion, DeployConfig, Deploy, DeployStation;
+  
+  CreateEnvironmentType(  true,  false, true,  false),
+  CreateEnvironment(      true,  false, true,  false),
+  CreateRegion(           true,  false, true,  false),
+  DeployConfig(           true,  false, true,  false),
+  Deploy(                 true,  true, true,  false),
+  Undeploy(               false,  true, false,  true),
+  UndeployAll(            false,  true, false,  true);
+  
+  public final boolean  processConfig_;
+  public final boolean  processContainers_;
+  public final boolean  isDeploy_;
+  public final boolean  isUndeploy_;
+  private FugueDeployAction(boolean processConfig, boolean processContainers, boolean isDeploy, boolean isUndeploy)
+  {
+    processConfig_ = processConfig;
+    processContainers_ = processContainers;
+    isDeploy_ = isDeploy;
+    isUndeploy_ = isUndeploy;
+  }
+  
+  
 }

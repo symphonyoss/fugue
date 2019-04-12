@@ -56,6 +56,7 @@ import org.symphonyoss.s2.fugue.aws.secret.AwsSecretManager;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
+import org.symphonyoss.s2.fugue.deploy.FugueDeployAction;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
@@ -66,16 +67,23 @@ import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEvents;
 import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEventsClientBuilder;
 import com.amazonaws.services.cloudwatchevents.model.EcsParameters;
 import com.amazonaws.services.cloudwatchevents.model.LaunchType;
+import com.amazonaws.services.cloudwatchevents.model.ListTargetsByRuleRequest;
+import com.amazonaws.services.cloudwatchevents.model.ListTargetsByRuleResult;
 import com.amazonaws.services.cloudwatchevents.model.PutRuleRequest;
 import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
+import com.amazonaws.services.cloudwatchevents.model.RemoveTargetsRequest;
 import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
 import com.amazonaws.services.ecs.model.CreateServiceResult;
+import com.amazonaws.services.ecs.model.DeleteServiceRequest;
+import com.amazonaws.services.ecs.model.DeregisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
+import com.amazonaws.services.ecs.model.ListTaskDefinitionsRequest;
+import com.amazonaws.services.ecs.model.ListTaskDefinitionsResult;
 import com.amazonaws.services.ecs.model.Service;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
 import com.amazonaws.services.ecs.model.UpdateServiceResult;
@@ -131,7 +139,10 @@ import com.amazonaws.services.identitymanagement.model.CreatePolicyVersionReques
 import com.amazonaws.services.identitymanagement.model.CreateRoleRequest;
 import com.amazonaws.services.identitymanagement.model.CreateUserRequest;
 import com.amazonaws.services.identitymanagement.model.DeleteAccessKeyRequest;
+import com.amazonaws.services.identitymanagement.model.DeletePolicyRequest;
 import com.amazonaws.services.identitymanagement.model.DeletePolicyVersionRequest;
+import com.amazonaws.services.identitymanagement.model.DeleteRoleRequest;
+import com.amazonaws.services.identitymanagement.model.DetachRolePolicyRequest;
 import com.amazonaws.services.identitymanagement.model.GetGroupRequest;
 import com.amazonaws.services.identitymanagement.model.GetPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.GetPolicyResult;
@@ -143,6 +154,7 @@ import com.amazonaws.services.identitymanagement.model.ListAccessKeysRequest;
 import com.amazonaws.services.identitymanagement.model.ListAccessKeysResult;
 import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListAttachedRolePoliciesRequest;
+import com.amazonaws.services.identitymanagement.model.ListAttachedRolePoliciesResult;
 import com.amazonaws.services.identitymanagement.model.ListGroupsForUserRequest;
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsRequest;
 import com.amazonaws.services.identitymanagement.model.ListPolicyVersionsResult;
@@ -153,6 +165,7 @@ import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyReq
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
+import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
@@ -962,6 +975,45 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   
 
+  private void deletePolicy(Name name)
+  {
+    String policyName       = name.append(POLICY).toString();
+    String policyArn        = getPolicyArn(policyName);
+    
+    try
+    {
+      iam_.getPolicy(new GetPolicyRequest().withPolicyArn(policyArn));
+      
+      ListPolicyVersionsResult versions = iam_.listPolicyVersions(new ListPolicyVersionsRequest()
+          .withPolicyArn(policyArn));
+      
+      for(PolicyVersion version : versions.getVersions())
+      {
+        if(version.getIsDefaultVersion())
+        {
+          log_.debug("Found existing default policy version " + version.getVersionId());
+        }
+        else
+        {
+          iam_.deletePolicyVersion(new DeletePolicyVersionRequest()
+              .withPolicyArn(policyArn)
+              .withVersionId(version.getVersionId()));
+          
+          log_.debug("Deleting policy version " + version.getVersionId());
+        }
+      }
+      
+      iam_.deletePolicy(new DeletePolicyRequest()
+        .withPolicyArn(policyArn));
+      
+      log_.info("Deleted policy " + policyArn);
+    }
+    catch(NoSuchEntityException e)
+    {
+      log_.info("Policy " + policyArn + " does not exist.");
+    }
+  }
+
   private String createPolicy(Name name, String templateOutput)
   {
     String policyName       = name.append(POLICY).toString();
@@ -1283,6 +1335,48 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
+    protected void deleteRole(String roleName)
+    {
+      Name name = getNameFactory().getServiceItemName(roleName);
+      
+      deleteRole(name);
+    }
+        
+    private void deleteRole(Name name)
+    {
+      String roleName       = name.append(ROLE).toString();
+      
+      try
+      {
+        iam_.getRole(new GetRoleRequest()
+          .withRoleName(roleName))
+          .getRole();
+        
+        ListAttachedRolePoliciesResult list = iam_.listAttachedRolePolicies(new ListAttachedRolePoliciesRequest()
+            .withRoleName(roleName));
+        
+        for(AttachedPolicy policy : list.getAttachedPolicies())
+        {
+          iam_.detachRolePolicy(new DetachRolePolicyRequest()
+              .withRoleName(roleName)
+              .withPolicyArn(policy.getPolicyArn()));
+        }
+        
+        DeleteRoleRequest request = new DeleteRoleRequest()
+            .withRoleName(roleName);
+        
+        iam_.deleteRole(request
+            );
+        
+        log_.debug("Deleted role " + roleName );
+      }
+      catch(NoSuchEntityException e)
+      {
+        log_.info("Role " + roleName + " does not exist.");
+      }
+    }
+
+    @Override
     protected void saveConfig()
     {
       String              name        = getNameFactory().getServiceName().toString();
@@ -1335,6 +1429,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       s3Client.putObject(request);
     }
+
+    @Override
+    protected void deleteConfig()
+    {
+      String              name        = getNameFactory().getServiceName().toString();
+      String              bucketName  = environmentTypeConfigBuckets_.get(getAwsRegion());
+      String              key         = CONFIG + "/" + name + DOT_JSON;
+      
+      
+      log_.info("Deleting config from region: " + getAwsRegion() + " bucket: " + bucketName + " key: " + key);
+      
+      AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+          .withRegion(getAwsRegion())
+          .build();
+    
+      try
+      {
+        s3Client.deleteObject(bucketName, key);
+      }
+      catch(AmazonS3Exception e)
+      {
+        log_.error("Failed to delete config", e);
+      }
+    }
     
     private String createPolicyFromResource(Name name, String fileName)
     {
@@ -1380,32 +1498,33 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       try
       {
-//        String  podId        = getTenantId();
-        Name    targetGroupName = getNameFactory().getServiceItemName(name);
-//        //new Name(getEnvironmentType(), getEnvironment(), podId, getService(), name);
-//        
-        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-//        
-//        String hostName = isPrimaryEnvironment() ? getServiceHostName(podId) : null;
-//        
-        String regionalHostName = getNameFactory()
-            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-        String wildCardHostName = getNameFactory()
-            .withRegionId("*")
-            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-//        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-//        
-        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
-//        
-//        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
-        
-        getOrCreateCluster();
-        
-  //      registerTaskDef(name, port, healthCheckPath, podId);
-        
-        createService(regionalHostName, targetGroupArn, name, port, instances, paths);
+        if(action_.isDeploy_)
+        {
+          Name    targetGroupName = getNameFactory().getServiceItemName(name);
+          String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+          String regionalHostName = getNameFactory()
+              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+          
+          String wildCardHostName = getNameFactory()
+              .withRegionId("*")
+              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+          
+  //        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+  //        
+          configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+  //        
+  //        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+          
+          getOrCreateCluster();
+          
+    //      registerTaskDef(name, port, healthCheckPath, podId);
+          
+          createService(targetGroupArn, name, port, instances, paths);
+        }
+        else
+        {
+          deleteService(name);
+        }
       }
       catch(RuntimeException e)
       {
@@ -1423,31 +1542,96 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       Name baseName     = serviceName.append("schedule");
       Name ruleName     = baseName.append("rule");
 
-      String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
-      String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
+      if(action_.isDeploy_)
+      {
+        String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
+        String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
+        
+        cweClient_.putRule(new PutRuleRequest()
+            .withName(ruleName.toString())
+            .withScheduleExpression("cron(" + schedule + ")")
+            .withState(RuleState.ENABLED)
+            );
+  
+        PutTargetsRequest request = new PutTargetsRequest()
+            .withTargets(new Target()
+                .withArn(getClusterArn())
+                .withRoleArn(roleArn)
+                .withEcsParameters(new EcsParameters()
+                    .withTaskCount(1)
+                    .withTaskDefinitionArn(getTaskDefinitionArn(serviceName.toString()))
+                    .withLaunchType(LaunchType.EC2)
+                    .withGroup(name)
+                    )
+                .withId(name)
+                )
+            .withRule(ruleName.toString()
+            );
+  
+        cweClient_.putTargets(request);
+      }
+      if(action_.isUndeploy_)
+      {
+        // undeploy
+        try
+        {
+          ListTargetsByRuleResult listResponse = cweClient_.listTargetsByRule(new ListTargetsByRuleRequest()
+              .withRule(ruleName.toString()));
+          
+          RemoveTargetsRequest  removeTargetsRequest  = new RemoveTargetsRequest().withRule(ruleName.toString());
+          Set<String>           targetArns            = new HashSet<>();
+          
+          for(Target target : listResponse.getTargets())
+          { 
+  
+            removeTargetsRequest.withIds(target.getId());
+            
+            targetArns.add(target.getEcsParameters().getTaskDefinitionArn());
+          }
+          
+          deleteTaskDefinitions(targetArns);
+          
+          
+          cweClient_.removeTargets(removeTargetsRequest);
+          
+          String n = ruleName.toString();
+          
+          cweClient_.deleteRule(new com.amazonaws.services.cloudwatchevents.model.DeleteRuleRequest()
+              .withName(ruleName.toString())
+              );
+        }
+        catch(com.amazonaws.services.cloudwatchevents.model.ResourceNotFoundException e)
+        {
+          log_.info("Rule " + ruleName + " does not exist.");
+        }
+        
+        
+        deleteRole(baseName);
+        deletePolicy(baseName);
+      }
+    }
+
+    private void deleteTaskDefinitions(Iterable<String> targetArns)
+    {
+      Set<String> taskDefFamilies = new HashSet<>();
       
-      cweClient_.putRule(new PutRuleRequest()
-          .withName(ruleName.toString())
-          .withScheduleExpression("cron(" + schedule + ")")
-          .withState(RuleState.ENABLED)
-          );
+      for(String targetArn : targetArns)
+      {
+        taskDefFamilies.add(stripAfter(stripBefore(targetArn, '/'), ':'));
+      }
 
-      PutTargetsRequest request = new PutTargetsRequest()
-          .withTargets(new Target()
-              .withArn(getClusterArn())
-              .withRoleArn(roleArn)
-              .withEcsParameters(new EcsParameters()
-                  .withTaskCount(1)
-                  .withTaskDefinitionArn(getTaskDefinitionArn(serviceName.toString()))
-                  .withLaunchType(LaunchType.EC2)
-                  .withGroup(name)
-                  )
-              .withId(name)
-              )
-          .withRule(ruleName.toString()
-          );
-
-      cweClient_.putTargets(request);
+      for(String taskDefFamily : taskDefFamilies)
+      {
+        ListTaskDefinitionsResult list = ecsClient_.listTaskDefinitions(new ListTaskDefinitionsRequest()
+            .withFamilyPrefix(taskDefFamily));
+        
+        for(String taskDefArn : list.getTaskDefinitionArns())
+        {
+          log_.info("Deregistering task definition " + taskDefArn + "...");
+          ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
+              .withTaskDefinition(taskDefArn));
+        }
+      }
     }
 
     @Override
@@ -1459,49 +1643,69 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String  key           = LAMBDA + "/" + getNameFactory().getServiceId() + "/" +
                               name + "-" + getBuildId() + DOT_JAR;
 
-      try
+      if(action_.isDeploy_)
       {
-        lambdaClient_.getFunction(new GetFunctionRequest()
-            .withFunctionName(functionName.toString())
-            );
-        
-        log_.info("Lambda function " + functionName + " already exists, updating...");
-        lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
-            .withFunctionName(functionName.toString())
-            .withS3Bucket(bucketName)
-            .withS3Key(key)
-            );
-        
-        lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
-            .withFunctionName(functionName.toString())
-            .withHandler(handler)
-            .withMemorySize(memorySize)
-            .withTimeout(timeout)
-            .withEnvironment(new Environment()
-                .withVariables(variables))
-            .withRole(getRoleArn(roleName))
-            .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
-            );
+        try
+        {
+          lambdaClient_.getFunction(new GetFunctionRequest()
+              .withFunctionName(functionName.toString())
+              );
+          
+          log_.info("Lambda function " + functionName + " already exists, updating...");
+          lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
+              .withFunctionName(functionName.toString())
+              .withS3Bucket(bucketName)
+              .withS3Key(key)
+              );
+          
+          lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
+              .withFunctionName(functionName.toString())
+              .withHandler(handler)
+              .withMemorySize(memorySize)
+              .withTimeout(timeout)
+              .withEnvironment(new Environment()
+                  .withVariables(variables))
+              .withRole(getRoleArn(roleName))
+              .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
+              );
+        }
+        catch(ResourceNotFoundException e)
+        {
+          log_.info("Lambda function " + functionName + " does not exist, creating...");
+          
+          lambdaClient_.createFunction(new CreateFunctionRequest()
+              .withFunctionName(functionName.toString())
+              .withHandler(handler)
+              .withMemorySize(memorySize)
+              .withTimeout(timeout)
+              .withEnvironment(new Environment()
+                  .withVariables(variables))
+              .withRole(getRoleArn(roleName))
+              .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
+              .withTags(getTags())
+              .withCode(new FunctionCode()
+                  .withS3Bucket(bucketName)
+                  .withS3Key(key)
+                  )
+              );
+        }
       }
-      catch(ResourceNotFoundException e)
+      if(action_.isUndeploy_)
       {
-        log_.info("Lambda function " + functionName + " does not exist, creating...");
-        
-        lambdaClient_.createFunction(new CreateFunctionRequest()
-            .withFunctionName(functionName.toString())
-            .withHandler(handler)
-            .withMemorySize(memorySize)
-            .withTimeout(timeout)
-            .withEnvironment(new Environment()
-                .withVariables(variables))
-            .withRole(getRoleArn(roleName))
-            .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
-            .withTags(getTags())
-            .withCode(new FunctionCode()
-                .withS3Bucket(bucketName)
-                .withS3Key(key)
-                )
-            );
+        try
+        {
+          lambdaClient_.getFunction(new GetFunctionRequest()
+              .withFunctionName(functionName.toString())
+              );
+          
+          log_.info("Deleting lambda function " + functionName + "...");
+          lambdaClient_.deleteFunction(new DeleteFunctionRequest()
+              .withFunctionName(functionName.toString()));
+        }
+        catch(ResourceNotFoundException e)
+        {
+          log_.info("Lambda function " + functionName + " does not exist.");
+        }
       }
     }
 
@@ -1534,7 +1738,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       if(host != null)
         createR53RecordSet(host, regionalHost, true);
       
-      createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
+      if(loadBalancer != null)
+        createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
     }
     
     private void createR53RecordSet(String source, String target, boolean multiValue)
@@ -1581,68 +1786,140 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           break;
         }
       }
-      if(ok)
+      
+      
+      if(action_ == FugueDeployAction.Deploy)
       {
-        log_.info("R53 record set for " + source + " to " + target + " exists, nothing to do here.");
+        if(ok)
+        {
+          log_.info("R53 record set for " + source + " to " + target + " exists, nothing to do here.");
+        }
+        else
+        {
+          log_.info("Creating R53 record set for " + source + " to " + target + "...");
+          
+          ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
+              .withName(source)
+              .withType(RRType.CNAME)
+              .withTTL(300L)
+              .withResourceRecords(new ResourceRecord()
+                  .withValue(target)
+                  )
+              ;
+          
+          if(multiValue)
+          {
+            resourceRecordSet
+              .withWeight(1L)
+              .withSetIdentifier(setIdentifier)
+              ;
+          }
+          
+          RuntimeException savedException = new RuntimeException("No saved exception");
+          
+          for(int i=0 ; i<10 ; i++)
+          {
+            try
+            {
+              ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
+                .withHostedZoneId(zoneId)
+                .withChangeBatch(new ChangeBatch()
+                    .withChanges(new Change()
+                        .withAction(ChangeAction.UPSERT)
+                        .withResourceRecordSet(resourceRecordSet)
+                        )
+                    )
+                );
+              
+              return;
+            }
+            catch(PriorRequestNotCompleteException e)
+            {
+              savedException = e;
+              log_.info("Route53 request still in progress", e);
+              
+              try
+              {
+                Thread.sleep(5000);
+              }
+              catch (InterruptedException e1)
+              {
+                log_.error("Interrupted", e1);
+                
+                throw e;
+              }
+            }
+          }
+          log_.error("Failed to create resource sets", savedException);
+          throw savedException;
+        }
       }
       else
       {
-        log_.info("Creating R53 record set for " + source + " to " + target + "...");
-        
-        ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
-            .withName(source)
-            .withType(RRType.CNAME)
-            .withTTL(300L)
-            .withResourceRecords(new ResourceRecord()
-                .withValue(target)
-                )
-            ;
-        
-        if(multiValue)
+        if(ok)
         {
-          resourceRecordSet
-            .withWeight(1L)
-            .withSetIdentifier(setIdentifier)
-            ;
-        }
-        
-        RuntimeException savedException = new RuntimeException("No saved exception");
-        
-        for(int i=0 ; i<10 ; i++)
-        {
-          try
-          {
-            ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
-              .withHostedZoneId(zoneId)
-              .withChangeBatch(new ChangeBatch()
-                  .withChanges(new Change()
-                      .withAction(ChangeAction.UPSERT)
-                      .withResourceRecordSet(resourceRecordSet)
-                      )
+          log_.info("Deleting R53 record set for " + source + " to " + target + "...");
+          
+          ResourceRecordSet resourceRecordSet = new ResourceRecordSet()
+              .withName(source)
+              .withType(RRType.CNAME)
+              .withTTL(300L)
+              .withResourceRecords(new ResourceRecord()
+                  .withValue(target)
                   )
-              );
-            
-            return;
-          }
-          catch(PriorRequestNotCompleteException e)
+              ;
+          
+          if(multiValue)
           {
-            savedException = e;
-            log_.info("Route53 request still in progress", e);
-            
+            resourceRecordSet
+              .withWeight(1L)
+              .withSetIdentifier(setIdentifier)
+              ;
+          }
+          
+          RuntimeException savedException = new RuntimeException("No saved exception");
+          
+          for(int i=0 ; i<10 ; i++)
+          {
             try
             {
-              Thread.sleep(5000);
-            }
-            catch (InterruptedException e1)
-            {
-              log_.error("Interrupted", e1);
+              ChangeResourceRecordSetsResult rresult = r53Clinet_.changeResourceRecordSets(new ChangeResourceRecordSetsRequest()
+                .withHostedZoneId(zoneId)
+                .withChangeBatch(new ChangeBatch()
+                    .withChanges(new Change()
+                        .withAction(ChangeAction.DELETE)
+                        .withResourceRecordSet(resourceRecordSet)
+                        )
+                    )
+                );
               
-              throw e;
+              return;
+            }
+            catch(PriorRequestNotCompleteException e)
+            {
+              savedException = e;
+              log_.info("Route53 request still in progress", e);
+              
+              try
+              {
+                Thread.sleep(5000);
+              }
+              catch (InterruptedException e1)
+              {
+                log_.error("Interrupted", e1);
+                
+                throw e;
+              }
             }
           }
+          log_.error("Failed to delete resource sets", savedException);
+          throw savedException;
         }
-        log_.error("Failed to create resource sets", savedException);
-        throw savedException;
+        else
+        {
+          log_.info("R53 record set for " + source + " to " + target + " does not exist.");
+          
+        }
       }
     }
 
@@ -1859,6 +2136,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       createTaskDef(name, port, paths, healthCheckPath);
     }
+    
+    @Override
+    protected void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+      // TODO move from groovy land
+      
+      deleteTaskDef(name, port, paths, healthCheckPath);
+    }
 
     @Override
     protected void deployService()
@@ -1867,14 +2152,33 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(hasDockerContainers())
       {
-        loadBalancer_ = createLoadBalancer();
+        if(action_.isDeploy_)
+        {
+          loadBalancer_ = getLoadBalancer(true);
+          
+          Name targetGroupName = getNameFactory().getServiceItemName(DEFAULT);
+              //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
+          
+          defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
+          
+          listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+        }
         
-        Name targetGroupName = getNameFactory().getServiceItemName(DEFAULT);
-            //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
-        
-        defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
-        
-        listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+        if(action_.isUndeploy_)
+        {
+          loadBalancer_ = getLoadBalancer(false);
+        }
+      }
+    }
+
+    @Override
+    protected void undeployService()
+    {
+      // createDnsZones();
+      
+      if(hasDockerContainers())
+      {
+        deleteLoadBalancer();
       }
     }
     
@@ -1952,8 +2256,50 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //          .withContainerDefinitions(containerDefinition)
 //          );
     }
+    
+    private void deleteTaskDef(String name, int port, Collection<String> paths, String healthCheckPath)
+    {
+//      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
+//      boolean create      = true;
+//      
+//      ContainerDefinition containerDefinition = new ContainerDefinition()
+//          .withName(serviceName.toString())
+//          .withImage(image)
+//          ;
+//      ecsClient_.registerTaskDefinition(new RegisterTaskDefinitionRequest()
+//          .withContainerDefinitions(containerDefinition)
+//          );
+    }
 
-    private void createService(String regionalHostName, String targetGroupArn, String name, int port, int desiredCnt, Collection<String> paths)
+    private void deleteService(String name)
+    {
+      Name    serviceName = getNameFactory().getServiceItemName(name);
+      
+      log_.info("Deleting service " + serviceName + "...");
+      
+      DescribeServicesResult services = ecsClient_.describeServices(new DescribeServicesRequest()
+          .withCluster(clusterName_)
+          .withServices(serviceName.toString())
+          );
+      
+      Set<String> targetArns = new HashSet<>();
+      
+      for(Service service : services.getServices())
+      {
+        targetArns.add(service.getTaskDefinition());
+      }
+      
+      deleteTaskDefinitions(targetArns);
+      
+      ecsClient_.deleteService(new DeleteServiceRequest()
+          .withCluster(clusterName_)
+          .withForce(true)
+          .withService(serviceName.toString()));
+      
+      log_.info("Deleted service " + serviceName + ".");
+    }
+
+    private void createService(String targetGroupArn, String name, int port, int desiredCnt, Collection<String> paths)
     {
       log_.info("Cluster name is " + clusterName_);
       
@@ -2011,6 +2357,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         CreateServiceResult createServiceResult = ecsClient_.createService(request);
         
         log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
+
       }
       else
       {
@@ -2028,7 +2375,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private LoadBalancer createLoadBalancer()
+    private LoadBalancer getLoadBalancer(boolean createIfNecessary)
     {
       String name = getNameFactory().getServiceName().getShortName(32);
 //          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
@@ -2046,6 +2393,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           LoadBalancer loadBalancer = loadBalancerList.get(0);
     
           log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+          
+          if(!createIfNecessary)
+            return loadBalancer;
           
           boolean ok = true;
           
@@ -2145,7 +2495,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       catch(LoadBalancerNotFoundException e)
       {
-        log_.info("Load balancer " + name + " does not exist, creating...");
+        if(createIfNecessary)
+        {
+          log_.info("Load balancer " + name + " does not exist, creating...");
+        }
+        else
+        {
+          log_.info("Load balancer " + name + " does not exist.");
+          return null;
+        }
       }
 
       CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
@@ -2162,6 +2520,50 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       elbTag(loadBalancer.getLoadBalancerArn());
       
       return loadBalancer;
+    }
+    
+
+
+    private void deleteLoadBalancer()
+    {
+      String name = getNameFactory().getServiceName().getShortName(32);
+      
+      try
+      {
+        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
+            .withNames(name)
+            );
+        
+        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
+        
+        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
+        {
+          LoadBalancer loadBalancer = loadBalancerList.get(0);
+    
+          log_.info("Deleting load balancer " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+          
+         
+          elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
+              .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+              );
+          
+
+          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " waiting for deletion...");
+          
+          elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
+              new DescribeLoadBalancersRequest()
+                .withLoadBalancerArns(loadBalancer.getLoadBalancerArn())
+              )
+              );
+          
+
+          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " deleted.");
+        }
+      }
+      catch(LoadBalancerNotFoundException e)
+      {
+          log_.info("Load balancer " + name + " does not exist.");
+      }
     }
   }
 }
