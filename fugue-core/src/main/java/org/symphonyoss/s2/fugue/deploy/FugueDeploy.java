@@ -149,6 +149,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   private boolean                 primaryRegion_      = false;
 
   protected FugueDeployAction     action_;
+  protected boolean               dryRun_;
+  
   private String                  dnsSuffix_;
 
   private ExecutorService         executor_           = Executors.newFixedThreadPool(20,
@@ -185,10 +187,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     withFlag('v',   ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE",     String.class,   false, false,   (v) -> environmentType_     = v);
     withFlag('e',   ENVIRONMENT,          "FUGUE_ENVIRONMENT",          String.class,   false, false,   (v) -> environment_         = v);
     withFlag('g',   REGION,               "FUGUE_REGION",               String.class,   false, false,   (v) -> region_              = v);
-    withFlag('p',   POD_NAME,             "FUGUE_POD_NAME",             String.class,   false, false,   (v) -> podName_              = v);
+    withFlag('p',   POD_NAME,             "FUGUE_POD_NAME",             String.class,   false, false,   (v) -> podName_             = v);
     withFlag('a',   ACTION,               "FUGUE_ACTION",               String.class,   false, true,    (v) -> setAction(v));
     withFlag('E',   "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",  Boolean.class,  false, false,   (v) -> primaryEnvironment_  = v);
     withFlag('G',   "primaryRegion",      "FUGUE_PRIMARY_REGION",       Boolean.class,  false, false,   (v) -> primaryRegion_       = v);
+    withFlag('d',   "dryRun",             "FUGUE_DRY_RUN",              Boolean.class,  false, false,   (v) -> dryRun_              = v);
     withFlag('i',   "instances",          "FUGUE_INSTANCES",            String.class,   false, false,   (v) -> instances_           = v);
     withFlag('b',   BUILD_ID,             "FUGUE_BUILD_ID",             String.class,   false, false,   (v) -> buildId_             = v);
     
@@ -504,7 +507,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     multiTenantContext_.deployInitContainers();
     
     // Now we can do all the single tenant processes in parallel
-    if(action_.processContainers_)
+    if(action_.processContainers_ || action_.isDeploy_)
     {
       IBatch<Runnable>    batch                 = createBatch();
 
