@@ -277,8 +277,6 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       }
       else
       {
-        //GetSubscriptionAttributesResult sa = snsClient_.getSubscriptionAttributes(getQueueARN(subscriptionName));
-        
         ListSubscriptionsByTopicResult subscriptionResult = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
         
         if(subscriptionResult != null)

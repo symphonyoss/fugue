@@ -54,7 +54,6 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
 
   private static final Object POLICY = "Policy";
 
-  private Set<TopicName>      obsoleteTopics_ = new HashSet<>();
   private Set<TopicName>      topics_         = new HashSet<>();
   
 //  /**
@@ -105,15 +104,8 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
   }
 
   @Override
-  public void deleteObsoleteTopic(String topicId)
-  {
-    obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
-  }
-
-  @Override
   public IPublisher getPublisherByName(String topicId)
   {
-    obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
     topics_.add(nameFactory_.getTopicName(topicId));
     
     return super.getPublisherByName(topicId);
@@ -255,8 +247,6 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
         log_.info("Topic " + topicName + " does not belong to this service and is unaffected.");
       }
     }
-    
-    deleteTopics(dryRun, obsoleteTopics_);
   }
 
   private void updateTopicPolicy(String topicArn, String topicPolicy)
@@ -289,7 +279,6 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
   @Override
   public void deleteTopics(boolean dryRun)
   {
-    deleteTopics(dryRun, obsoleteTopics_);
     deleteTopics(dryRun, topics_);
   }
 

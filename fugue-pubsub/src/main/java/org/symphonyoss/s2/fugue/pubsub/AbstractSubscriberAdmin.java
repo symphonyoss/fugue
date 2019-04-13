@@ -112,15 +112,8 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     log_.info("About to create subscriptions...");
     for(SubscriptionImpl<?> subscription : getSubscribers())
     {
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
-      }
-      
       for(TopicName topicName : subscription.getTopicNames())
       {
-        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
-        
         createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
       }
     }
@@ -134,16 +127,8 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     {
 
       log_.info("About to delete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
-      for(TopicName topicName : subscription.getObsoleteTopicNames())
-      {
-        log_.info("About to delete subscriptions... topicName=" + topicName);
-        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
-      }
-      
       for(TopicName topicName : subscription.getTopicNames())
       {
-        deleteSubcription(topicName, nameFactory_.getObsoleteSubscriptionName(topicName, subscription.getObsoleteSubscriptionId()), dryRun);
-        
         deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
       }
     }

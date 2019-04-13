@@ -98,9 +98,8 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
         
         subscribers_.add(new SubscriptionImpl<P>(
             topicNames,
-            subscription.createObsoleteTopicNames(nameFactory_),
             subscription.getId(),
-            subscription.getObsoleteId(), consumer));
+            consumer));
         
         totalSubscriptionCnt_ += topicNames.size();
       });
@@ -108,7 +107,6 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
       return self();
     }
   
-    @Deprecated
     protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
         String... additionalTopicIds)
     {
@@ -118,8 +116,6 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
         
         subscribers_.add(new SubscriptionImpl<P>(
             topicNames,
-            nameFactory_.getObsoleteTopicNameCollection(topicId, additionalTopicIds),
-            null,
             subscriptionId, consumer));
         
         totalSubscriptionCnt_ += topicNames.size();
@@ -148,15 +144,13 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
       taskList_.add(() ->
       {
         List<TopicName> topicNameList = new ArrayList<>(topicIds.length);
-        List<TopicName> obsoleteTopicNameList = new ArrayList<>(topicIds.length);
     
         for(String id : topicIds)
         {
           topicNameList.add(nameFactory_.getTopicName(id));
-          obsoleteTopicNameList.add(nameFactory_.getObsoleteTopicName(id));
         }
         
-        subscribers_.add(new SubscriptionImpl<P>(topicNameList, obsoleteTopicNameList, null, subscriptionId, consumer));
+        subscribers_.add(new SubscriptionImpl<P>(topicNameList, subscriptionId, consumer));
         
         totalSubscriptionCnt_ += topicNameList.size();
       });

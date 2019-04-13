@@ -23,7 +23,6 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.ArrayList;
 import java.util.Collection;
 
 import javax.annotation.Nullable;
@@ -42,11 +41,7 @@ public class SubscriptionImpl<P>
 {
   private final IThreadSafeRetryableConsumer<P> consumer_;
   private final Collection<TopicName>           topicNames_;
-  @Deprecated
-  private final Collection<TopicName>           obsoleteTopicNames_;
   private final String                          subscriptionId_;
-  @Deprecated
-  private final String                          obsoleteSubscriptionId_;
 
   /**
    * Constructor.
@@ -59,20 +54,7 @@ public class SubscriptionImpl<P>
   {
     consumer_ = consumer;
     topicNames_ = topicNames;
-    obsoleteTopicNames_ = new ArrayList<>();
-    obsoleteSubscriptionId_ = null;
     subscriptionId_ = subscriptionName;
-  }
-
-  @Deprecated
-  public SubscriptionImpl(Collection<TopicName> topicNames, Collection<TopicName> obsoleteTopicNames,
-      String subscriptionId, String obsoleteSubscriptionId, @Nullable IThreadSafeRetryableConsumer<P> consumer)
-  {
-    consumer_ = consumer;
-    topicNames_ = topicNames;
-    obsoleteTopicNames_ = obsoleteTopicNames;
-    subscriptionId_ = subscriptionId;
-    obsoleteSubscriptionId_ = obsoleteSubscriptionId;
   }
 
   /**
@@ -84,12 +66,6 @@ public class SubscriptionImpl<P>
     return topicNames_;
   }
 
-  @Deprecated
-  public Collection<TopicName> getObsoleteTopicNames()
-  {
-    return obsoleteTopicNames_;
-  }
-
   /**
    * 
    * @return The simple subscription name.
@@ -97,12 +73,6 @@ public class SubscriptionImpl<P>
   public String getSubscriptionId()
   {
     return subscriptionId_;
-  }
-
-  @Deprecated
-  public String getObsoleteSubscriptionId()
-  {
-    return obsoleteSubscriptionId_ == null ? subscriptionId_ : obsoleteSubscriptionId_;
   }
 
   /**
