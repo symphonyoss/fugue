@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 import java.util.UUID;
 
@@ -83,10 +84,14 @@ import com.amazonaws.services.ecs.model.DeleteServiceRequest;
 import com.amazonaws.services.ecs.model.DeregisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
+import com.amazonaws.services.ecs.model.DescribeTasksRequest;
+import com.amazonaws.services.ecs.model.DescribeTasksResult;
 import com.amazonaws.services.ecs.model.KeyValuePair;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsRequest;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsResult;
+import com.amazonaws.services.ecs.model.ListTasksRequest;
 import com.amazonaws.services.ecs.model.RunTaskRequest;
+import com.amazonaws.services.ecs.model.RunTaskResult;
 import com.amazonaws.services.ecs.model.Service;
 import com.amazonaws.services.ecs.model.TaskOverride;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
@@ -178,6 +183,9 @@ import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
+import com.amazonaws.services.logs.model.GetLogEventsRequest;
+import com.amazonaws.services.logs.model.GetLogEventsResult;
+import com.amazonaws.services.logs.model.OutputLogEvent;
 import com.amazonaws.services.route53.AmazonRoute53;
 import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
 import com.amazonaws.services.route53.model.Change;
@@ -2136,29 +2144,85 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
     {
+      Name taskName = getNameFactory().getServiceItemName(name);
       // TODO move from groovy land
       
-      createTaskDef(name, port, paths, healthCheckPath);
+      createTaskDef(taskName, port, paths, healthCheckPath);
       
-      ecsClient_.runTask(new RunTaskRequest()
+      RunTaskResult run = ecsClient_.runTask(new RunTaskRequest()
           .withCluster(clusterName_)
           .withCount(1)
-          .withTaskDefinition(name)
+          .withTaskDefinition(taskName.toString())
           .withOverrides(new TaskOverride()
               .withContainerOverrides(new ContainerOverride()
+                  .withName(taskName.toString())
                   .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
                   .withEnvironment(new KeyValuePair().withName("FUGUE_DRY_RUN").withValue(String.valueOf(dryRun_)))
                   )
               )
           );
+      
+      String taskArn = run.getTasks().get(0).getTaskArn();
+      
+      waitTaskComplete(taskArn, TimeUnit.SECONDS, 300);
+      
     }
     
+    private void waitTaskComplete(String taskArn, TimeUnit timeUnit, long timeout)
+    {
+      long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
+      String logGroupName = getNameFactory().getServiceName().toString();
+      String logStreamName = getService();
+      String nextToken = null;
+      
+      while(System.currentTimeMillis() < deadline)
+      {
+        
+        DescribeTasksResult taskDesc = ecsClient_.describeTasks(new DescribeTasksRequest()
+            .withTasks(taskArn)
+            );
+        
+        String status = taskDesc.getTasks().get(0).getLastStatus();
+        
+        // read log
+        GetLogEventsResult events = logsClient_.getLogEvents(new GetLogEventsRequest()
+            .withLogGroupName(logGroupName)
+            .withLogStreamName(logStreamName)
+            .withNextToken(nextToken)
+            );
+        
+        nextToken = events.getNextForwardToken();
+        
+        for(OutputLogEvent event : events.getEvents())
+        {
+          log_.info(">" + event.getMessage());
+        }
+        
+        if("STOPPED".equals(status))
+        {
+          return;
+        }
+        
+        try
+        {
+          Thread.sleep(10000);
+        }
+        catch (InterruptedException e)
+        {
+          throw new IllegalStateException("Interrupted.", e);
+        }
+      }
+      
+      throw new IllegalStateException("Timed out.");
+    }
+
     @Override
     protected void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
     {
+      Name taskName = getNameFactory().getServiceItemName(name);
       // TODO move from groovy land
       
-      deleteTaskDef(name, port, paths, healthCheckPath);
+      deleteTaskDef(taskName, port, paths, healthCheckPath);
     }
 
     @Override
@@ -2259,7 +2323,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
 
     
-    private void createTaskDef(String name, int port, Collection<String> paths, String healthCheckPath)
+    private void createTaskDef(Name name, int port, Collection<String> paths, String healthCheckPath)
     {
 //      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
 //      boolean create      = true;
@@ -2273,7 +2337,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //          );
     }
     
-    private void deleteTaskDef(String name, int port, Collection<String> paths, String healthCheckPath)
+    private void deleteTaskDef(Name name, int port, Collection<String> paths, String healthCheckPath)
     {
 //      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
 //      boolean create      = true;
