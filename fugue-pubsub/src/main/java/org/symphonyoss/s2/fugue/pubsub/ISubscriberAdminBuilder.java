@@ -58,6 +58,27 @@ public interface ISubscriberAdminBuilder<T extends ISubscriberAdminBuilder<T,B>,
   T withSubscription(String subscriptionName, String topicName, String ...additionalTopicNames);
   
   /**
+   * Delete the given subscription on the given topics.
+   * 
+   * This method allows for the deletion of subscriptions which are no longer required. It causes the subscription
+   * to be deleted during both deploy and undeploy operations. If currently running instances of the service are
+   * actively consuming from this subscription then they will experience errors. For this reason, subscriptions
+   * should normally be phased out in two stages (assuming a no downtime deployment is required). In the first
+   * stage the service would remove the withSubscription() call, once that version is deployed a subsequent
+   * deployment can be made including a call to this method, which will cause the subscription to be deleted.
+   * 
+   * This does mean that messages will back up on the subscription during the period between the two releases
+   * which may cause montioring systems to alert.
+   * 
+   * @param subscriptionName        A subscription name.
+   * @param topicName               A topic name.
+   * @param additionalTopicNames    An optional list of additional topic names.
+   * 
+   * @return  this (fluent method)
+   */
+  T withObsoleteSubscription(String subscriptionName, String topicName, String ...additionalTopicNames);
+  
+  /**
    * Subscribe to the given subscription on the given topics.
    * 
    * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 

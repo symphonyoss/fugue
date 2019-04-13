@@ -45,7 +45,6 @@ public class InMemoryPublisherAdmin extends InMemoryPublisherBase<InMemoryPublis
 {
   private static final Logger log_            = LoggerFactory.getLogger(InMemoryPublisherAdmin.class);
 
-  private Set<TopicName>      obsoleteTopics_ = new HashSet<>();
   private Set<TopicName>      topics_         = new HashSet<>();
   
   private InMemoryPublisherAdmin(Builder builder)
@@ -83,15 +82,8 @@ public class InMemoryPublisherAdmin extends InMemoryPublisherBase<InMemoryPublis
   }
 
   @Override
-  public void deleteObsoleteTopic(String topicId)
-  {
-    obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
-  }
-
-  @Override
   public IPublisher getPublisherByName(String topicId)
   {
-    obsoleteTopics_.add(nameFactory_.getObsoleteTopicName(topicId));
     topics_.add(nameFactory_.getTopicName(topicId));
     
     return super.getPublisherByName(topicId);
@@ -127,14 +119,11 @@ public class InMemoryPublisherAdmin extends InMemoryPublisherBase<InMemoryPublis
         log_.info("Topic " + topicName + " does not belong to this service and is unaffected.");
       }
     }
-    
-    deleteTopics(dryRun, obsoleteTopics_);
   }
 
   @Override
   public void deleteTopics(boolean dryRun)
   {
-    deleteTopics(dryRun, obsoleteTopics_);
     deleteTopics(dryRun, topics_);
   }
 

@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.aws.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -30,6 +32,11 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
+import com.amazonaws.services.s3.model.DeleteObjectsRequest;
+import com.amazonaws.services.s3.model.DeleteObjectsRequest.KeyVersion;
+import com.amazonaws.services.s3.model.ListObjectsV2Request;
+import com.amazonaws.services.s3.model.ListObjectsV2Result;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.model.SSEAlgorithm;
 import com.amazonaws.services.s3.model.ServerSideEncryptionByDefault;
 import com.amazonaws.services.s3.model.ServerSideEncryptionConfiguration;
@@ -39,7 +46,66 @@ import com.amazonaws.services.s3.model.SetBucketEncryptionRequest;
 public class S3Helper
 {
   private static final Logger            log_                          = LoggerFactory.getLogger(S3Helper.class);
+  private static final int BATCH_SIZE = 100;
 
+  public static void deleteBucket(AmazonS3 s3, String name, boolean dryRun)
+  {
+    try
+    {
+      String location = s3.getBucketLocation(name);
+      
+      log_.info("Bucket location is " + location);
+      
+      if(dryRun)
+      {
+        log_.info("Bucket " + name + " would be deleted (dry run).");
+      }
+      else
+      {
+        String continuationToken = null;
+        do
+        {
+          ListObjectsV2Result list = s3.listObjectsV2(new ListObjectsV2Request()
+              .withBucketName(name)
+              .withMaxKeys(BATCH_SIZE)
+              .withContinuationToken(continuationToken)
+              );
+          
+          continuationToken = list.getNextContinuationToken();
+          
+          List<KeyVersion> keys = new ArrayList<>(BATCH_SIZE);
+          
+          
+          for(S3ObjectSummary item : list.getObjectSummaries())
+          {
+            keys.add(new KeyVersion(item.getKey()));
+          }
+          
+          log_.info("Deleting " + keys.size() + " objects from bucket " + name);
+          s3.deleteObjects(new DeleteObjectsRequest(name).withKeys(keys));
+          
+        }while(continuationToken != null);
+        log_.info("Bucket " + name + " emptied.");
+      }
+    }
+    catch(AmazonS3Exception e)
+    {
+      switch(e.getErrorCode())
+      {
+        case "NoSuchBucket":
+          log_.info("Bucket " + name + " does not exist.");
+          break;
+          
+        case "AuthorizationHeaderMalformed":
+          abort("Bucket " + name + ", appears to be in the wrong region.", e);
+          break;
+                 
+        default:
+          abort("Unexpected S3 error looking for bucket " + name, e);
+      }
+    }
+  }
+  
   public static void createBucketIfNecessary(AmazonS3 s3, String name, boolean dryRun)
   {
     try

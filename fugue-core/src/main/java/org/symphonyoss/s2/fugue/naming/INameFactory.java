@@ -35,12 +35,6 @@ public interface INameFactory
   TableName getTableName(String table);
 
   CredentialName getEnvironmentCredentialName(String owner);
-
-  @Deprecated
-  TopicName getObsoleteTopicName(String topicId);
-  
-  @Deprecated
-  Collection<TopicName> getObsoleteTopicNameCollection(String topicId, String ...additionalTopicIds);
   
   /**
    * Return a TopicName for the given topic owned by the current service.

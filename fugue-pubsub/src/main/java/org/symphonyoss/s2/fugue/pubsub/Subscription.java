@@ -55,7 +55,6 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
 public class Subscription
 {
   private String  id_;
-  private String  obsoleteId_;
 
   private List<Topic> topics_ = new LinkedList<>();
   
@@ -69,22 +68,6 @@ public class Subscription
   public Subscription withId(String id)
   {
     id_ = id;
-    
-    return this;
-  }
-  
-  /**
-   * Set the obsolete ID for this subscription.
-   * 
-   * The subscription with the obsolete id will be deleted.
-   * 
-   * @param obsoleteId  The obsolete subscriptionId.
-   * 
-   * @return This (fluent method)
-   */
-  public Subscription withObsoleteId(String obsoleteId)
-  {
-    obsoleteId_ = obsoleteId;
     
     return this;
   }
@@ -133,15 +116,6 @@ public class Subscription
   }
 
   /**
-   * 
-   * @return The obsolete topic ID, if any.
-   */
-  public String getObsoleteId()
-  {
-    return obsoleteId_;
-  }
-
-  /**
    * Create a Collection of TopicNames for all topics for this subscription, using the given NameFactory.
    * 
    * @param nameFactory The name factory to use (which knows the current environment, service etc)
@@ -154,34 +128,6 @@ public class Subscription
     
     for(Topic t : topics_)
       names.add(t.createTopicName(nameFactory));
-    
-    return names;
-  }
-
-  /**
-   * Create a Collection of TopicNames for all topics with obsolete names for this subscription, using the given NameFactory.
-   * 
-   * @param nameFactory The name factory to use (which knows the current environment, service etc)
-   * 
-   * @return A Collection of fully qualified topic names.
-   */
-  @Deprecated
-  public Collection<TopicName> createObsoleteTopicNames(INameFactory nameFactory)
-  {
-    List<TopicName> names = new LinkedList<>();
-    
-    for(Topic t : topics_)
-      names.add(t.createObsoleteTopicName(nameFactory));
-    
-//    for(Topic t : topics_)
-//    {
-//      String id = t.getObsoleteId();
-//      
-//      if(id != null)
-//      {
-//        names.add(nameFactory.getObsoleteTopicName(id));
-//      }
-//    }
     
     return names;
   }

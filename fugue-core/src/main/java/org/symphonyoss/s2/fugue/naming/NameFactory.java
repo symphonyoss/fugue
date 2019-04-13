@@ -236,37 +236,6 @@ public class NameFactory implements INameFactory
     return createTableName(serviceId_, tableId, 
         getGlobalNamePrefix(), environmentType_, environmentId_, serviceId_, tableId);
   }
-  
-  @Deprecated
-  public TableName  getObsoleteTableName(String tableId)
-  {
-    return createTableName(serviceId_, tableId, environmentType_, environmentId_, tableId);
-  }
-  
-  @Override
-  @Deprecated
-  public TopicName  getObsoleteTopicName(String topicId)
-  {
-    return createTopicName(getServiceId(), true, topicId, environmentType_, environmentId_, topicId);
-  }
-  
-  @Override
-  @Deprecated
-  public Collection<TopicName> getObsoleteTopicNameCollection(String topicId, String... additionalTopicIds)
-  {
-    ArrayList<TopicName> result = new ArrayList<>(additionalTopicIds==null ? 1 : 1 + additionalTopicIds.length);
-    
-    result.add(getObsoleteTopicName(topicId));
-    
-    if(additionalTopicIds != null)
-    {
-      for(String id : additionalTopicIds)
-      {
-        result.add(getObsoleteTopicName(id));
-      }
-    }
-    return result;
-  }
 
   @Override
   public TopicName getTopicName(String topicId)
@@ -378,7 +347,7 @@ public class NameFactory implements INameFactory
   
   protected Name createName(@Nonnull String name, String ...additional)
   {
-    return new Name(name, additional);
+    return new Name(name, (Object[])additional);
   }
 
   protected ServiceName createServiceName(String serviceId, String tenantId, @Nonnull String name, String ...additional)

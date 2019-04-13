@@ -58,6 +58,7 @@ import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.Name;
 
 /**
  * Abstract base class for deployment utility implementations, to be subclassed for each cloud service provider.
@@ -147,7 +148,9 @@ public abstract class FugueDeploy extends CommandLineHandler
   private boolean                 primaryEnvironment_ = false;
   private boolean                 primaryRegion_      = false;
 
-  private FugueDeployAction       action_;
+  protected FugueDeployAction     action_;
+  protected boolean               dryRun_;
+  
   private String                  dnsSuffix_;
 
   private ExecutorService         executor_           = Executors.newFixedThreadPool(20,
@@ -184,10 +187,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     withFlag('v',   ENVIRONMENT_TYPE,     "FUGUE_ENVIRONMENT_TYPE",     String.class,   false, false,   (v) -> environmentType_     = v);
     withFlag('e',   ENVIRONMENT,          "FUGUE_ENVIRONMENT",          String.class,   false, false,   (v) -> environment_         = v);
     withFlag('g',   REGION,               "FUGUE_REGION",               String.class,   false, false,   (v) -> region_              = v);
-    withFlag('p',   POD_NAME,             "FUGUE_POD_NAME",             String.class,   false, false,   (v) -> podName_              = v);
+    withFlag('p',   POD_NAME,             "FUGUE_POD_NAME",             String.class,   false, false,   (v) -> podName_             = v);
     withFlag('a',   ACTION,               "FUGUE_ACTION",               String.class,   false, true,    (v) -> setAction(v));
     withFlag('E',   "primaryEnvironment", "FUGUE_PRIMARY_ENVIRONMENT",  Boolean.class,  false, false,   (v) -> primaryEnvironment_  = v);
     withFlag('G',   "primaryRegion",      "FUGUE_PRIMARY_REGION",       Boolean.class,  false, false,   (v) -> primaryRegion_       = v);
+    withFlag('d',   "dryRun",             "FUGUE_DRY_RUN",              Boolean.class,  false, false,   (v) -> dryRun_              = v);
     withFlag('i',   "instances",          "FUGUE_INSTANCES",            String.class,   false, false,   (v) -> instances_           = v);
     withFlag('b',   BUILD_ID,             "FUGUE_BUILD_ID",             String.class,   false, false,   (v) -> buildId_             = v);
     
@@ -339,18 +343,14 @@ public abstract class FugueDeploy extends CommandLineHandler
    * Perform the deployment.
    */
   public void deploy()
-  {    
-    if(action_ == FugueDeployAction.DeployStation)
-    {
+  {
+    if(track_ != null || station_ != null)
       getStationConfig();
-    }
-    else
-    {
-      if(podName_ != null)
-        tenantContextList_.add(createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, service_)));
-    }
 
-    log_.info("FugueDeploy v1.1");
+    if(podName_ != null)
+      tenantContextList_.add(createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, service_)));
+
+    log_.info("FugueDeploy v1.2");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
@@ -377,14 +377,10 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     dnsSuffix_   = multiTenantConfig.getRequiredString(DNS_SUFFIX);
     
-    final boolean deployConfig;
-    final boolean deployContainers;
     
     switch (action_)
     {
       case CreateEnvironmentType:
-        deployConfig = false;
-        deployContainers = false;
         log_.info("Creating environment type \"" + environmentType_ + "\"");
         
         multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null));
@@ -393,8 +389,6 @@ public abstract class FugueDeploy extends CommandLineHandler
         break;
 
       case CreateEnvironment:
-        deployConfig = false;
-        deployContainers = false;
         log_.info("Creating environment \"" + environment_ + "\"");
         
         multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null));
@@ -403,167 +397,159 @@ public abstract class FugueDeploy extends CommandLineHandler
         break;
 
       case Deploy:
-      case DeployStation:
-        deployConfig = true;
-        deployContainers = true;
-//        MutableJsonObject serviceJson = deployConfig();
-//        
-//        if(serviceJson != null)
-//          deployContainers(serviceJson);
-        break;
-        
       case DeployConfig:
-//        deployConfig();
-          deployConfig = true;
-          deployContainers = false;
+      case Undeploy:
+      case UndeployAll:
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, service_));
+        multiTenantContext_.setConfig(multiTenantConfig);
+        
+        deploy( multiTenantDefaults,
+            environmentConfig,
+            multiTenantOverrides);
         break;
         
       default:
         throw new IllegalStateException("Unrecognized action " + action_);
     }
+  }
+  
+  private void deploy(ImmutableJsonObject multiTenantDefaults, ImmutableJsonObject environmentConfig,
+      ImmutableJsonObject multiTenantOverrides)
+  {
+    ImmutableJsonObject serviceJson;
+    String dir = SERVICE_DIR + "/" + getService();
     
+    try
+    {
+      serviceJson = provider_.fetchConfig(dir, SERVICE + ".json").immutify();
+      
+      log_.info("Service=" + serviceJson);
+    }
+    catch(IOException e)
+    {
+      throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
+    }
     
+    IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
+    
+    Map<ContainerType, Map<String, JsonObject<?>>>  singleTenantContainerMap     = new HashMap<>();
+    Map<ContainerType, Map<String, JsonObject<?>>>  multiTenantContainerMap      = new HashMap<>();
 
-    if(deployConfig)
-    {    
-      multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, service_));
-      multiTenantContext_.setConfig(multiTenantConfig);
+    if(action_.processContainers_)
+    { 
+      // Load all the containers
       
-      ImmutableJsonObject serviceJson;
-      String dir = SERVICE_DIR + "/" + getService();
+      Iterator<String>                it                      = containerJson.getNameIterator();
       
-      try
+      while(it.hasNext())
       {
-        serviceJson = provider_.fetchConfig(dir, SERVICE + ".json").immutify();
+        String name = it.next();
+        IJsonDomNode c = containerJson.get(name);
         
-        log_.info("Service=" + serviceJson);
-      }
-      catch(IOException e)
-      {
-        throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
-      }
-      
-      dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
-      
-      
-      
-      // deploy multi-tenant containers first
-      
-
-      policyTrust_ = fetchPolicies(dir, TRUST);
-
-      multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
-      
-      multiTenantContext_.processConfigAndPolicies();
-      
-      IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
-      
-      Map<ContainerType, Map<String, JsonObject<?>>>  singleTenantContainerMap     = new HashMap<>();
-      Map<ContainerType, Map<String, JsonObject<?>>>  multiTenantContainerMap      = new HashMap<>();
-      
-//      Map<String, JsonObject<?>>  singleTenantInitMap     = new HashMap<>();
-//      Map<String, JsonObject<?>>  multiTenantInitMap      = new HashMap<>();
-//      Map<String, JsonObject<?>>  singleTenantServiceMap  = new HashMap<>();
-//      Map<String, JsonObject<?>>  multiTenantServiceMap   = new HashMap<>();
-      
-      if(deployContainers)
-      {
-        // Load all the containers
-        
-        Iterator<String>                it                      = containerJson.getNameIterator();
-        
-        while(it.hasNext())
+        if(c instanceof JsonObject)
         {
-          String name = it.next();
-          IJsonDomNode c = containerJson.get(name);
+          JsonObject<?> container = (JsonObject<?>)c;
+          Tenancy       tenancy   = Tenancy.parse(container.getRequiredString("tenancy"));
           
-          if(c instanceof JsonObject)
+          Map<ContainerType, Map<String, JsonObject<?>>>  containerMap;
+          
+          switch(tenancy)
           {
-            JsonObject<?> container = (JsonObject<?>)c;
-            Tenancy       tenancy   = Tenancy.parse(container.getRequiredString("tenancy"));
-            
-            Map<ContainerType, Map<String, JsonObject<?>>>  containerMap;
-            
-            switch(tenancy)
-            {
-              case SINGLE:
-                containerMap = singleTenantContainerMap;
-                break;
-                
-              case MULTI:
-                containerMap = multiTenantContainerMap;
-                break;
-                
-              default:
-                throw new CodingFault("Unknown tenancy type " + tenancy);
-            }
-            
-            ContainerType containerType = ContainerType.parse(container.getString("containerType", null));
-            
-            Map<String, JsonObject<?>> map = containerMap.get(containerType);
-            
-            if(map == null)
-            {
-              map = new HashMap<>();
-              containerMap.put(containerType, map);
-            }
-            
-            map.put(name, container);
+            case SINGLE:
+              containerMap = singleTenantContainerMap;
+              break;
+              
+            case MULTI:
+              containerMap = multiTenantContainerMap;
+              break;
+              
+            default:
+              throw new CodingFault("Unknown tenancy type " + tenancy);
           }
+          
+          ContainerType containerType = ContainerType.parse(container.getString("containerType", null));
+          
+          Map<String, JsonObject<?>> map = containerMap.get(containerType);
+          
+          if(map == null)
+          {
+            map = new HashMap<>();
+            containerMap.put(containerType, map);
+          }
+          
+          map.put(name, container);
         }
-        
-        // Deploy multi-tenant init containers
-        
-        multiTenantContext_.setContainers(multiTenantContainerMap);
-        
-        multiTenantContext_.deployInitContainers();
       }
-      
-      // Now we can do all the single tenant processes in parallel
-      
-      
+    }
+
+    dir = dir + "/" + cloudServiceProvider_ + "/" + POLICY;
+    
+    policyTrust_ = fetchPolicies(dir, TRUST);
+
+    multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
+    multiTenantContext_.setContainers(multiTenantContainerMap);
+    
+    Map<String, String> singleTenantPolicies  = fetchPolicies(dir, SINGLE_TENANT);
+        
+    for(DeploymentContext context : tenantContextList_)
+    {
+      context.setPolicies(singleTenantPolicies);
+      context.setContainers(singleTenantContainerMap);
+    }
+    
+    // deploy Multi tenant config
+    if(action_.isDeploy_)
+    {
+      multiTenantContext_.processConfigAndPolicies();
+    }
+    
+    // multi tenant init containers
+    multiTenantContext_.deployInitContainers();
+    
+    // Now we can do all the single tenant processes in parallel
+    if(action_.processContainers_ || action_.isDeploy_)
+    {
       IBatch<Runnable>    batch                 = createBatch();
-      Map<String, String> singleTenantPolicies  = fetchPolicies(dir, SINGLE_TENANT);
-      
+
       for(DeploymentContext context : tenantContextList_)
       {
-        context.setPolicies(singleTenantPolicies);
-        
-        String podName = context.getPodName();
-        
         batch.submit(() ->
         {
+          if(action_.isDeploy_)
+          {
+            String podName = context.getPodName();
+            
+            ImmutableJsonObject tenantIdConfig         = createIdConfig(podName);
+            ImmutableJsonObject tenantConfig           = fetchTenantConfig(podName);
+            ImmutableJsonObject singleTenantIdConfig   = overlay(
+                multiTenantDefaults,
+                environmentConfig,
+                tenantConfig,
+                multiTenantOverrides,
+                tenantIdConfig);
+            ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, podName);
+            ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, podName);
+            
+            /*
+             * At this point the defaults and environment config have all been merged in, we now just need to overlay the 
+             * multiTenantOverrides and tenantIdConfig to ensure that they win over anything else which happened previously.
+             * 
+             * This is a bit confusing but it allows ConfigHelpers to use config from previous steps to identify what needs to
+             * be added, specifically we need this for tenantId -> podName mapping.
+             * 
+             * Perhaps this can be removed once this mapping is in consul.
+             */
+            ImmutableJsonObject singleTenantConfig     = overlay(
+                singleTenantOverrides,
+                multiTenantOverrides,
+                tenantIdConfig);
+            
+            context.setConfig(singleTenantConfig);
+            context.processConfigAndPolicies();
+            
+          }
           
-          ImmutableJsonObject tenantIdConfig         = createIdConfig(podName);
-          ImmutableJsonObject tenantConfig           = fetchTenantConfig(podName);
-          ImmutableJsonObject singleTenantIdConfig   = overlay(
-              multiTenantDefaults,
-              environmentConfig,
-              tenantConfig,
-              multiTenantOverrides,
-              tenantIdConfig);
-          ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, podName);
-          ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, podName);
-          
-          /*
-           * At this point the defaults and environment config have all been merged in, we now just need to overlay the 
-           * multiTenantOverrides and tenantIdConfig to ensure that they win over anything else which happened previously.
-           * 
-           * This is a bit confusing but it allows ConfigHelpers to use config from previous steps to identify what needs to
-           * be added, specifically we need this for tenantId -> podName mapping.
-           * 
-           * Perhaps this can be removed once this mapping is in consul.
-           */
-          ImmutableJsonObject singleTenantConfig     = overlay(
-              singleTenantOverrides,
-              multiTenantOverrides,
-              tenantIdConfig);
-          
-          context.setConfig(singleTenantConfig);
-          context.processConfigAndPolicies();
-          context.setContainers(singleTenantContainerMap);
-          
-          if(deployContainers)
+          if(action_.processContainers_)
           {
             context.deployInitContainers();
           }
@@ -571,23 +557,44 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
       
       batch.waitForAllTasks();
+    }
+    
+    
+    if(action_.processContainers_)
+    {
+      // Now launch all the service containers in parallel
       
-      if(deployContainers)
+      IBatch<Runnable> containerBatch = createBatch();
+          
+      
+      multiTenantContext_.deployServiceContainers(containerBatch);
+      
+      for(DeploymentContext context : tenantContextList_)
       {
-        // Now launch all the service containers in parallel
-        
-        IBatch<Runnable> containerBatch = createBatch();
-            
-        
-        multiTenantContext_.deployServiceContainers(containerBatch);
-        
-        for(DeploymentContext context : tenantContextList_)
-        {
-          context.deployServiceContainers(containerBatch);
-        }
-        
-        containerBatch.waitForAllTasks();
+        context.deployServiceContainers(containerBatch);
       }
+      
+      containerBatch.waitForAllTasks();
+    }
+    
+    if(action_.isUndeploy_)
+    {
+      IBatch<Runnable>    batch                 = createBatch();
+
+      for(DeploymentContext context : tenantContextList_)
+      {
+        batch.submit(() ->
+        {
+          context.undeployInitContainers();
+          
+          context.deleteConfigAndPolicies();
+        });
+      }
+      
+      multiTenantContext_.undeployInitContainers();
+      multiTenantContext_.deleteConfigAndPolicies();
+      
+      batch.waitForAllTasks();
     }
   }
   
@@ -917,15 +924,22 @@ public abstract class FugueDeploy extends CommandLineHandler
       nameFactory_ = nameFactory;
     }
 
+
     protected abstract void createEnvironmentType();
     
     protected abstract void createEnvironment();
     
     protected abstract void processRole(String name, String roleSpec, String trustSpec);
-    
+
     protected abstract void saveConfig();
     
+    protected abstract void deleteConfig();
+    
+    protected abstract void deleteRole(String roleName);
+    
     protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
+    
+    protected abstract void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
     protected abstract void configureServiceNetwork();
     
@@ -936,6 +950,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
     
     protected abstract void deployService();
+    protected abstract void undeployService();
 
     protected abstract String getFugueConfig();
     
@@ -1130,6 +1145,29 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
     }
     
+
+    private void deleteConfigAndPolicies()
+    {
+      IBatch<Runnable> batch = createBatch();
+      
+      batch.submit(() ->
+      { 
+        deleteConfig();
+      });
+      
+      for(Entry<String, String> entry : policies_.entrySet())
+      {
+        String name     = entry.getKey();
+        
+        batch.submit(() ->
+        {
+          deleteRole(name);
+        });
+      }
+      
+      batch.waitForAllTasks();
+    }
+    
     private void processConfigAndPolicies()
     {
       IBatch<Runnable> batch = createBatch();
@@ -1159,14 +1197,13 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployInitContainers()
     {
+      // Deploy service level assets, load balancers, DNS zones etc
+      deployService();
+      
       Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
       
-      if(initContainerMap != null && !initContainerMap.isEmpty())
+      if(action_.isDeploy_ && initContainerMap != null && !initContainerMap.isEmpty())
       {
-        // Deploy service level assets, load balancers, DNS zones etc
-        
-        deployService();
-        
         for(String name : initContainerMap.keySet())
         {
           JsonObject<?> container = initContainerMap.get(name);
@@ -1181,15 +1218,47 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
     }
     
+    protected void undeployInitContainers()
+    {
+      Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
+      
+      if(action_.isUndeploy_ && initContainerMap != null && !initContainerMap.isEmpty())
+      {
+        for(String name : initContainerMap.keySet())
+        {
+          JsonObject<?> container = initContainerMap.get(name);
+          
+          IJsonDomNode        portNode = container.get(PORT);
+          int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+          Collection<String>  paths = container.getListOf(String.class, PATHS);
+          String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+          
+          undeployInitContainer(name, port, paths, healthCheckPath);
+        }
+      }
+      
+      // Undeploy service level assets, load balancers, DNS zones etc
+      undeployService();
+      
+    }
+    
     protected void deployServiceContainers(IBatch<Runnable> batch)
     {
       if(!getContainerMap().isEmpty())
       {
-        configureServiceNetwork();
+        if(action_ == FugueDeployAction.Deploy && isPrimaryEnvironment()) // we can't find the IP addresses for this.......
+        {
+          configureServiceNetwork();
+        }
   
         deployDockerContainers(batch, ContainerType.SERVICE,    false);
         deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
         deployLambdaContainers(batch, ContainerType.LAMBDA);
+        
+        if(action_.isUndeploy_)
+        {
+          configureServiceNetwork();
+        }
       }
     }
 
@@ -1255,12 +1324,38 @@ public abstract class FugueDeploy extends CommandLineHandler
             int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
             
             if(scheduled)
+            {
               deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
+            }
             else
+            {
               deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
+            }
           });
         }
       }
     }
+  }
+  
+
+
+  public static String stripAfter(String s, char c)
+  {
+    int i = s.lastIndexOf(c);
+    
+    if(i>0)
+      return s.substring(0, i);
+    
+    return s;
+  }
+  
+  public static String stripBefore(String s, char c)
+  {
+    int i = s.lastIndexOf(c);
+    
+    if(i>0)
+      return s.substring(i + 1);
+    
+    return s;
   }
 }
