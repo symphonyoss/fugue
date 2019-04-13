@@ -1246,7 +1246,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       if(!getContainerMap().isEmpty())
       {
-        if(action_ == FugueDeployAction.Deploy)
+        if(action_ == FugueDeployAction.Deploy && isPrimaryEnvironment()) // we can't find the IP addresses for this.......
         {
           configureServiceNetwork();
         }

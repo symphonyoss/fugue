@@ -2009,6 +2009,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath)
     {
+      if(action_.isDeploy_ && !isPrimaryEnvironment())
+        return;
       
       List<String> remainingPaths = new ArrayList<>();
       
@@ -2164,43 +2166,59 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       String taskArn = run.getTasks().get(0).getTaskArn();
       
-      waitTaskComplete(taskArn, TimeUnit.SECONDS, 300);
+      waitTaskComplete(taskName, taskArn, TimeUnit.SECONDS, 300);
       
     }
     
-    private void waitTaskComplete(String taskArn, TimeUnit timeUnit, long timeout)
+    private void waitTaskComplete(Name taskName, String taskArn, TimeUnit timeUnit, long timeout)
     {
       long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
       String logGroupName = getNameFactory().getServiceName().toString();
-      String logStreamName = getService();
+      String logStreamName = getService() + '/' + taskName + '/' + taskArn.substring(taskArn.lastIndexOf('/') + 1);
       String nextToken = null;
       
+      log_.info("Waiting for task " + taskArn + "...");
       while(System.currentTimeMillis() < deadline)
       {
         
         DescribeTasksResult taskDesc = ecsClient_.describeTasks(new DescribeTasksRequest()
             .withTasks(taskArn)
+            .withCluster(clusterName_)
             );
         
-        String status = taskDesc.getTasks().get(0).getLastStatus();
-        
-        // read log
-        GetLogEventsResult events = logsClient_.getLogEvents(new GetLogEventsRequest()
-            .withLogGroupName(logGroupName)
-            .withLogStreamName(logStreamName)
-            .withNextToken(nextToken)
-            );
-        
-        nextToken = events.getNextForwardToken();
-        
-        for(OutputLogEvent event : events.getEvents())
+        if(taskDesc.getTasks().size() == 1)
         {
-          log_.info(">" + event.getMessage());
+          String status = taskDesc.getTasks().get(0).getLastStatus();
+          
+          // read log
+          try
+          {
+            GetLogEventsResult events = logsClient_.getLogEvents(new GetLogEventsRequest()
+                .withLogGroupName(logGroupName)
+                .withLogStreamName(logStreamName)
+                .withNextToken(nextToken)
+                );
+            
+            nextToken = events.getNextForwardToken();
+            
+            for(OutputLogEvent event : events.getEvents())
+            {
+              log_.info("| " + event.getMessage());
+            }
+          }
+          catch(com.amazonaws.services.logs.model.ResourceNotFoundException e)
+          {
+            // No logs yet...
+          }
+          
+          if("STOPPED".equals(status))
+          {
+            return;
+          }
         }
-        
-        if("STOPPED".equals(status))
+        else
         {
-          return;
+          log_.info("Got " + taskDesc.getTasks().size() + " tasks");
         }
         
         try
@@ -2234,14 +2252,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         if(action_.isDeploy_)
         {
-          loadBalancer_ = getLoadBalancer(true);
+          if(isPrimaryEnvironment()) // we can't find the IP addresses for this.......
+            loadBalancer_ = getLoadBalancer(true);
           
           Name targetGroupName = getNameFactory().getServiceItemName(DEFAULT);
               //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
           
-          defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
+          if(isPrimaryEnvironment())
+          {
+            defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
           
-          listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+            listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+          }
         }
         
         if(action_.isUndeploy_)
@@ -2425,7 +2447,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     //            )
             ;
         
-        if(!paths.isEmpty())
+        if(isPrimaryEnvironment() && !paths.isEmpty())
         {
           request
             .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()

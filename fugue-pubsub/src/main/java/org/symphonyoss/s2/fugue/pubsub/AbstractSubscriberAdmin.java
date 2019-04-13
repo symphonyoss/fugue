@@ -23,7 +23,9 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,9 +44,13 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
   
+  protected final List<SubscriptionImpl<?>> obsoleteSubscribers_;
+  
   protected AbstractSubscriberAdmin(Class<T> type, Builder<?,T> builder)
   {
     super(type, builder);
+    
+    obsoleteSubscribers_ = builder.obsoleteSubscribers_;
   }
 
   /**
@@ -59,6 +65,8 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   extends AbstractSubscriberBase.Builder<Void,T,B>
   implements ISubscriberAdminBuilder<T,B>
   {
+    protected List<SubscriptionImpl<?>> obsoleteSubscribers_ = new ArrayList<>();
+    
     protected Builder(Class<T> type)
     {
       super(type);
@@ -69,7 +77,23 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     {
       return super.withSubscription(null, subscription);
     }
-  
+    
+    @Override
+    public T withObsoleteSubscription(String subscriptionId, String topicId,
+        String... additionalTopicIds)
+    {
+      taskList_.add(() ->
+      {
+        Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
+        
+        obsoleteSubscribers_.add(new SubscriptionImpl<T>(
+            topicNames,
+            subscriptionId, null));
+      });
+      
+      return self();
+    }
+
     @Override
     public T withSubscription(String subscriptionId, String topicId,
         String... additionalTopicIds)
@@ -117,6 +141,8 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
         createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
       }
     }
+
+    deleteObsoleteSubscriptions(dryRun);
   }
   
   @Override
@@ -127,6 +153,20 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     {
 
       log_.info("About to delete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
+      for(TopicName topicName : subscription.getTopicNames())
+      {
+        deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+      }
+    }
+    
+    deleteObsoleteSubscriptions(dryRun);
+  }
+  
+  private void deleteObsoleteSubscriptions(boolean dryRun)
+  {
+    for(SubscriptionImpl<?> subscription : obsoleteSubscribers_)
+    {
+      log_.info("About to delete obsolete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
       for(TopicName topicName : subscription.getTopicNames())
       {
         deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);

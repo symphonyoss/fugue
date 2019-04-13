@@ -75,6 +75,7 @@
             "Sid": "All",
             "Effect": "Allow",
             "Action": [
+                "ecs:DescribeTasks",
                 "route53:ListResourceRecordSets",
                 "route53:ListHostedZonesByName",
                 "route53:CreateHostedZone",
@@ -131,12 +132,14 @@
             "Sid": "ECS",
             "Effect": "Allow",
             "Action": [
+                "logs:GetLogEvents",
                 "ecs:StartTask",
                 "ecs:RunTask"
             ],
             "Resource": [
-                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-${environmentId}-*:*",
-                "arn:aws:ecs:*:*:task/sym-s2-${environmentType}-${environmentId}-*"
+                "arn:aws:logs:*:*:log-group:sym-s2-dev-s2smoke2-*",
+                "arn:aws:logs:*:*:log-group:sym-s2-dev-s2smoke2-*:*:*",
+                "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-${environmentId}-*"
             ]
         },
         {

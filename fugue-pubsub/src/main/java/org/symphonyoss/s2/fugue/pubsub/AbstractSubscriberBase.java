@@ -73,16 +73,16 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
    */
   public static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberBase<P,B>> extends BaseAbstractBuilder<T,B>
   {
-    private INameFactory              nameFactory_;
-    private int                       totalSubscriptionCnt_;
-    private List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
-    private List<Runnable>            taskList_    = new ArrayList<>();
+    protected INameFactory              nameFactory_;
+    protected int                       totalSubscriptionCnt_;
+    protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
+    protected List<Runnable>            taskList_    = new ArrayList<>();
     
     protected Builder(Class<T> type)
     {
       super(type);
     }
-    
+
     public T withNameFactory(INameFactory nameFactory)
     {
       nameFactory_ = nameFactory;
