@@ -137,8 +137,8 @@
                 "ecs:RunTask"
             ],
             "Resource": [
-                "arn:aws:logs:*:*:log-group:sym-s2-dev-s2smoke2-*",
-                "arn:aws:logs:*:*:log-group:sym-s2-dev-s2smoke2-*:*:*",
+                "arn:aws:logs:*:*:log-group:sym-s2-${environmentType}-${environmentId}-*",
+                "arn:aws:logs:*:*:log-group:sym-s2-${environmentType}-${environmentId}-*:*:*",
                 "arn:aws:ecs:*:*:task-definition/sym-s2-${environmentType}-${environmentId}-*"
             ]
         },
