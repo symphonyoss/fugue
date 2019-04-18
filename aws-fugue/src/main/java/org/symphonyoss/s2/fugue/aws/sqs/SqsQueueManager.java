@@ -32,6 +32,7 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.IQueueManager;
+import org.symphonyoss.s2.fugue.pubsub.IQueueSender;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -54,19 +55,32 @@ public class SqsQueueManager implements IQueueManager
   private static final Logger                log_ = LoggerFactory.getLogger(SqsQueueManager.class);
 
   private final String                       region_;
-  private final String                       accountId_;
   private final ImmutableMap<String, String> tags_;
 
   private final AmazonSQS                    sqsClient_;
-//  private List<SqsSubscriber> subscribers_ = new LinkedList<>();
+  private Map<Name, SqsQueueSender>          senderMap_ = new HashMap<>();
 
   private SqsQueueManager(Builder builder)
   {
-    accountId_  = builder.accountId_;
     region_     = builder.region_;
     tags_       = ImmutableMap.copyOf(builder.tags_);
     
-    sqsClient_ = builder.sqsBuilder_.build();
+    sqsClient_ = builder.sqsBuilder_.withRegion(region_).build();
+  }
+  
+  @Override
+  public synchronized IQueueSender getSender(Name queueName)
+  {
+    SqsQueueSender sender = senderMap_.get(queueName);
+    
+    if(sender == null)
+    {
+      sender = new SqsQueueSender(sqsClient_, queueName);
+      
+      senderMap_.put(queueName, sender);
+    }
+    
+    return sender;
   }
   
   /**
@@ -79,7 +93,6 @@ public class SqsQueueManager implements IQueueManager
   {
     private AmazonSQSClientBuilder sqsBuilder_;
     private String                 region_;
-    private String                 accountId_;
     private Map<String, String>    tags_ = new HashMap<>();
     //  private String configPath_ = "org/symphonyoss/s2/fugue/aws/sqs";
 
@@ -132,20 +145,6 @@ public class SqsQueueManager implements IQueueManager
       
       return self();
     }
-    
-    /**
-     * Set the AWS account ID.
-     * 
-     * @param accountId The ID of the AWS account in which to operate.
-     * 
-     * @return this (fluent method)
-     */
-    public Builder withAccountId(String accountId)
-    {
-      accountId_  = accountId;
-      
-      return self();
-    }
 
     /**
      * Set the AWS credentials provider.
@@ -182,7 +181,6 @@ public class SqsQueueManager implements IQueueManager
       super.validate(faultAccumulator);
       
       faultAccumulator.checkNotNull(region_,    "region");
-      faultAccumulator.checkNotNull(accountId_, "accountId");
     }
 
     @Override
@@ -193,7 +191,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public void createQueue(Name queueName, boolean dryRun)
+  public void createQueue(Name queueName, Map<String, String> tags, boolean dryRun)
   {
     String  queueUrl;
     
@@ -218,9 +216,22 @@ public class SqsQueueManager implements IQueueManager
       }
     }
     
+    Map<String, String> effectiveTags;
+    
+    if(tags == null || tags.isEmpty())
+    {
+      effectiveTags = tags_;
+    }
+    else
+    {
+      effectiveTags = new HashMap<>(tags_);
+      effectiveTags.putAll(tags);
+    }
+    
+    
     sqsClient_.tagQueue(new TagQueueRequest()
         .withQueueUrl(queueUrl)
-        .withTags(tags_)
+        .withTags(effectiveTags)
         );
   }
   

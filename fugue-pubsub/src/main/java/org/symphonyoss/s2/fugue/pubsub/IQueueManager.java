@@ -23,6 +23,10 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import java.util.Map;
+
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.fugue.naming.Name;
 
 /**
@@ -32,9 +36,30 @@ import org.symphonyoss.s2.fugue.naming.Name;
  */
 public interface IQueueManager
 {
-
+  /**
+   * Delete the given queue.
+   * 
+   * @param queueName The name of the queue to be deleted.
+   * @param dryRun    If true then log actions which would be performed but don't actually do anything.
+   */
   void deleteQueue(Name queueName, boolean dryRun);
 
-  void createQueue(Name queueName, boolean dryRun);
+  /**
+   * Create a queue.
+   * 
+   * @param queueName The name of the queue to be created.
+   * @param tags      Tags to be applied to the queue.
+   * @param dryRun    If true then log actions which would be performed but don't actually do anything.
+   */
+  void createQueue(Name queueName, @Nullable Map<String, String> tags, boolean dryRun);
+
+  /**
+   * Return a sender for the given queue.
+   * 
+   * @param queueName The name of the queue to which messages will be sent.
+   * 
+   * @return A sender for the given queue.
+   */
+  IQueueSender getSender(Name queueName);
   
 }
