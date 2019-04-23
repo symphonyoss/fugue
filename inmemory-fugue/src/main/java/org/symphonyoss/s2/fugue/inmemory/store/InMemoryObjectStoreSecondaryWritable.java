@@ -27,7 +27,6 @@ import java.util.TreeMap;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
