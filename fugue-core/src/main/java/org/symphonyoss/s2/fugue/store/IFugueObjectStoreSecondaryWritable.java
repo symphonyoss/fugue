@@ -56,7 +56,6 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param saveToSecondary           Iff true then save to secondary storage.
    * @param trace                     A trace context.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
-   * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    */
   void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
