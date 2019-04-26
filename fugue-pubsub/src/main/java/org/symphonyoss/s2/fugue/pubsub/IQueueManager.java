@@ -61,5 +61,12 @@ public interface IQueueManager
    * @return A sender for the given queue.
    */
   IQueueSender getSender(Name queueName);
+
+  /**
+   * Return the maximum allowed size of a message in bytes.
+   * 
+   * @return The maximum allowed size of a message in bytes.
+   */
+  int getMaximumMessageSize();
   
 }

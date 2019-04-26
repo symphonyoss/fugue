@@ -52,6 +52,8 @@ import com.google.common.collect.ImmutableMap;
  */
 public class SqsQueueManager implements IQueueManager
 {
+  protected static final int                   MAX_MESSAGE_SIZE  = 256 * 1024; // 256K
+  
   private static final Logger                log_ = LoggerFactory.getLogger(SqsQueueManager.class);
 
   private final String                       region_;
@@ -81,6 +83,12 @@ public class SqsQueueManager implements IQueueManager
     }
     
     return sender;
+  }
+
+  @Override
+  public int getMaximumMessageSize()
+  {
+    return MAX_MESSAGE_SIZE;
   }
   
   /**
