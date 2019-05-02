@@ -27,6 +27,8 @@ import java.util.Collection;
 
 import javax.annotation.Nullable;
 
+import org.symphonyoss.s2.common.hash.Hash;
+
 import com.google.common.collect.ImmutableMap;
 
 public interface INameFactory
@@ -80,8 +82,6 @@ public interface INameFactory
    */
   SubscriptionName  getSubscriptionName(TopicName topicName, @Nullable String subscriptionId);
 
-  CredentialName getCredentialName(String tenantId, String owner);
-
   /**
    * 
    * @return the service name with no tenant element even if we are in a tenant specific context.
@@ -117,16 +117,18 @@ public interface INameFactory
   /**
    * Create a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
    * 
-   * @param tenantId  The tenantId for the new Name Factory.
+   * @param podName The podName for the new Name Factory.
+   * @param podId   The podId for the new Name Factory.
    * 
    * @return a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
    */
-  INameFactory withTenantId(String tenantId);
+  INameFactory withPod(String podName, Integer podId);
   
   String getEnvironmentType();
   
   String getEnvironmentId();
 
+  Integer getPodId();
   String getPodName();
   
   String getServiceId();
@@ -136,8 +138,6 @@ public interface INameFactory
   String getRequiredEnvironmentType();
   
   String getRequiredEnvironmentId();
-
-  String getRequiredTenantId();
   
   String getRequiredServiceId();
   
@@ -152,4 +152,11 @@ public interface INameFactory
   String getGlobalNamePrefix();
 
   INameFactory withGlobalNamePrefix(String globalNamePrefix);
+
+  CredentialName getCredentialName(Integer podId, String owner);
+
+  CredentialName getCredentialName(String owner);
+
+  CredentialName getCredentialName(Integer podId, Hash principalBaseHash);
+
 }

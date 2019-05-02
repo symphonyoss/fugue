@@ -34,22 +34,22 @@ import javax.annotation.Nonnull;
 public class ServiceName extends Name
 {
   private final String serviceId_;
-  private final String tenantId_;
+  private final String podName_;
 
   /**
    * Constructor.
    * 
    * @param serviceId       The ID of the service.
-   * @param tenantId        The tenantId (simple name).
+   * @param podName           The podName (simple name).
    * @param name            The first element of the actual name.
    * @param additional      Zero or more optional suffix elements.
    */
-  protected ServiceName(String serviceId, String tenantId, @Nonnull String name, String ...additional)
+  protected ServiceName(String serviceId, String podName, @Nonnull String name, Object ...additional)
   {
     super(name, additional);
     
     serviceId_ = serviceId;
-    tenantId_ = tenantId;
+    podName_ = podName;
   }
 
   /**
@@ -63,10 +63,10 @@ public class ServiceName extends Name
   
   /**
    * 
-   * @return The tenant ID (simple name)
+   * @return The podName (simple name)
    */
-  public String getTenantId()
+  public String getPodName()
   {
-    return tenantId_;
+    return podName_;
   }
 }

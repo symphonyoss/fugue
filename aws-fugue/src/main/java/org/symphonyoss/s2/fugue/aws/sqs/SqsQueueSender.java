@@ -30,7 +30,6 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.IPubSubMessage;
 import org.symphonyoss.s2.fugue.pubsub.IQueueSender;
 
@@ -61,11 +60,11 @@ public class SqsQueueSender implements IQueueSender
    * 
    * @throws QueueDoesNotExistException if the queue does not exist.
    */
-  SqsQueueSender(AmazonSQS sqsClient, Name queueName)
+  SqsQueueSender(AmazonSQS sqsClient, String queueName)
   {
     sqsClient_     = sqsClient;
     
-    queueUrl_ = sqsClient_.getQueueUrl(queueName.toString()).getQueueUrl();
+    queueUrl_ = sqsClient_.getQueueUrl(queueName).getQueueUrl();
 
     log_.info("Queue " + queueName + " exists as " + queueUrl_);
   }

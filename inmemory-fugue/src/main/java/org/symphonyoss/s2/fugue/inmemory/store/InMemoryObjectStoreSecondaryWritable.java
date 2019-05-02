@@ -67,44 +67,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace)
-  {
-    doSaveToSecondaryStorage(absoluteHash, payload, saveToSecondary, trace,
-        null, null,
-        null, null, null, null);
-  }
-  
-  @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
-      List<Hash> absoluteSequenceHashes, Instant createdDate)
-  {
-    doSaveToSecondaryStorage(absoluteHash, payload, saveToSecondary, trace,
-        absoluteSequenceHashes, createdDate,
-        null, null, null, null);
-  }
-
-  @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
-  {
-    doSaveToSecondaryStorage(absoluteHash, payload, saveToSecondary, trace,
-        null, null,
-        currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
-  }
-  
-  @Override
-  public void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
-  {
-    doSaveToSecondaryStorage(absoluteHash, payload, saveToSecondary, trace,
-        absoluteSequenceHashes, createdDate,
-        currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
-  }
-
-  private void doSaveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  public String saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace)
   {
     String  payloadString;
     
@@ -125,6 +88,43 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
       payloadString = payload.toString();
       trace.trace("READ_PAYLOAD_NOTIFICATION");
     }
+    
+    return payloadString;
+  }
+  
+  @Override
+  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+      List<Hash> absoluteSequenceHashes, Instant createdDate)
+  {
+    doSaveToSequences(absoluteHash, payload,
+        absoluteSequenceHashes, createdDate,
+        null, null, null, null);
+  }
+
+  @Override
+  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    doSaveToSequences(absoluteHash, payload,
+        null, null,
+        currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
+  }
+  
+  @Override
+  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+      List<Hash> absoluteSequenceHashes, Instant createdDate,
+      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    doSaveToSequences(absoluteHash, payload,
+        absoluteSequenceHashes, createdDate,
+        currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
+  }
+
+  private void doSaveToSequences(Hash absoluteHash, IFugueObject payload,
+      List<Hash> absoluteSequenceHashes, Instant createdDate,
+      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  {
+    String payloadString = payload.toString();
     
     if(absoluteSequenceHashes != null)
       processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, absoluteSequenceHashes);

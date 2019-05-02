@@ -27,8 +27,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.symphonyoss.s2.fugue.naming.Name;
-
 /**
  * A queue manager.
  * 
@@ -42,7 +40,7 @@ public interface IQueueManager
    * @param queueName The name of the queue to be deleted.
    * @param dryRun    If true then log actions which would be performed but don't actually do anything.
    */
-  void deleteQueue(Name queueName, boolean dryRun);
+  void deleteQueue(String queueName, boolean dryRun);
 
   /**
    * Create a queue.
@@ -51,7 +49,7 @@ public interface IQueueManager
    * @param tags      Tags to be applied to the queue.
    * @param dryRun    If true then log actions which would be performed but don't actually do anything.
    */
-  void createQueue(Name queueName, @Nullable Map<String, String> tags, boolean dryRun);
+  void createQueue(String queueName, @Nullable Map<String, String> tags, boolean dryRun);
 
   /**
    * Return a sender for the given queue.
@@ -60,7 +58,7 @@ public interface IQueueManager
    * 
    * @return A sender for the given queue.
    */
-  IQueueSender getSender(Name queueName);
+  IQueueSender getSender(String queueName);
 
   /**
    * Return the maximum allowed size of a message in bytes.
@@ -68,5 +66,4 @@ public interface IQueueManager
    * @return The maximum allowed size of a message in bytes.
    */
   int getMaximumMessageSize();
-  
 }

@@ -31,7 +31,6 @@ import java.io.InputStreamReader;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -54,11 +53,11 @@ import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.type.provider.IIntegerProvider;
 import org.symphonyoss.s2.common.type.provider.IStringProvider;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.Name;
 
 /**
  * Abstract base class for deployment utility implementations, to be subclassed for each cloud service provider.
@@ -156,7 +155,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private ExecutorService         executor_           = Executors.newFixedThreadPool(20,
       new NamedThreadFactory("Batch", true));
 
-  private List<DeploymentContext> tenantContextList_  = new LinkedList<>();
+  private Map<String, DeploymentContext> tenantContextMap_  = new HashMap<>();
   private DeploymentContext       multiTenantContext_;
 
   private Map<String, String>     tags_               = new HashMap<>();
@@ -202,7 +201,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   }
   
   protected abstract INameFactory createNameFactory(String environmentType, String environmentId, String regionId,
-      String podName, String serviceId);
+      String podName, Integer podId, String serviceId);
 
   private void setAction(String v)
   {
@@ -347,8 +346,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     if(track_ != null || station_ != null)
       getStationConfig();
 
-    if(podName_ != null)
-      tenantContextList_.add(createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, service_)));
+    if(podName_ != null && !tenantContextMap_.containsKey(podName_))
+      tenantContextMap_.put(podName_, createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, null, service_)));
 
     log_.info("FugueDeploy v1.2");
     log_.info("ACTION           = " + action_);
@@ -356,8 +355,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     log_.info("ENVIRONMENT      = " + environment_);
     log_.info("REGION           = " + region_);
     
-    for(int i=0 ; i<tenantContextList_.size() ; i++)
-      log_.info(String.format("TENANT[%3d]      = %s", i, tenantContextList_.get(i).getPodName()));
+    for(String podName : tenantContextMap_.keySet())
+      log_.info(String.format("TENANT           = %s", podName));
     
     populateTags(tags_);
     
@@ -383,7 +382,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       case CreateEnvironmentType:
         log_.info("Creating environment type \"" + environmentType_ + "\"");
         
-        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null));
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, null, null, null, null, null));
         multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironmentType();
         break;
@@ -391,7 +390,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       case CreateEnvironment:
         log_.info("Creating environment \"" + environment_ + "\"");
         
-        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null));
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, null, null, null, null));
         multiTenantContext_.setConfig(multiTenantConfig);
         multiTenantContext_.createEnvironment();
         break;
@@ -400,7 +399,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       case DeployConfig:
       case Undeploy:
       case UndeployAll:
-        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, service_));
+        multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, null, service_));
         multiTenantContext_.setConfig(multiTenantConfig);
         
         deploy( multiTenantDefaults,
@@ -491,7 +490,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     Map<String, String> singleTenantPolicies  = fetchPolicies(dir, SINGLE_TENANT);
         
-    for(DeploymentContext context : tenantContextList_)
+    for(DeploymentContext context : tenantContextMap_.values())
     {
       context.setPolicies(singleTenantPolicies);
       context.setContainers(singleTenantContainerMap);
@@ -511,7 +510,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       IBatch<Runnable>    batch                 = createBatch();
 
-      for(DeploymentContext context : tenantContextList_)
+      for(DeploymentContext context : tenantContextMap_.values())
       {
         batch.submit(() ->
         {
@@ -569,7 +568,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       multiTenantContext_.deployServiceContainers(containerBatch);
       
-      for(DeploymentContext context : tenantContextList_)
+      for(DeploymentContext context : tenantContextMap_.values())
       {
         context.deployServiceContainers(containerBatch);
       }
@@ -581,7 +580,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       IBatch<Runnable>    batch                 = createBatch();
 
-      for(DeploymentContext context : tenantContextList_)
+      for(DeploymentContext context : tenantContextMap_.values())
       {
         batch.submit(() ->
         {
@@ -818,8 +817,11 @@ public abstract class FugueDeploy extends CommandLineHandler
                   {
                      String podName = ((IStringProvider)tenantNode).asString();
                    
-                     tenantContextList_.add(createContext(podName,
-                        createNameFactory(environmentType_, environment_, region_, podName, service_)));
+                     if(!tenantContextMap_.containsKey(podName))
+                     {
+                       tenantContextMap_.put(podName, createContext(podName,
+                          createNameFactory(environmentType_, environment_, region_, podName, null, service_)));
+                     }
                   }
                   else
                   {
@@ -1073,7 +1075,11 @@ public abstract class FugueDeploy extends CommandLineHandler
         if(value instanceof IStringProvider)
         {
           templateVariables.put(name, ((IStringProvider)value).asString());
-        }      
+        }
+        else if(value instanceof IIntegerProvider)
+        {
+          templateVariables.put(name, String.valueOf(((IIntegerProvider)value).asInteger()));
+        }
       }
       
       try

@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
-import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.IQueueManager;
 import org.symphonyoss.s2.fugue.pubsub.IQueueSender;
 
@@ -60,7 +59,7 @@ public class SqsQueueManager implements IQueueManager
   private final ImmutableMap<String, String> tags_;
 
   private final AmazonSQS                    sqsClient_;
-  private Map<Name, SqsQueueSender>          senderMap_ = new HashMap<>();
+  private Map<String, SqsQueueSender>          senderMap_ = new HashMap<>();
 
   private SqsQueueManager(Builder builder)
   {
@@ -71,7 +70,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public synchronized IQueueSender getSender(Name queueName)
+  public synchronized IQueueSender getSender(String queueName)
   {
     SqsQueueSender sender = senderMap_.get(queueName);
     
@@ -199,7 +198,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public void createQueue(Name queueName, Map<String, String> tags, boolean dryRun)
+  public void createQueue(String queueName, Map<String, String> tags, boolean dryRun)
   {
     String  queueUrl;
     
@@ -244,7 +243,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public void deleteQueue(Name queueName, boolean dryRun)
+  public void deleteQueue(String queueName, boolean dryRun)
   {
     try
     {

@@ -26,6 +26,8 @@ package org.symphonyoss.s2.fugue.store;
 import java.time.Instant;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
@@ -39,50 +41,34 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreReadOnly
 {
   /**
-   * Save the given object to secondary storage.
-   * 
-   * @param absoluteHash            The absolute hash of the object to store.
-   * @param payload                 The payload (if available).
-   * @param saveToSecondary         Iff true then save to secondary storage.
-   * @param trace                   A trace context.
-   */
-  void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace);
-  
-  /**
-   * Save the given object to secondary storage.
+   * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
-   * @param saveToSecondary           Iff true then save to secondary storage.
-   * @param trace                     A trace context.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    */
-  void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
+  void saveToSequences(Hash absoluteHash, IFugueObject payload,
       List<Hash> absoluteSequenceHashes, Instant createdDate);
   
   /**
-   * Save the given object to secondary storage.
+   * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
-   * @param saveToSecondary           Iff true then save to secondary storage.
-   * @param trace                     A trace context.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
    * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    */
-  void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
+  void saveToSequences(Hash absoluteHash, IFugueObject payload,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate);
   
   /**
-   * Save the given object to secondary storage.
+   * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
-   * @param saveToSecondary           Iff true then save to secondary storage.
-   * @param trace                     A trace context.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
@@ -90,7 +76,18 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    */
-  void saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, boolean saveToSecondary, ITraceContext trace,
+  void saveToSequences(Hash absoluteHash, IFugueObject payload,
       List<Hash> absoluteSequenceHashes, Instant createdDate,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate);
+
+  /**
+   * Save the given object to secondary storage.
+   * 
+   * @param absoluteHash              The absolute hash of the object to store.
+   * @param payload                   The payload (if available).
+   * @param trace                     A trace context.
+   * 
+   * @return The payload as a string, which may have been retrieved from storage if it is not provided as an input.
+   */
+  String saveToSecondaryStorage(Hash absoluteHash, @Nullable IFugueObject payload, ITraceContext trace);
 }

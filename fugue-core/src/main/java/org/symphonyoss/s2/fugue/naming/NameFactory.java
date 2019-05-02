@@ -28,6 +28,7 @@ import java.util.Collection;
 
 import javax.annotation.Nonnull;
 
+import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
 
 import com.google.common.collect.ImmutableMap;
@@ -43,22 +44,24 @@ public class NameFactory implements INameFactory
   private final String                       environmentId_;
   private final String                       regionId_;
   private final String                       podName_;
+  private final Integer                      podId_;
   private final String                       serviceId_;
   private final ImmutableMap<String, String> tags_;
   
   
   public NameFactory(IGlobalConfiguration config)
   {
-    this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRegionId(), config.getPodName(), config.getServiceId());
+    this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRegionId(), config.getPodName(), config.getPodId(), config.getServiceId());
   }
 
-  public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String regionId, String podName, String serviceId)
+  public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String regionId, String podName, Integer podId, String serviceId)
   {
     globalNamePrefix_ = globalNamePrefix;
     environmentType_ = environmentType;
     environmentId_ = environmentId;
     regionId_ = regionId;
     podName_ = podName;
+    podId_ = podId;
     serviceId_ = serviceId;
     tags_ = createTags();
   }
@@ -70,6 +73,7 @@ public class NameFactory implements INameFactory
     environmentId_ = nameFactory.getEnvironmentId();
     regionId_ = nameFactory.getRegionId();
     podName_ = nameFactory.getPodName();
+    podId_ = nameFactory.getPodId();
     serviceId_ = nameFactory.getServiceId();
     tags_ = createTags();
   }
@@ -77,19 +81,19 @@ public class NameFactory implements INameFactory
   @Override
   public INameFactory withRegionId(String regionId)
   {
-    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId, podName_, serviceId_);
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId, podName_, podId_, serviceId_);
   }
   
   @Override
-  public INameFactory withTenantId(String tenantId)
+  public INameFactory withPod(String podName, Integer podId)
   {
-    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, tenantId, serviceId_);
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, podName, podId, serviceId_);
   }
   
   @Override
   public INameFactory withGlobalNamePrefix(String globalNamePrefix)
   {
-    return new NameFactory(globalNamePrefix, environmentType_, environmentId_, regionId_, podName_, serviceId_);
+    return new NameFactory(globalNamePrefix, environmentType_, environmentId_, regionId_, podName_, podId_, serviceId_);
   }
 
   private ImmutableMap<String, String> createTags()
@@ -99,7 +103,8 @@ public class NameFactory implements INameFactory
     putIfNotNull(builder, "FUGUE_ENVIRONMENT_TYPE", environmentType_);
     putIfNotNull(builder, "FUGUE_ENVIRONMENT",      environmentId_);
     putIfNotNull(builder, "FUGUE_REGION",           regionId_);
-    putIfNotNull(builder, "FUGUE_TENANT",           podName_);
+    putIfNotNull(builder, "FUGUE_POD_NAME",         podName_);
+    putIfNotNull(builder, "FUGUE_POD_ID",           podId_);
     
     return builder.build();
   }
@@ -147,6 +152,12 @@ public class NameFactory implements INameFactory
   }
 
   @Override
+  public Integer getPodId()
+  {
+    return podId_;
+  }
+
+  @Override
   public String getServiceId()
   {
     return serviceId_;
@@ -176,12 +187,6 @@ public class NameFactory implements INameFactory
   public String getRequiredRegionId()
   {
     return require(regionId_, "regionId");
-  }
-  
-  @Override
-  public String getRequiredTenantId()
-  {
-    return require(podName_, "tenantId");
   }
   
   @Override
@@ -323,12 +328,24 @@ public class NameFactory implements INameFactory
   public CredentialName getEnvironmentCredentialName(String owner)
   {
     return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, null, owner, CredentialName.SUFFIX);
+}
+  
+  @Override
+  public CredentialName getCredentialName(String owner)
+  {
+    return getCredentialName(podId_, owner);
   }
   
   @Override
-  public CredentialName getCredentialName(String tenantId, String owner)
+  public CredentialName getCredentialName(Integer podId, String owner)
   {
-    return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, tenantId, owner, CredentialName.SUFFIX);
+    return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, "pod-" + podId, owner, CredentialName.SUFFIX);
+  }
+  
+  @Override
+  public CredentialName getCredentialName(Integer podId, Hash principalBaseHash)
+  {
+    return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, "pod-" + podId, "principal-" + principalBaseHash, CredentialName.SUFFIX);
   }
   
   @Override
@@ -350,9 +367,9 @@ public class NameFactory implements INameFactory
     return new Name(name, (Object[])additional);
   }
 
-  protected ServiceName createServiceName(String serviceId, String tenantId, @Nonnull String name, String ...additional)
+  protected ServiceName createServiceName(String serviceId, String podName, @Nonnull String name, Object ...additional)
   {
-    return new ServiceName(serviceId, tenantId, name, additional);
+    return new ServiceName(serviceId, podName, name, additional);
   }
 
   protected TableName createTableName(String serviceId, String tableId, @Nonnull String name, String ...additional)
@@ -370,8 +387,8 @@ public class NameFactory implements INameFactory
     return new SubscriptionName(topicName, serviceId, subscriptionId, name, additional);
   }
 
-  protected CredentialName createCredentialName(String prefix, String environmentTypeId, String environmentId, String tenantId, String owner, String suffix)
+  protected CredentialName createCredentialName(String prefix, String environmentTypeId, String environmentId, String podId, String owner, String suffix)
   {
-    return new CredentialName(prefix, environmentTypeId, environmentId, tenantId, owner, suffix);
+    return new CredentialName(prefix, environmentTypeId, environmentId, podId, owner, suffix);
   }
 }
