@@ -36,7 +36,6 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.ICounter;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 import com.google.cloud.pubsub.v1.AckReplyConsumer;
@@ -75,14 +74,14 @@ public class GoogleAsyncSubscriber implements MessageReceiver
   private final GoogleAsyncSubscriberManager                     manager_;
   private final ITraceContextTransactionFactory                  traceFactory_;
   private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
-  private final SubscriptionName                                 subscriptionName_;
+  private final String                                           subscriptionName_;
   private final ICounter                                         counter_;
   private final String                                           tenantId_;
 
   private AtomicBoolean                                          stopped_                = new AtomicBoolean();
 
   /* package */ GoogleAsyncSubscriber(GoogleAsyncSubscriberManager manager, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, SubscriptionName subscriptionName, ICounter counter, String tenantId)
+      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, String subscriptionName, ICounter counter, String tenantId)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;

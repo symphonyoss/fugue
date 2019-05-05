@@ -32,7 +32,8 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
+import org.symphonyoss.s2.fugue.pubsub.ISubscription;
+import org.symphonyoss.s2.fugue.pubsub.TopicSubscription;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -177,18 +178,16 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
   }
 
   @Override
-  protected void initSubscription(SubscriptionImpl<String> subscription)
+  protected void initSubscription(ISubscription<String> subscription)
   {
-    for(TopicName topicName : subscription.getTopicNames())
+    for(String subscriptionName : subscription.getSubscriptionNames())
     {
-      SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-
       log_.info("Subscribing to " + subscriptionName + "..."); 
       
       String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 
-          sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
+          sqsClient_.getQueueUrl(subscriptionName).getQueueUrl();
       
-      SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, subscriptionName.toString(), getTraceFactory(), subscription.getConsumer(),
+      SqsSubscriber subscriber = new SqsSubscriber(this, sqsClient_, queueUrl, subscriptionName, getTraceFactory(), subscription.getConsumer(),
           getCounter(), getBusyCounter(), nameFactory_.getPodName());
 
       subscribers_.add(subscriber); 

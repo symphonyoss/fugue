@@ -44,7 +44,7 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
   
-  protected final List<SubscriptionImpl<?>> obsoleteSubscribers_;
+  protected final List<TopicSubscription<?>> obsoleteSubscribers_;
   
   protected AbstractSubscriberAdmin(Class<T> type, Builder<?,T> builder)
   {
@@ -65,7 +65,7 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   extends AbstractSubscriberBase.Builder<Void,T,B>
   implements ISubscriberAdminBuilder<T,B>
   {
-    protected List<SubscriptionImpl<?>> obsoleteSubscribers_ = new ArrayList<>();
+    protected List<TopicSubscription<?>> obsoleteSubscribers_ = new ArrayList<>();
     
     protected Builder(Class<T> type)
     {
@@ -86,7 +86,8 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
       {
         Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
         
-        obsoleteSubscribers_.add(new SubscriptionImpl<T>(
+        obsoleteSubscribers_.add(new TopicSubscription<T>(
+            nameFactory_,
             topicNames,
             subscriptionId, null));
       });
@@ -134,11 +135,16 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   public void createSubscriptions(boolean dryRun)
   {
     log_.info("About to create subscriptions...");
-    for(SubscriptionImpl<?> subscription : getSubscribers())
+    for(ISubscription<?> subscription : getSubscribers())
     {
-      for(TopicName topicName : subscription.getTopicNames())
+      if(subscription instanceof TopicSubscription)
       {
-        createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+        TopicSubscription<?> topicSubscription = (TopicSubscription<?>)subscription;
+        
+        for(TopicName topicName : topicSubscription.getTopicNames())
+        {
+          createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, topicSubscription.getSubscriptionId()), dryRun);
+        }
       }
     }
 
@@ -149,13 +155,17 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   public void deleteSubscriptions(boolean dryRun)
   {
     log_.info("About to delete subscriptions...");
-    for(SubscriptionImpl<?> subscription : getSubscribers())
+    for(ISubscription<?> subscription : getSubscribers())
     {
-
-      log_.info("About to delete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
-      for(TopicName topicName : subscription.getTopicNames())
+      if(subscription instanceof TopicSubscription)
       {
-        deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+        TopicSubscription<?> topicSubscription = (TopicSubscription<?>)subscription;
+        
+        log_.info("About to delete subscriptions... subscriptionId=" + topicSubscription.getSubscriptionId());
+        for(TopicName topicName : topicSubscription.getTopicNames())
+        {
+          deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, topicSubscription.getSubscriptionId()), dryRun);
+        }
       }
     }
     
@@ -164,7 +174,7 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   
   private void deleteObsoleteSubscriptions(boolean dryRun)
   {
-    for(SubscriptionImpl<?> subscription : obsoleteSubscribers_)
+    for(TopicSubscription<?> subscription : obsoleteSubscribers_)
     {
       log_.info("About to delete obsolete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
       for(TopicName topicName : subscription.getTopicNames())

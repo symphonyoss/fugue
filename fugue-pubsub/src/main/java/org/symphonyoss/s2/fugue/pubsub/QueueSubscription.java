@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,62 +23,41 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.Collection;
-
-import javax.annotation.Nullable;
-
-import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
+import com.google.common.collect.ImmutableList;
+
 /**
- * A subscription.
+ * A subscription on a Queue.
  * 
  * @author Bruce Skingle
  *
  * @param <P> The type of message produced by this subscription.
  */
-public class SubscriptionImpl<P>
+public class QueueSubscription<P> implements ISubscription<P>
 {
+  private final ImmutableList<String>           subscriptionNames_;
   private final IThreadSafeRetryableConsumer<P> consumer_;
-  private final Collection<TopicName>           topicNames_;
-  private final String                          subscriptionId_;
-
+  
   /**
    * Constructor.
    * 
-   * @param topicNames        One or more topics on which to subscribe.
-   * @param subscriptionName  The simple subscription name.
+   * @param subscriptionName  The name of the queue to be subscribed to.
    * @param consumer          A consumer for received messages.
    */
-  public SubscriptionImpl(Collection<TopicName> topicNames, String subscriptionName, @Nullable IThreadSafeRetryableConsumer<P> consumer)
+  public QueueSubscription(String subscriptionName, IThreadSafeRetryableConsumer<P> consumer)
   {
+    subscriptionNames_ = ImmutableList.of(subscriptionName);
     consumer_ = consumer;
-    topicNames_ = topicNames;
-    subscriptionId_ = subscriptionName;
   }
 
-  /**
-   * 
-   * @return The list of topic names.
-   */
-  public Collection<TopicName> getTopicNames()
+  @Override
+  public ImmutableList<String> getSubscriptionNames()
   {
-    return topicNames_;
+    return subscriptionNames_;
   }
 
-  /**
-   * 
-   * @return The simple subscription name.
-   */
-  public String getSubscriptionId()
-  {
-    return subscriptionId_;
-  }
-
-  /**
-   * 
-   * @return The consumer for received messages.
-   */
+  @Override
   public IThreadSafeRetryableConsumer<P> getConsumer()
   {
     return consumer_;

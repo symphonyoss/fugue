@@ -48,10 +48,9 @@ import com.google.common.collect.ImmutableList;
  */
 public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase<P,T>> extends FugueLifecycleComponent<T>
 {
-  protected final INameFactory                       nameFactory_;
-  protected final ImmutableList<SubscriptionImpl<P>> subscribers_;
-  
-  protected final int                                  totalSubscriptionCnt_;
+  protected final INameFactory                    nameFactory_;
+  protected final ImmutableList<ISubscription<P>> subscribers_;
+  protected final int                             totalSubscriptionCnt_;
   
   protected AbstractSubscriberBase(Class<T> type, Builder<P,?,T> builder)
   {
@@ -75,7 +74,7 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
   {
     protected INameFactory              nameFactory_;
     protected int                       totalSubscriptionCnt_;
-    protected List<SubscriptionImpl<P>> subscribers_ = new ArrayList<>();
+    protected List<ISubscription<P>>    subscribers_ = new ArrayList<>();
     protected List<Runnable>            taskList_    = new ArrayList<>();
     
     protected Builder(Class<T> type)
@@ -96,12 +95,26 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
       {
         Collection<TopicName> topicNames = subscription.createTopicNames(nameFactory_);
         
-        subscribers_.add(new SubscriptionImpl<P>(
+        subscribers_.add(new TopicSubscription<P>(
+            nameFactory_,
             topicNames,
             subscription.getId(),
             consumer));
         
         totalSubscriptionCnt_ += topicNames.size();
+      });
+      
+      return self();
+    }
+
+    protected T withSubscription(@Nullable IThreadSafeRetryableConsumer<P> consumer, String subscriptionName)
+    {
+      taskList_.add(() ->
+      {
+        subscribers_.add(new QueueSubscription<P>(subscriptionName,
+            consumer));
+        
+        totalSubscriptionCnt_ ++;
       });
       
       return self();
@@ -114,7 +127,8 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
       {
         Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
         
-        subscribers_.add(new SubscriptionImpl<P>(
+        subscribers_.add(new TopicSubscription<P>(
+            nameFactory_,
             topicNames,
             subscriptionId, consumer));
         
@@ -129,7 +143,8 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
       if(topicNames.isEmpty())
         throw new IllegalArgumentException("At least one topic name is required");
       
-      subscribers_.add(new SubscriptionImpl<P>(topicNames, subscriptionId, consumer));
+      subscribers_.add(new TopicSubscription<P>(
+          nameFactory_, topicNames, subscriptionId, consumer));
       
       totalSubscriptionCnt_ += topicNames.size();
       
@@ -150,7 +165,8 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
           topicNameList.add(nameFactory_.getTopicName(id));
         }
         
-        subscribers_.add(new SubscriptionImpl<P>(topicNameList, subscriptionId, consumer));
+        subscribers_.add(new TopicSubscription<P>(
+            nameFactory_, topicNameList, subscriptionId, consumer));
         
         totalSubscriptionCnt_ += topicNameList.size();
       });
@@ -172,7 +188,7 @@ public abstract class AbstractSubscriberBase<P, T extends AbstractSubscriberBase
     }
   }
   
-  protected List<SubscriptionImpl<P>> getSubscribers()
+  protected List<ISubscription<P>> getSubscribers()
   {
     return subscribers_;
   }
