@@ -23,22 +23,10 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
-import org.symphonyoss.s2.fugue.pubsub.QueueSubscription.Builder;
-
-import com.google.common.collect.ImmutableSet;
 
 /**
  * A subscription on a Topic.
@@ -71,7 +59,6 @@ public class TopicSubscription extends TopicSubscriptionAdmin implements ISubscr
    */
   public static class Builder extends TopicSubscriptionAdmin.AbstractBuilder<Builder, TopicSubscription>
   {
-    private Set<String>  subscriptionNames_ = new HashSet<>();
     private IThreadSafeRetryableConsumer<String> consumer_;
 
     /**
