@@ -23,18 +23,23 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * A subscription.
  * 
  * @author Bruce Skingle
  */
-public interface ISubscription extends ISubscriptionAdmin
+public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
 {
   /**
+   * Return the set of subscription names.
    * 
-   * @return The consumer for received messages.
+   * @return The subscription names for this subscription.
    */
-  IThreadSafeRetryableConsumer<String> getConsumer();
+  @Override
+  ImmutableSet<? extends SubscriptionName> getSubscriptionNames();
+
 }

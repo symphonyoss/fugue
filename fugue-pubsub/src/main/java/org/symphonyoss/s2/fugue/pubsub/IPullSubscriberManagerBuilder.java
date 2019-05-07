@@ -24,19 +24,17 @@
 package org.symphonyoss.s2.fugue.pubsub;
 
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
 
 /**
  * A builder for a pull subscriber manager of payload type P.
  * 
  * @author Bruce Skingle
  *
- * @param <P> The type of payload received.
  * @param <T> Type of concrete builder, needed for fluent methods.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface IPullSubscriberManagerBuilder<P,T extends IPullSubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>>
-extends ISubscriberManagerBuilder<P,T,B>
+public interface IPullSubscriberManagerBuilder<T extends IPullSubscriberManagerBuilder<T,B>, B extends ISubscriberManager<B>>
+extends ISubscriberManagerBuilder<T,B>
 {
   /**
    * Set the IBusyCounter to use.

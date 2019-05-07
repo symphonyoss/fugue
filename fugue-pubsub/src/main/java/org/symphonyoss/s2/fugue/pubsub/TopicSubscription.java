@@ -25,78 +25,89 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.Immutable;
 
+import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
+import org.symphonyoss.s2.fugue.pubsub.QueueSubscription.Builder;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * A subscription on a Topic.
  * 
  * @author Bruce Skingle
- *
- * @param <P> The type of message produced by this subscription.
  */
-public class TopicSubscription<P> implements ISubscription<P>
+@Immutable
+public class TopicSubscription extends TopicSubscriptionAdmin implements ISubscription
 {
-  private final INameFactory                    nameFactory_;
-  private final IThreadSafeRetryableConsumer<P> consumer_;
-  private final Collection<TopicName>           topicNames_;
-  private final String                          subscriptionId_;
+  private final IThreadSafeRetryableConsumer<String> consumer_;
 
-  /**
-   * Constructor.
-   * 
-   * @param nameFactory       A name factory.
-   * @param topicNames        One or more topics on which to subscribe.
-   * @param subscriptionName  The simple subscription name.
-   * @param consumer          A consumer for received messages.
-   */
-  public TopicSubscription(INameFactory nameFactory, Collection<TopicName> topicNames, String subscriptionName, @Nullable IThreadSafeRetryableConsumer<P> consumer)
+  protected TopicSubscription(Builder builder)
   {
-    nameFactory_ = nameFactory;
-    consumer_ = consumer;
-    topicNames_ = topicNames;
-    subscriptionId_ = subscriptionName;
-  }
-
-  /**
-   * 
-   * @return The list of topic names.
-   */
-  public Collection<TopicName> getTopicNames()
-  {
-    return topicNames_;
-  }
-
-  /**
-   * 
-   * @return The simple subscription name.
-   */
-  public String getSubscriptionId()
-  {
-    return subscriptionId_;
+    super(builder);
+    
+    consumer_ = builder.consumer_;
   }
 
   @Override
-  public IThreadSafeRetryableConsumer<P> getConsumer()
+  public IThreadSafeRetryableConsumer<String> getConsumer()
   {
     return consumer_;
   }
   
-  @Override
-  public List<String> getSubscriptionNames()
+  /**
+   * Builder.
+   * 
+   * @author Bruce Skingle
+   *
+   */
+  public static class Builder extends TopicSubscriptionAdmin.AbstractBuilder<Builder, TopicSubscription>
   {
-    List<String> names = new ArrayList<>();
-    
-    for(TopicName topicName : getTopicNames())
-    { 
-      names.add(nameFactory_.getSubscriptionName(topicName, getSubscriptionId()).toString());
+    private Set<String>  subscriptionNames_ = new HashSet<>();
+    private IThreadSafeRetryableConsumer<String> consumer_;
+
+    /**
+     * Constructor.
+     */
+    public Builder()
+    {
+      super(Builder.class);
+    }
+
+    /**
+     * Set the consumer for the subscription.
+     * 
+     * @param consumer A consumer for received messages.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withConsumer(IThreadSafeRetryableConsumer<String> consumer)
+    {
+      consumer_ = consumer;
+      
+      return this;
     }
     
-    return names;
+    @Override
+    protected void validate(FaultAccumulator faultAccumulator)
+    {
+      super.validate(faultAccumulator);
+      
+      faultAccumulator.checkNotNull(consumer_, "consumer");
+    }
+
+    @Override
+    protected TopicSubscription construct()
+    {
+      return new TopicSubscription(this);
+    }
   }
 }

@@ -38,24 +38,31 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  */
 public interface ISubscriberAdminBuilder<T extends ISubscriberAdminBuilder<T,B>, B extends ISubscriberAdmin<B>> extends IBuilder<T,B>
 {
-  T withSubscription(Subscription subscription);
-  
   /**
    * Subscribe to the given subscription on the given topics.
    * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+   * @param subscription The required subscription details.
    * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param subscriptionName        A subscription name.
-   * @param topicName               A topic name.
-   * @param additionalTopicNames    An optional list of additional topic names.
-   * 
-   * @return  this (fluent method)
+   * @return this (fluent method)
    */
-  T withSubscription(String subscriptionName, String topicName, String ...additionalTopicNames);
+  T withSubscription(ITopicSubscriptionAdmin subscription);
+  
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param subscriptionName        A subscription name.
+//   * @param topicName               A topic name.
+//   * @param additionalTopicNames    An optional list of additional topic names.
+//   * 
+//   * @return  this (fluent method)
+//   */
+//  T withSubscription(String subscriptionName, String topicName, String ...additionalTopicNames);
   
   /**
    * Delete the given subscription on the given topics.
@@ -76,41 +83,41 @@ public interface ISubscriberAdminBuilder<T extends ISubscriberAdminBuilder<T,B>,
    * 
    * @return  this (fluent method)
    */
-  T withObsoleteSubscription(String subscriptionName, String topicName, String ...additionalTopicNames);
+  T withObsoleteSubscription(ITopicSubscriptionAdmin subscription);
   
-  /**
-   * Subscribe to the given subscription on the given topics.
-   * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-   * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param subscriptionName        A subscription name.
-   * @param topicNames              A list of topic names.
-   * 
-   * @return  this (fluent method)
-   * 
-   * @throws IllegalArgumentException If the list of topics is empty.
-   */
-  T withSubscription(String subscriptionName, Collection<TopicName> topicNames);
-
-  /**
-   * Subscribe to the given subscription on the given topics.
-   * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-   * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param subscriptionName        A subscription name.
-   * @param topicNames              A list of topic names.
-   * 
-   * @return  this (fluent method)
-   * 
-   * @throws IllegalArgumentException If the list of topics is empty.
-   */
-  T withSubscription(String subscriptionName, String[] topicNames);
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param subscriptionName        A subscription name.
+//   * @param topicNames              A list of topic names.
+//   * 
+//   * @return  this (fluent method)
+//   * 
+//   * @throws IllegalArgumentException If the list of topics is empty.
+//   */
+//  T withSubscription(String subscriptionName, Collection<TopicName> topicNames);
+//
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param subscriptionName        A subscription name.
+//   * @param topicNames              A list of topic names.
+//   * 
+//   * @return  this (fluent method)
+//   * 
+//   * @throws IllegalArgumentException If the list of topics is empty.
+//   */
+//  T withSubscription(String subscriptionName, String[] topicNames);
 }

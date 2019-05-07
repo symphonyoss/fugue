@@ -73,7 +73,7 @@ public class GoogleAsyncSubscriber implements MessageReceiver
   
   private final GoogleAsyncSubscriberManager                     manager_;
   private final ITraceContextTransactionFactory                  traceFactory_;
-  private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
+  private final IThreadSafeRetryableConsumer<String> consumer_;
   private final String                                           subscriptionName_;
   private final ICounter                                         counter_;
   private final String                                           tenantId_;
@@ -81,7 +81,7 @@ public class GoogleAsyncSubscriber implements MessageReceiver
   private AtomicBoolean                                          stopped_                = new AtomicBoolean();
 
   /* package */ GoogleAsyncSubscriber(GoogleAsyncSubscriberManager manager, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, String subscriptionName, ICounter counter, String tenantId)
+      IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, ICounter counter, String tenantId)
   {
     manager_ = manager;
     traceFactory_ = traceFactory;
@@ -118,7 +118,7 @@ public class GoogleAsyncSubscriber implements MessageReceiver
       trace.trace("RECEIVED");
       ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
       
-      long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
+      long retryTime = manager_.handleMessage(consumer_, byteArray.toString(), trace, message.getMessageId());
       
       if(retryTime < 0)
       {

@@ -14,10 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscription;
@@ -57,7 +57,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleAsyncSubscriberManager>
+public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<GoogleAsyncSubscriberManager>
 {
   private static final Logger log_            = LoggerFactory.getLogger(GoogleAsyncSubscriberManager.class);
 
@@ -84,7 +84,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractSubscriberManager.Builder<ImmutableByteArray, Builder, GoogleAsyncSubscriberManager>
+  public static class Builder extends AbstractSubscriberManager.Builder<Builder, GoogleAsyncSubscriberManager>
   {
     private String                 projectId_;
 
@@ -98,7 +98,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
      * @param projectId                       The Google project ID for the pubsub service.
      */
     public Builder(INameFactory nameFactory, ITraceContextTransactionFactory traceFactory,
-        IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer, IConfiguration config, String projectId)
+        IThreadSafeErrorConsumer<String> unprocessableMessageConsumer, IConfiguration config, String projectId)
     {
       super(Builder.class);
     }
@@ -133,13 +133,13 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
   }
 
   @Override
-  protected void initSubscription(ISubscription<ImmutableByteArray> subscription)
+  protected void initSubscription(ISubscription subscription)
   { 
-    for(String subscriptionName : subscription.getSubscriptionNames())
+    for(Name subscriptionName : subscription.getSubscriptionNames())
     {
       log_.info("Validating subscription " + subscriptionName + "...");
       
-      validateSubcription(subscriptionName);
+      validateSubcription(subscriptionName.toString());
       
     }
     
@@ -162,14 +162,12 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
         " ...");
 
     
-    for(String subscriptionName : subscription.getSubscriptionNames())
+    for(Name subscriptionName : subscription.getSubscriptionNames())
     {
       log_.info("Subscribing to " + subscriptionName + " ...");
       
-      validateSubcription(subscriptionName);
-      
-      GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_, nameFactory_.getPodName());
-      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName);      
+      GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName.toString(), counter_, nameFactory_.getPodName());
+      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
       Subscriber.Builder      builder = Subscriber.newBuilder(projectSubscriptionName, receiver);
       
 //        ExecutorProvider executorProvider =

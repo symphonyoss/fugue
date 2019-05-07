@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
+import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
@@ -53,7 +53,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberManager extends AbstractPullSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractPullSubscriberManager<GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -74,7 +74,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractPullSubscriberManager.Builder<ImmutableByteArray, Builder, GoogleSubscriberManager>
+  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, GoogleSubscriberManager>
   {
     private String                 projectId_;
 
@@ -122,26 +122,32 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
   }
 
   @Override
-  protected void initSubscription(ISubscription<ImmutableByteArray> subscription)
+  protected void initSubscription(ISubscription subscription)
   { 
-    for(String subscriptionName : subscription.getSubscriptionNames())
+
+    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
     {
-      log_.info("Validating subscription " + subscriptionName + "...");
-      
-      validateSubcription(subscriptionName);
-
-      GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName),
-          getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
-
-      subscribers_.add(subscriber);
-      log_.info("Subscribing to " + subscriptionName + "...");  
+      for(Name subscriptionName : subscription.getSubscriptionNames())
+      {
+        log_.info("Validating subscription " + subscriptionName + "...");
+        
+        validateSubcription(subscriptionAdminClient, subscriptionName.toString());
+  
+        GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
+            getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
+  
+        subscribers_.add(subscriber);
+        log_.info("Subscribing to " + subscriptionName + "...");  
+      }
+    }
+    catch (IOException e)
+    {
+      throw new TransactionFault(e);
     }
   }
   
-  private void validateSubcription(String subscriptionName)
+  private void validateSubcription(SubscriptionAdminClient subscriptionAdminClient, String subscriptionName)
   {
-    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
-    {
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName);
       
       try
@@ -158,11 +164,6 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
       {
         log_.error("Subscription " + subscriptionName + " cannot be validated - lets hope....", e);
       }
-    }
-    catch (IOException e)
-    {
-      throw new TransactionFault(e);
-    }
   }
 
   @Override

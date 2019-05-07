@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2019 Symphony Communication Services, LLC.
+ * Copyright 2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,60 +26,56 @@ package org.symphonyoss.s2.fugue.pubsub;
 import javax.annotation.concurrent.Immutable;
 
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 
 /**
- * A subscription on a Queue.
+ * An abstract subscription, subclasses deal with Topic and Queue subscriptions.
  * 
  * @author Bruce Skingle
  */
 @Immutable
-public class QueueSubscription  extends QueueSubscriptionAdmin implements ISubscription
+public abstract class AbstractSubscription // TODO: rename to Subscription
 {
-  private final IThreadSafeRetryableConsumer<String> consumer_;
-  
-  private QueueSubscription(Builder builder)
+  /**
+   * Constructor.
+   * 
+   * @param builder A builder.
+   */
+  protected AbstractSubscription(AbstractBuilder<?,?> builder)
   {
-    super(builder);
-    consumer_ = builder.consumer_;
-  }
-
-  @Override
-  public IThreadSafeRetryableConsumer<String> getConsumer()
-  {
-    return consumer_;
   }
   
   /**
-   * Builder.
+   * AbstractBuilder.
    * 
    * @author Bruce Skingle
+   * 
+   * @param <T> The concrete type of the builder for fluent methods.
+   * @param <B> The type of the built object.
    *
    */
-  public static class Builder extends QueueSubscriptionAdmin.AbstractBuilder<Builder, QueueSubscription>
+  public static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends ISubscriptionAdmin> extends BaseAbstractBuilder<T,B>
   {
-    private IThreadSafeRetryableConsumer<String> consumer_;
-
-    /**
-     * Constructor.
-     */
-    public Builder()
+    protected INameFactory nameFactory_;
+    
+    protected AbstractBuilder(Class<T> type)
     {
-      super(Builder.class);
+      super(type);
     }
-
+    
     /**
-     * Set the consumer for the subscription.
+     * Set the name factory.
      * 
-     * @param consumer A consumer for received messages.
+     * @param nameFactory A name factory.
      * 
-     * @return this (fluent method)
+     * @return This (fluent method).
      */
-    public Builder withConsumer(IThreadSafeRetryableConsumer<String> consumer)
+    public T withNameFactory(INameFactory nameFactory)
     {
-      consumer_ = consumer;
+      nameFactory_ = nameFactory;
       
-      return this;
+      return self();
     }
     
     @Override
@@ -87,13 +83,7 @@ public class QueueSubscription  extends QueueSubscriptionAdmin implements ISubsc
     {
       super.validate(faultAccumulator);
       
-      faultAccumulator.checkNotNull(consumer_, "consumer");
-    }
-
-    @Override
-    protected QueueSubscription construct()
-    {
-      return new QueueSubscription(this);
+      faultAccumulator.checkNotNull(nameFactory_, "name factory");
     }
   }
 }

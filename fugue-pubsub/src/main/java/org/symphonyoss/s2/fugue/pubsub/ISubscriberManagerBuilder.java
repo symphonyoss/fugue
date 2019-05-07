@@ -39,71 +39,71 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  * 
  * @author Bruce Skingle
  *
- * @param <P> The type of payload received.
  * @param <T> Type of concrete builder, needed for fluent methods.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface ISubscriberManagerBuilder<P,T extends ISubscriberManagerBuilder<P,T,B>, B extends ISubscriberManager<P,B>> extends IBuilder<T,B>
+public interface ISubscriberManagerBuilder<T extends ISubscriberManagerBuilder<T,B>, B extends ISubscriberManager<B>> extends IBuilder<T,B>
 {
   T withNameFactory(INameFactory nameFactory);
   
-  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription);
   
-  /**
-   * Subscribe to the given subscription on the given topics.
-   * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-   * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param consumer                A consumer for received messages.
-   * @param subscriptionName        A subscription name.
-   * @param topicName               A topic name.
-   * @param additionalTopicNames    An optional list of additional topic names.
-   * 
-   * @return  this (fluent method)
-   */
-  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String topicName, String ...additionalTopicNames);
-  
-  /**
-   * Subscribe to the given subscription on the given topics.
-   * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-   * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param consumer                A consumer for received messages.
-   * @param subscriptionName        A subscription name.
-   * @param topicNames              A list of topic names.
-   * 
-   * @return  this (fluent method)
-   * 
-   * @throws IllegalArgumentException If the list of topics is empty.
-   */
-  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, Collection<TopicName> topicNames);
-
-  /**
-   * Subscribe to the given subscription on the given topics.
-   * 
-   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-   * 
-   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-   * 
-   * @param consumer                A consumer for received messages.
-   * @param subscriptionName        A subscription name.
-   * @param topicNames              A list of topic names.
-   * 
-   * @return  this (fluent method)
-   * 
-   * @throws IllegalArgumentException If the list of topics is empty.
-   */
-  T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionName, String[] topicNames);
+//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, Subscription subscription);
+//  
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param consumer                A consumer for received messages.
+//   * @param subscriptionName        A subscription name.
+//   * @param topicName               A topic name.
+//   * @param additionalTopicNames    An optional list of additional topic names.
+//   * 
+//   * @return  this (fluent method)
+//   */
+//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, String topicName, String ...additionalTopicNames);
+//  
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param consumer                A consumer for received messages.
+//   * @param subscriptionName        A subscription name.
+//   * @param topicNames              A list of topic names.
+//   * 
+//   * @return  this (fluent method)
+//   * 
+//   * @throws IllegalArgumentException If the list of topics is empty.
+//   */
+//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, Collection<TopicName> topicNames);
+//
+//  /**
+//   * Subscribe to the given subscription on the given topics.
+//   * 
+//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
+//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
+//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
+//   * 
+//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
+//   * 
+//   * @param consumer                A consumer for received messages.
+//   * @param subscriptionName        A subscription name.
+//   * @param topicNames              A list of topic names.
+//   * 
+//   * @return  this (fluent method)
+//   * 
+//   * @throws IllegalArgumentException If the list of topics is empty.
+//   */
+//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, String[] topicNames);
 
   T withConfig(IConfiguration config);
 
@@ -111,5 +111,8 @@ public interface ISubscriberManagerBuilder<P,T extends ISubscriberManagerBuilder
 
   T withTraceContextTransactionFactory(ITraceContextTransactionFactory traceFactory);
 
-  T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer);
+  T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<String> unprocessableMessageConsumer);
+
+
+  T withSubscription(ISubscription subscription);
 }

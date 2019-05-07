@@ -70,7 +70,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
 
   private final GoogleSubscriberManager                          manager_;
   private final ITraceContextTransactionFactory                  traceFactory_;
-  private final IThreadSafeRetryableConsumer<ImmutableByteArray> consumer_;
+  private final IThreadSafeRetryableConsumer<String> consumer_;
   private final NonIdleSubscriber                                nonIdleSubscriber_;
   private final String                                           subscriptionName_;
   private final String                                           tenantId_;
@@ -82,7 +82,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
 
   /* package */ GoogleSubscriber(GoogleSubscriberManager manager,
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
-      IThreadSafeRetryableConsumer<ImmutableByteArray> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
+      IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
     super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS);
     
@@ -218,9 +218,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
         ITraceContext trace = traceTransaction.open();
         
         trace.trace("RECEIVED");
-        ImmutableByteArray byteArray = ImmutableByteArray.newInstance(message.getData());
-        
-        long retryTime = manager_.handleMessage(consumer_, byteArray, trace, message.getMessageId());
+        long retryTime = manager_.handleMessage(consumer_, message.getData().toStringUtf8(), trace, message.getMessageId());
         
         synchronized(this)
         {

@@ -39,10 +39,9 @@ import org.symphonyoss.s2.fugue.counter.IBusyCounter;
  * 
  * @author Bruce Skingle
  *
- * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
+public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscriberManager<T>> extends AbstractSubscriberManager<T>
 {
   private static final Logger                 log_           = LoggerFactory
       .getLogger(AbstractPullSubscriberManager.class);
@@ -56,7 +55,7 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
   private ThreadPoolExecutor                  subscriberExecutor_;
   private ThreadPoolExecutor                  handlerExecutor_;
   
-  protected AbstractPullSubscriberManager(Class<T> type, Builder<P,?,T> builder)
+  protected AbstractPullSubscriberManager(Class<T> type, Builder<?,T> builder)
   {
     super(type, builder);
     
@@ -78,9 +77,9 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractPullSubscriberManager<P,B>>
-  extends AbstractSubscriberManager.Builder<P,T,B>
-  implements IPullSubscriberManagerBuilder<P,T,B>
+  public static abstract class Builder<T extends Builder<T,B>, B extends AbstractPullSubscriberManager<B>>
+  extends AbstractSubscriberManager.Builder<T,B>
+  implements IPullSubscriberManagerBuilder<T,B>
   {
     private IBusyCounter         busyCounter_;
 

@@ -42,16 +42,15 @@ public abstract class AbstractPullSubscriber implements Runnable
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractPullSubscriber.class);
   
-
-  private final AbstractPullSubscriberManager<?, ?> manager_;
-  private final String                                           subscriptionName_;
-  private final ICounter                                         counter_;
-  private final IBusyCounter                                     busyCounter_;
-  private final long              extensionFrequency_;
-  private boolean                                   running_ = true;
+  private final AbstractPullSubscriberManager<?> manager_;
+  private final String                           subscriptionName_;
+  private final ICounter                         counter_;
+  private final IBusyCounter                     busyCounter_;
+  private final long                             extensionFrequency_;
+  private boolean                                running_ = true;
 
   
-  public AbstractPullSubscriber(AbstractPullSubscriberManager<?,?> manager,
+  public AbstractPullSubscriber(AbstractPullSubscriberManager<?> manager,
       String subscriptionName,
       
       ICounter counter, IBusyCounter busyCounter,

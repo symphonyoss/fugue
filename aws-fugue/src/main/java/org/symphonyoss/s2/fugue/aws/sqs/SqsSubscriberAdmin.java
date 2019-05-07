@@ -199,7 +199,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
   }
   
   @Override
-  protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  protected void createSubcription(SubscriptionName subscriptionName, boolean dryRun)
   {
     boolean subscriptionOk = false;
     String  queueUrl;
@@ -210,7 +210,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       
       String queueArn = getQueueARN(subscriptionName);
       
-      ListSubscriptionsByTopicResult subscriptionList = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
+      ListSubscriptionsByTopicResult subscriptionList = snsClient_.listSubscriptionsByTopic(getTopicARN(subscriptionName.getTopicName()));
             
       for(com.amazonaws.services.sns.model.Subscription s : subscriptionList.getSubscriptions())
       {
@@ -250,7 +250,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       }
       else
       {
-        String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(topicName), queueUrl);
+        String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(subscriptionName.getTopicName()), queueUrl);
         
         snsClient_.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
         
@@ -265,7 +265,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
   }
   
   @Override
-  protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  protected void deleteSubcription(SubscriptionName subscriptionName, boolean dryRun)
   {
     try
     {
@@ -277,7 +277,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       }
       else
       {
-        ListSubscriptionsByTopicResult subscriptionResult = snsClient_.listSubscriptionsByTopic(getTopicARN(topicName));
+        ListSubscriptionsByTopicResult subscriptionResult = snsClient_.listSubscriptionsByTopic(getTopicARN(subscriptionName.getTopicName()));
         
         if(subscriptionResult != null)
         {
