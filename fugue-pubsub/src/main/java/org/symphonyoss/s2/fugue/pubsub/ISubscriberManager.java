@@ -34,7 +34,10 @@ import org.symphonyoss.s2.common.fluent.IFluent;
  */
 public interface ISubscriberManager<T extends ISubscriberManager<T>> extends IFluent<T>
 {
-
+  /**
+   * 
+   * @return The total number of subscriptions (product of topic and subscription) covered by this subscription configuration.
+   */
   int getTotalSubscriptionCnt();
   
 }
