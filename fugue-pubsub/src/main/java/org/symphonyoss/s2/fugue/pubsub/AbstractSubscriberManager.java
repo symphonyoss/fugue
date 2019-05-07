@@ -23,20 +23,22 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransientTransactionFault;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
+import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
-import org.symphonyoss.s2.fugue.counter.Counter;
 import org.symphonyoss.s2.fugue.counter.ICounter;
-import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
@@ -44,17 +46,17 @@ import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Base class for subscriber managers.
  * 
  * @author Bruce Skingle
  *
- * @param <P> Type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberManager<P, T extends AbstractSubscriberManager<P,T>> extends AbstractSubscriberBase<P,T>
-implements ISubscriberManager<P, T>
+public abstract class AbstractSubscriberManager<T extends AbstractSubscriberManager<T>> extends FugueLifecycleComponent<T>
+implements ISubscriberManager<T>
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
   protected static final long          FAILED_CONSUMER_RETRY_TIME    = TimeUnit.SECONDS.toMillis(30);
@@ -63,10 +65,14 @@ implements ISubscriberManager<P, T>
   private static final Logger                     log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
   private static final Integer                    FAILURE_CNT_LIMIT             = 5;
 
-  protected final ITraceContextTransactionFactory traceFactory_;
-  protected final IThreadSafeErrorConsumer<P>     unprocessableMessageConsumer_;
-  protected final IConfiguration                  config_;
-  protected final ICounter                        counter_;
+
+  protected final INameFactory                     nameFactory_;
+  protected final ImmutableList<ISubscription>     subscribers_;
+  protected final ITraceContextTransactionFactory  traceFactory_;
+  protected final IThreadSafeErrorConsumer<String> unprocessableMessageConsumer_;
+  protected final IConfiguration                   config_;
+  protected final ICounter                         counter_;
+  protected final int                              totalSubscriptionCnt_;
 
   // TODO: replace this with a local topic
   private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
@@ -75,14 +81,23 @@ implements ISubscriberManager<P, T>
                                                                             .build();
   
 
-  protected AbstractSubscriberManager(Class<T> type, Builder<P,?,T> builder)
+  protected AbstractSubscriberManager(Class<T> type, Builder<?,T> builder)
   {
-    super(type, builder);
+    super(type);
     
+    nameFactory_                  = builder.nameFactory_;
+    subscribers_                  = ImmutableList.copyOf(builder.subscribers_);
     traceFactory_                 = builder.traceFactory_;
     unprocessableMessageConsumer_ = builder.unprocessableMessageConsumer_;
     config_                       = builder.config_;
     counter_                      = builder.counter_;
+    totalSubscriptionCnt_         = builder.totalSubscriptionCnt_;
+  }
+
+  @Override
+  public int getTotalSubscriptionCnt()
+  {
+    return totalSubscriptionCnt_;
   }
 
   /**
@@ -93,43 +108,72 @@ implements ISubscriberManager<P, T>
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  protected static abstract class Builder<P, T extends Builder<P,T,B>, B extends AbstractSubscriberManager<P,B>>
-  extends AbstractSubscriberBase.Builder<P,T,B>
-  implements ISubscriberManagerBuilder<P,T,B>
+  protected static abstract class Builder<T extends Builder<T,B>, B extends AbstractSubscriberManager<B>>
+  extends BaseAbstractBuilder<T,B>
+  implements ISubscriberManagerBuilder<T,B>
   {
-    private ITraceContextTransactionFactory traceFactory_;
-    private IThreadSafeErrorConsumer<P>     unprocessableMessageConsumer_;
-    private IConfiguration                  config_;
-    private ICounter                        counter_;
+    protected INameFactory                     nameFactory_;
+    protected List<ISubscription>              subscribers_ = new LinkedList<>();
+    protected ITraceContextTransactionFactory  traceFactory_;
+    protected IThreadSafeErrorConsumer<String> unprocessableMessageConsumer_;
+    protected IConfiguration                   config_;
+    protected ICounter                         counter_;
+    protected int                              totalSubscriptionCnt_;
 
     protected Builder(Class<T> type)
     {
       super(type);
     }
-
-    @Override
-    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, Subscription subscription)
-    {
-      return super.withSubscription(consumer, subscription);
-    }
-  
-    @Override
-    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String topicId,
-        String... additionalTopicIds)
-    {
-      return super.withSubscription(consumer, subscriptionId, topicId, additionalTopicIds);
-    }
-  
-    @Override
-    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, Collection<TopicName> topicNames)
-    {
-      return super.withSubscription(consumer, subscriptionId, topicNames);
-    }
     
     @Override
-    public T withSubscription(IThreadSafeRetryableConsumer<P> consumer, String subscriptionId, String[] topicNames)
+    public T withNameFactory(INameFactory nameFactory)
     {
-      return super.withSubscription(consumer, subscriptionId, topicNames);
+      nameFactory_ = nameFactory;
+      
+      return self();
+    }
+
+//    @Override
+//    public T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName)
+//    {
+//      return super.withSubscription(consumer, subscriptionName);
+//    }
+//
+//    @Override
+//    public T withSubscription(IThreadSafeRetryableConsumer<String> consumer, Subscription subscription)
+//    {
+//      return super.withSubscription(consumer, subscription);
+//    }
+//  
+//    @Override
+//    public T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionId, String topicId,
+//        String... additionalTopicIds)
+//    {
+//      return super.withSubscription(consumer, subscriptionId, topicId, additionalTopicIds);
+//    }
+//  
+//    @Override
+//    public T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionId, Collection<TopicName> topicNames)
+//    {
+//      return super.withSubscription(consumer, subscriptionId, topicNames);
+//    }
+//    
+//    @Override
+//    public T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionId, String[] topicNames)
+//    {
+//      return super.withSubscription(consumer, subscriptionId, topicNames);
+//    }
+    
+
+
+    @Override
+    public T withSubscription(ISubscription subscription)
+    {
+      subscribers_.add(subscription);
+      
+      totalSubscriptionCnt_ += subscription.getSubscriptionNames().size();
+      
+      return self();
     }
 
     @Override
@@ -162,7 +206,7 @@ implements ISubscriberManager<P, T>
     }
 
     @Override
-    public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
+    public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
     {
       unprocessableMessageConsumer_ = unprocessableMessageConsumer;
       
@@ -185,7 +229,7 @@ implements ISubscriberManager<P, T>
     return counter_;
   }
   
-  protected abstract void initSubscription(SubscriptionImpl<P> subscription);
+  protected abstract void initSubscription(ISubscription subscription);
   protected abstract void startSubscriptions();
   /**
    * Stop all subscribers.
@@ -202,7 +246,7 @@ implements ISubscriberManager<P, T>
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
-    for(SubscriptionImpl<P> s : getSubscribers())
+    for(ISubscription s : subscribers_)
     {
       initSubscription(s);
     }
@@ -243,7 +287,7 @@ implements ISubscriberManager<P, T>
    * @return The number of milliseconds after which a retry should be made, or -1 if the message was
    * processed and no retry is necessary.
    */
-  public long handleMessage(IThreadSafeRetryableConsumer<P> consumer, P payload, ITraceContext trace, String messageId)
+  public long handleMessage(IThreadSafeRetryableConsumer<String> consumer, String payload, ITraceContext trace, String messageId)
   {
     try
     {
@@ -279,7 +323,7 @@ implements ISubscriberManager<P, T>
     return MESSAGE_PROCESSED_OK;
   }
 
-  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId, long retryTime, boolean retryForever)
+  private long retryMessage(String payload, ITraceContext trace, Throwable cause, String messageId, long retryTime, boolean retryForever)
   {
     if(!retryForever)
     {
@@ -306,7 +350,7 @@ implements ISubscriberManager<P, T>
     return retryTime;
   }
 
-  private long abortMessage(P payload, ITraceContext trace, Throwable e)
+  private long abortMessage(String payload, ITraceContext trace, Throwable e)
   {
     try
     {

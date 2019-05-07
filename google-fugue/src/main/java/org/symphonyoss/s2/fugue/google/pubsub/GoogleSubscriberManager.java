@@ -15,11 +15,9 @@ import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
+import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
@@ -55,7 +53,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberManager extends AbstractPullSubscriberManager<ImmutableByteArray, GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractPullSubscriberManager<GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -76,7 +74,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractPullSubscriberManager.Builder<ImmutableByteArray, Builder, GoogleSubscriberManager>
+  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, GoogleSubscriberManager>
   {
     private String                 projectId_;
 
@@ -124,49 +122,48 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Immut
   }
 
   @Override
-  protected void initSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
+  protected void initSubscription(ISubscription subscription)
   { 
-    for(TopicName topicName : subscription.getTopicNames())
-    {
-      log_.info("Validating topic " + topicName + "...");
-      
-      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
 
-      validateSubcription(topicName, subscriptionName);
-
-      GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
-          getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
-
-      subscribers_.add(subscriber);
-      log_.info("Subscribing to " + subscriptionName + "...");  
-    }
-  }
-  
-  private void validateSubcription(TopicName topicName, SubscriptionName subscriptionName)
-  {
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
     {
-      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
-      
-      try
+      for(Name subscriptionName : subscription.getSubscriptionNames())
       {
-        com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
+        log_.info("Validating subscription " + subscriptionName + "...");
         
-        log_.info("Subscription " + subscriptionName + " on topic " + topicName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
-      }
-      catch(NotFoundException e)
-      {   
-        throw new ProgramFault("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
-      }
-      catch(StatusRuntimeException e)
-      {
-        log_.error("Subscription " + subscriptionName + " on topic " + topicName + " cannot be validated - lets hope....", e);
+        validateSubcription(subscriptionAdminClient, subscriptionName.toString());
+  
+        GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
+            getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
+  
+        subscribers_.add(subscriber);
+        log_.info("Subscribing to " + subscriptionName + "...");  
       }
     }
     catch (IOException e)
     {
       throw new TransactionFault(e);
     }
+  }
+  
+  private void validateSubcription(SubscriptionAdminClient subscriptionAdminClient, String subscriptionName)
+  {
+      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName);
+      
+      try
+      {
+        com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
+        
+        log_.info("Subscription " + subscriptionName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
+      }
+      catch(NotFoundException e)
+      {   
+        throw new ProgramFault("Subscription " + subscriptionName + " DOES NOT EXIST.");
+      }
+      catch(StatusRuntimeException e)
+      {
+        log_.error("Subscription " + subscriptionName + " cannot be validated - lets hope....", e);
+      }
   }
 
   @Override

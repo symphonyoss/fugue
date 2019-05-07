@@ -14,15 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransactionFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
+import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.pubsub.v1.Subscriber;
@@ -59,7 +57,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<ImmutableByteArray, GoogleAsyncSubscriberManager>
+public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<GoogleAsyncSubscriberManager>
 {
   private static final Logger log_            = LoggerFactory.getLogger(GoogleAsyncSubscriberManager.class);
 
@@ -86,7 +84,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractSubscriberManager.Builder<ImmutableByteArray, Builder, GoogleAsyncSubscriberManager>
+  public static class Builder extends AbstractSubscriberManager.Builder<Builder, GoogleAsyncSubscriberManager>
   {
     private String                 projectId_;
 
@@ -100,7 +98,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
      * @param projectId                       The Google project ID for the pubsub service.
      */
     public Builder(INameFactory nameFactory, ITraceContextTransactionFactory traceFactory,
-        IThreadSafeErrorConsumer<ImmutableByteArray> unprocessableMessageConsumer, IConfiguration config, String projectId)
+        IThreadSafeErrorConsumer<String> unprocessableMessageConsumer, IConfiguration config, String projectId)
     {
       super(Builder.class);
     }
@@ -135,15 +133,13 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
   }
 
   @Override
-  protected void initSubscription(SubscriptionImpl<ImmutableByteArray> subscription)
+  protected void initSubscription(ISubscription subscription)
   { 
-    for(TopicName topicName : subscription.getTopicNames())
+    for(Name subscriptionName : subscription.getSubscriptionNames())
     {
-      log_.info("Validating topic " + topicName + "...");
+      log_.info("Validating subscription " + subscriptionName + "...");
       
-      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-
-      validateSubcription(topicName, subscriptionName);
+      validateSubcription(subscriptionName.toString());
       
     }
     
@@ -166,15 +162,11 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
         " ...");
 
     
-    for(TopicName topicName : subscription.getTopicNames())
+    for(Name subscriptionName : subscription.getSubscriptionNames())
     {
-      log_.info("Subscribing to topic " + topicName + " ...");
+      log_.info("Subscribing to " + subscriptionName + " ...");
       
-      SubscriptionName        subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-
-      validateSubcription(topicName, subscriptionName);
-      
-      GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName, counter_, nameFactory_.getPodName());
+      GoogleAsyncSubscriber   receiver                = new GoogleAsyncSubscriber(this, getTraceFactory(), subscription.getConsumer(), subscriptionName.toString(), counter_, nameFactory_.getPodName());
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());      
       Subscriber.Builder      builder = Subscriber.newBuilder(projectSubscriptionName, receiver);
       
@@ -222,28 +214,28 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Immu
     }
   }
 
-  private void validateSubcription(TopicName topicName, SubscriptionName subscriptionName)
+  private void validateSubcription(String subscriptionName)
   {
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
     {
-      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
+      ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName);
       
       try
       {
         com.google.pubsub.v1.Subscription existing = subscriptionAdminClient.getSubscription(projectSubscriptionName);
         
-        log_.info("Subscription " + subscriptionName + " on topic " + topicName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
+        log_.info("Subscription " + subscriptionName + " exists with ack deadline " + existing.getAckDeadlineSeconds() + " seconds.");
         
         
       }
       catch(NotFoundException e)
       {   
-        log_.error("Subscription " + subscriptionName + " on topic " + topicName + " DOES NOT EXIST.");
+        log_.error("Subscription " + subscriptionName + " DOES NOT EXIST.");
         subscriptionErrorCnt_++;
       }
       catch(StatusRuntimeException e)
       {
-        log_.error("Subscription " + subscriptionName + " on topic " + topicName + " cannot be validated - lets hope....", e);
+        log_.error("Subscription " + subscriptionName + " cannot be validated - lets hope....", e);
       }
     }
     catch (IOException e)

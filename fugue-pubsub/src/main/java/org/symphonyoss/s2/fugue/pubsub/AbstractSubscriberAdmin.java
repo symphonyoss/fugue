@@ -23,15 +23,17 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
+import org.symphonyoss.s2.fugue.FugueLifecycleComponent;
 import org.symphonyoss.s2.fugue.FugueLifecycleState;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-import org.symphonyoss.s2.fugue.naming.TopicName;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Base class for subscriber managers.
@@ -40,17 +42,19 @@ import org.symphonyoss.s2.fugue.naming.TopicName;
  *
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<T>> extends AbstractSubscriberBase<Void, T> implements ISubscriberAdmin<T>
+public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<T>> extends FugueLifecycleComponent<T> implements ISubscriberAdmin<T>
 {
-  private static final Logger log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
-  
-  protected final List<SubscriptionImpl<?>> obsoleteSubscribers_;
+  private static final Logger                            log_ = LoggerFactory.getLogger(AbstractSubscriberAdmin.class);
+
+  protected final ImmutableList<ITopicSubscriptionAdmin> obsoleteSubscribers_;
+  protected final ImmutableList<ITopicSubscriptionAdmin> subscribers_;
   
   protected AbstractSubscriberAdmin(Class<T> type, Builder<?,T> builder)
   {
-    super(type, builder);
+    super(type);
     
-    obsoleteSubscribers_ = builder.obsoleteSubscribers_;
+    obsoleteSubscribers_ = ImmutableList.copyOf(builder.obsoleteSubscribers_);
+    subscribers_ = ImmutableList.copyOf(builder.subscribers_);
   }
 
   /**
@@ -62,10 +66,11 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
    * @param <B>   The concrete type of the built object.
    */
   public static abstract class Builder<T extends Builder<T,B>, B extends AbstractSubscriberAdmin<B>>
-  extends AbstractSubscriberBase.Builder<Void,T,B>
+  extends BaseAbstractBuilder<T,B>
   implements ISubscriberAdminBuilder<T,B>
   {
-    protected List<SubscriptionImpl<?>> obsoleteSubscribers_ = new ArrayList<>();
+    protected List<ITopicSubscriptionAdmin> obsoleteSubscribers_ = new LinkedList<>();
+    protected List<ITopicSubscriptionAdmin> subscribers_         = new LinkedList<>();
     
     protected Builder(Class<T> type)
     {
@@ -73,45 +78,53 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     }
 
     @Override
-    public T withSubscription(Subscription subscription)
+    public T withSubscription(ITopicSubscriptionAdmin subscription)
     {
-      return super.withSubscription(null, subscription);
-    }
-    
-    @Override
-    public T withObsoleteSubscription(String subscriptionId, String topicId,
-        String... additionalTopicIds)
-    {
-      taskList_.add(() ->
-      {
-        Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
-        
-        obsoleteSubscribers_.add(new SubscriptionImpl<T>(
-            topicNames,
-            subscriptionId, null));
-      });
+      subscribers_.add(subscription);
       
       return self();
     }
 
-    @Override
-    public T withSubscription(String subscriptionId, String topicId,
-        String... additionalTopicIds)
-    {
-      return super.withSubscription(null, subscriptionId, topicId, additionalTopicIds);
-    }
-  
-    @Override
-    public T withSubscription(String subscriptionId, Collection<TopicName> topicNames)
-    {
-      return super.withSubscription(null, subscriptionId, topicNames);
-    }
+//    @Override
+//    public T withSubscription(Subscription subscription)
+//    {
+//      return super.withSubscription(null, subscription);
+//    }
     
     @Override
-    public T withSubscription(String subscriptionId, String[] topicNames)
+    public T withObsoleteSubscription(ITopicSubscriptionAdmin subscription)
     {
-      return super.withSubscription(null, subscriptionId, topicNames);
+      obsoleteSubscribers_.add(subscription);
+//      taskList_.add(() ->
+//      {
+//        Collection<TopicName> topicNames = nameFactory_.getTopicNameCollection(topicId, additionalTopicIds);
+//        
+//        obsoleteSubscribers_.add(new TopicSubscription(
+//            topicNames,
+//            subscriptionId, null));
+//      });
+      
+      return self();
     }
+
+//    @Override
+//    public T withSubscription(String subscriptionId, String topicId,
+//        String... additionalTopicIds)
+//    {
+//      return super.withSubscription(null, subscriptionId, topicId, additionalTopicIds);
+//    }
+//  
+//    @Override
+//    public T withSubscription(String subscriptionId, Collection<TopicName> topicNames)
+//    {
+//      return super.withSubscription(null, subscriptionId, topicNames);
+//    }
+//    
+//    @Override
+//    public T withSubscription(String subscriptionId, String[] topicNames)
+//    {
+//      return super.withSubscription(null, subscriptionId, topicNames);
+//    }
   }
 
   @Override
@@ -126,19 +139,19 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     setLifeCycleState(FugueLifecycleState.Stopped);
   }
   
-  protected abstract void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun);
+  protected abstract void createSubcription(SubscriptionName subscriptionName, boolean dryRun);
   
-  protected abstract void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun);
+  protected abstract void deleteSubcription(SubscriptionName subscriptionName, boolean dryRun);
   
   @Override
   public void createSubscriptions(boolean dryRun)
   {
     log_.info("About to create subscriptions...");
-    for(SubscriptionImpl<?> subscription : getSubscribers())
-    {
-      for(TopicName topicName : subscription.getTopicNames())
+    for(ITopicSubscriptionAdmin subscription : subscribers_)
+    { 
+      for(SubscriptionName subscriptionName : subscription.getSubscriptionNames())
       {
-        createSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+        createSubcription(subscriptionName, dryRun);
       }
     }
 
@@ -149,13 +162,11 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   public void deleteSubscriptions(boolean dryRun)
   {
     log_.info("About to delete subscriptions...");
-    for(SubscriptionImpl<?> subscription : getSubscribers())
+    for(ITopicSubscriptionAdmin subscription : subscribers_)
     {
-
-      log_.info("About to delete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
-      for(TopicName topicName : subscription.getTopicNames())
+      for(SubscriptionName subscriptionName : subscription.getSubscriptionNames())
       {
-        deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+        deleteSubcription(subscriptionName, dryRun);
       }
     }
     
@@ -164,12 +175,13 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
   
   private void deleteObsoleteSubscriptions(boolean dryRun)
   {
-    for(SubscriptionImpl<?> subscription : obsoleteSubscribers_)
+    log_.info("About to delete obsolete subscriptions...");
+    
+    for(ITopicSubscriptionAdmin subscription : obsoleteSubscribers_)
     {
-      log_.info("About to delete obsolete subscriptions... subscriptionId=" + subscription.getSubscriptionId());
-      for(TopicName topicName : subscription.getTopicNames())
+      for(SubscriptionName subscriptionName : subscription.getSubscriptionNames())
       {
-        deleteSubcription(topicName, nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId()), dryRun);
+        deleteSubcription(subscriptionName, dryRun);
       }
     }
   }

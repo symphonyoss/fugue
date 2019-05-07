@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,39 +23,18 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 /**
- * A payload sent or received over a pub sub channel.
+ * A subscription.
  * 
  * @author Bruce Skingle
  */
-public interface IPubSubMessage
+public interface ISubscription extends ISubscriptionAdmin
 {
-  static final String PAYLOAD_TYPE_ATTRIBUTE  = "payloadType";
-  static final String POD_ID_ATTRIBUTE        = "podId";
-  static final String FINAL_ATTRIBUTE         = "final";
-  
   /**
    * 
-   * @return The message payload
+   * @return The consumer for received messages.
    */
-  @Nonnull String getPayload();
-  
-  /**
-   * 
-   * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
-   */
-  @Nonnull Map<String, Object> getAttributes();
-
-  /**
-   * 
-   * @return The trace context.
-   */
-  @Nonnull ITraceContext getTraceContext();
-
+  IThreadSafeRetryableConsumer<String> getConsumer();
 }

@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.common.type.provider.IIntegerProvider;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.naming.TopicName;
@@ -343,11 +344,9 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
       {
         Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
         
-        for(Entry<String, String> entry : pubSubMessage.getAttributes().entrySet())
+        for(Entry<String, Object> entry : pubSubMessage.getAttributes().entrySet())
         {
-          messageAttributes.put(entry.getKey(), new MessageAttributeValue()
-              .withDataType("String")
-              .withStringValue(entry.getValue()));
+          messageAttributes.put(entry.getKey(), getAttribute(entry.getValue()));
         }
         
         publishRequest.withMessageAttributes(messageAttributes);
@@ -360,6 +359,21 @@ public abstract class SnsPublisherBase<T extends SnsPublisherBase<T>> extends Ab
     {
       throw new TransactionFault(e);
     }
+  }
+
+  private static MessageAttributeValue getAttribute(Object value)
+  {
+    if(value instanceof Number || value instanceof IIntegerProvider)
+    {
+      return new MessageAttributeValue()
+          .withDataType("Number")
+          .withStringValue(value.toString());
+    }
+    
+    return new MessageAttributeValue()
+        .withDataType("String")
+        .withStringValue(value.toString());
+    
   }
 
   @Override

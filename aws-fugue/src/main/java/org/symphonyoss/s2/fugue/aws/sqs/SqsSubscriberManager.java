@@ -29,10 +29,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-import org.symphonyoss.s2.fugue.naming.TopicName;
+import org.symphonyoss.s2.fugue.naming.Name;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
-import org.symphonyoss.s2.fugue.pubsub.SubscriptionImpl;
+import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -69,7 +68,7 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
  * @author Bruce Skingle
  *
  */
-public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, SqsSubscriberManager>
+public class SqsSubscriberManager extends AbstractPullSubscriberManager<SqsSubscriberManager>
 {
   private static final Logger log_         = LoggerFactory.getLogger(SqsSubscriberManager.class);
 
@@ -91,7 +90,7 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractPullSubscriberManager.Builder<String, Builder, SqsSubscriberManager>
+  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, SqsSubscriberManager>
   {
     private AmazonSQSClientBuilder sqsBuilder_;
     private String                 region_;
@@ -177,12 +176,10 @@ public class SqsSubscriberManager extends AbstractPullSubscriberManager<String, 
   }
 
   @Override
-  protected void initSubscription(SubscriptionImpl<String> subscription)
+  protected void initSubscription(ISubscription subscription)
   {
-    for(TopicName topicName : subscription.getTopicNames())
+    for(Name subscriptionName : subscription.getSubscriptionNames())
     {
-      SubscriptionName subscriptionName = nameFactory_.getSubscriptionName(topicName, subscription.getSubscriptionId());
-
       log_.info("Subscribing to " + subscriptionName + "..."); 
       
       String queueUrl = //"https://sqs.us-west-2.amazonaws.com/189141687483/s2-bruce2-trace-monitor"; 

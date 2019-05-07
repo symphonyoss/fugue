@@ -37,10 +37,10 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  */
 public class PubSubMessage implements IPubSubMessage
 {
-  private static final Map<String, String>  EMPTY_ATTRIBUTES = new HashMap<>();
+  private static final Map<String, Object>  EMPTY_ATTRIBUTES = new HashMap<>();
   
   private final String              payload_;
-  private final Map<String, String> attributes_;
+  private final Map<String, Object> attributes_;
   private final ITraceContext       traceContext_;
   
   /**
@@ -84,7 +84,7 @@ public class PubSubMessage implements IPubSubMessage
    * @param traceContext  A trace context
    * @param attributes    Message attributes
    */
-  public PubSubMessage(String payload, ITraceContext traceContext, Map<String, String> attributes)
+  public PubSubMessage(String payload, ITraceContext traceContext, Map<String, Object> attributes)
   {
     payload_ = payload;
     traceContext_ = traceContext;
@@ -106,7 +106,7 @@ public class PubSubMessage implements IPubSubMessage
    * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
    */
   @Override
-  public @Nonnull Map<String, String> getAttributes()
+  public @Nonnull Map<String, Object> getAttributes()
   {
     return attributes_;
   }

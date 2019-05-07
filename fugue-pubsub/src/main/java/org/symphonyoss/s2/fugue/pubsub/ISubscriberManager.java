@@ -26,14 +26,18 @@ package org.symphonyoss.s2.fugue.pubsub;
 import org.symphonyoss.s2.common.fluent.IFluent;
 
 /**
- * A subscriber manager of payload type P.
+ * A subscriber manager.
  * 
  * @author Bruce Skingle
  *
- * @param <P> The type of payload received.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public interface ISubscriberManager<P,T extends ISubscriberManager<P,T>> extends IFluent<T>
+public interface ISubscriberManager<T extends ISubscriberManager<T>> extends IFluent<T>
 {
+  /**
+   * 
+   * @return The total number of subscriptions (product of topic and subscription) covered by this subscription configuration.
+   */
+  int getTotalSubscriptionCnt();
   
 }

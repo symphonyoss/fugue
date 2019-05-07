@@ -68,7 +68,7 @@ public class TestInMemoryPubSub
       }
 
       @Override
-      public Map<String, String> getAttributes()
+      public Map<String, Object> getAttributes()
       {
         return null;
       }

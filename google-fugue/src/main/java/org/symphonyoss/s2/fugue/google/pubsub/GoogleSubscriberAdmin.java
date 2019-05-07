@@ -108,8 +108,9 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
   }
 
   @Override
-  protected void createSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  protected void createSubcription(SubscriptionName subscriptionName, boolean dryRun)
   {
+    TopicName topicName = subscriptionName.getTopicName();
     try
     {
       ProjectTopicName projectTopicName = ProjectTopicName.of(projectId_, topicName.toString());
@@ -144,15 +145,14 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
   }
 
   @Override
-  protected void deleteSubcription(TopicName topicName, SubscriptionName subscriptionName, boolean dryRun)
+  protected void deleteSubcription(SubscriptionName subscriptionName, boolean dryRun)
   {
+    TopicName topicName = subscriptionName.getTopicName();
     log_.info("About to delete subscription " + subscriptionName + " on topic " + topicName);
     
     try
     {
       ProjectSubscriptionName projectSubscriptionName = ProjectSubscriptionName.of(projectId_, subscriptionName.toString());
-      
-      log_.info("About to get subscription with name " + projectSubscriptionName);
       
       subscriptionAdminClient_.getSubscription(projectSubscriptionName);
       
