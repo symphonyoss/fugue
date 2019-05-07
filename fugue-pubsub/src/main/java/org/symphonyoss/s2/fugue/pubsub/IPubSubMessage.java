@@ -50,7 +50,7 @@ public interface IPubSubMessage
    * 
    * @return Any optional attributes. If the object was created with null attributes an empty map is returned.
    */
-  @Nonnull Map<String, String> getAttributes();
+  @Nonnull Map<String, Object> getAttributes();
 
   /**
    * 

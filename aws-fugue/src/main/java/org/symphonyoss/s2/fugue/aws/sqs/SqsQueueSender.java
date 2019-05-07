@@ -84,11 +84,9 @@ public class SqsQueueSender implements IQueueSender
       {
         Map<String, MessageAttributeValue> messageAttributes = new HashMap<>();
         
-        for(Entry<String, String> entry : pubSubMessage.getAttributes().entrySet())
+        for(Entry<String, Object> entry : pubSubMessage.getAttributes().entrySet())
         {
-          messageAttributes.put(entry.getKey(), new MessageAttributeValue()
-              .withDataType("String")
-              .withStringValue(entry.getValue()));
+          messageAttributes.put(entry.getKey(), getAttribute(entry.getValue()));
         }
         
         sendRequest.withMessageAttributes(messageAttributes);
@@ -101,5 +99,20 @@ public class SqsQueueSender implements IQueueSender
     {
       throw new TransactionFault(e);
     }
+  }
+
+  private static MessageAttributeValue getAttribute(Object value)
+  {
+    if(value instanceof Number)
+    {
+      return new MessageAttributeValue()
+          .withDataType("Number")
+          .withStringValue(value.toString());
+    }
+    
+    return new MessageAttributeValue()
+        .withDataType("String")
+        .withStringValue(value.toString());
+    
   }
 }
