@@ -77,6 +77,7 @@ import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
+import com.amazonaws.services.ecs.model.Container;
 import com.amazonaws.services.ecs.model.ContainerOverride;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
 import com.amazonaws.services.ecs.model.CreateServiceResult;
@@ -93,6 +94,7 @@ import com.amazonaws.services.ecs.model.ListTasksRequest;
 import com.amazonaws.services.ecs.model.RunTaskRequest;
 import com.amazonaws.services.ecs.model.RunTaskResult;
 import com.amazonaws.services.ecs.model.Service;
+import com.amazonaws.services.ecs.model.Task;
 import com.amazonaws.services.ecs.model.TaskOverride;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
 import com.amazonaws.services.ecs.model.UpdateServiceResult;
@@ -2166,7 +2168,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       String taskArn = run.getTasks().get(0).getTaskArn();
       
-      waitTaskComplete(taskName, taskArn, TimeUnit.SECONDS, 300);
+      waitTaskComplete(taskName, taskArn, TimeUnit.SECONDS, 600);
       
     }
     
@@ -2178,8 +2180,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String nextToken = null;
       
       log_.info("Waiting for task " + taskArn + "...");
-      while(System.currentTimeMillis() < deadline)
+      
+      boolean notDone = true;
+      boolean stopped = false;
+      boolean taskFailed = false;
+      
+      while(notDone)
       {
+        notDone = stopped || System.currentTimeMillis() < deadline;
         
         DescribeTasksResult taskDesc = ecsClient_.describeTasks(new DescribeTasksRequest()
             .withTasks(taskArn)
@@ -2188,7 +2196,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         if(taskDesc.getTasks().size() == 1)
         {
-          String status = taskDesc.getTasks().get(0).getLastStatus();
+          Task myTask = taskDesc.getTasks().get(0);
+          
+          String status = myTask.getLastStatus();
+          
           
           // read log
           try
@@ -2204,6 +2215,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             for(OutputLogEvent event : events.getEvents())
             {
               log_.info("| " + event.getMessage());
+              notDone = false; // go around at least one more time to get more log data
             }
           }
           catch(com.amazonaws.services.logs.model.ResourceNotFoundException e)
@@ -2213,7 +2225,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           if("STOPPED".equals(status))
           {
-            return;
+            stopped = true;
+            
+            for(Container container : myTask.getContainers())
+            {
+              if(container.getExitCode() != 0)
+              {
+                taskFailed = true;
+                
+                log_.error("Container exited with an error code: " + container);
+              }
+            }
           }
         }
         else
@@ -2221,15 +2243,24 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           log_.info("Got " + taskDesc.getTasks().size() + " tasks");
         }
         
-        try
+        if(notDone)
         {
-          Thread.sleep(10000);
-        }
-        catch (InterruptedException e)
-        {
-          throw new IllegalStateException("Interrupted.", e);
+          try
+          {
+            Thread.sleep(10000);
+          }
+          catch (InterruptedException e)
+          {
+            throw new IllegalStateException("Interrupted.", e);
+          }
         }
       }
+      
+      if(taskFailed)
+        throw new IllegalStateException("TASK FAILED");
+
+      if(stopped)
+        return;
       
       throw new IllegalStateException("Timed out.");
     }

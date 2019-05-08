@@ -349,7 +349,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     if(podName_ != null && !tenantContextMap_.containsKey(podName_))
       tenantContextMap_.put(podName_, createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, null, service_)));
 
-    log_.info("FugueDeploy v1.2");
+    log_.info("FugueDeploy v1.3");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
