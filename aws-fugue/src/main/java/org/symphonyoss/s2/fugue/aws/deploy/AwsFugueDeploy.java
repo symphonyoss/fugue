@@ -2179,7 +2179,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String logStreamName = getService() + '/' + taskName + '/' + taskArn.substring(taskArn.lastIndexOf('/') + 1);
       String nextToken = null;
       
-      log_.info("Waiting for task " + taskArn + "...");
+      log_.info("Waiting for task " + taskArn + " logGroup=" + logGroupName + " logStream=" + logStreamName + " ...");
       
       boolean notDone = true;
       boolean stopped = false;
@@ -2187,7 +2187,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       while(notDone)
       {
-        notDone = stopped || System.currentTimeMillis() < deadline;
+        notDone = !(stopped || System.currentTimeMillis() > deadline);
         
         DescribeTasksResult taskDesc = ecsClient_.describeTasks(new DescribeTasksRequest()
             .withTasks(taskArn)
