@@ -2215,7 +2215,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             for(OutputLogEvent event : events.getEvents())
             {
               log_.info("| " + event.getMessage());
-              notDone = false; // go around at least one more time to get more log data
+              notDone = true; // go around at least one more time to get more log data
             }
           }
           catch(com.amazonaws.services.logs.model.ResourceNotFoundException e)
