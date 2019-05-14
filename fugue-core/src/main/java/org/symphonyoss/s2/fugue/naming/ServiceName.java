@@ -33,23 +33,26 @@ import javax.annotation.Nonnull;
  */
 public class ServiceName extends Name
 {
-  private final String serviceId_;
-  private final String podName_;
+  private final String  serviceId_;
+  private final String  podName_;
+  private final Integer podId_;
 
   /**
    * Constructor.
    * 
    * @param serviceId       The ID of the service.
-   * @param podName           The podName (simple name).
+   * @param podName         The physical podName (simple name).
+   * @param podId           The logical podId.
    * @param name            The first element of the actual name.
    * @param additional      Zero or more optional suffix elements.
    */
-  protected ServiceName(String serviceId, String podName, @Nonnull String name, Object ...additional)
+  protected ServiceName(String serviceId, String podName, Integer podId, @Nonnull String name, Object ...additional)
   {
     super(name, additional);
     
     serviceId_ = serviceId;
     podName_ = podName;
+    podId_ = podId;
   }
 
   /**
@@ -63,10 +66,19 @@ public class ServiceName extends Name
   
   /**
    * 
-   * @return The podName (simple name)
+   * @return The podName (physical name)
    */
   public String getPodName()
   {
     return podName_;
+  }
+
+  /**
+   * 
+   * @return The logical podId.
+   */
+  public Integer getPodId()
+  {
+    return podId_;
   }
 }

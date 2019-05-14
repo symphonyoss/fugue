@@ -61,6 +61,7 @@ import org.symphonyoss.s2.fugue.deploy.FugueDeployAction;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
+import org.symphonyoss.s2.fugue.naming.ServiceName;
 
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
@@ -78,6 +79,7 @@ import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
 import com.amazonaws.services.ecs.model.Container;
+import com.amazonaws.services.ecs.model.ContainerDefinition;
 import com.amazonaws.services.ecs.model.ContainerOverride;
 import com.amazonaws.services.ecs.model.CreateServiceRequest;
 import com.amazonaws.services.ecs.model.CreateServiceResult;
@@ -85,17 +87,24 @@ import com.amazonaws.services.ecs.model.DeleteServiceRequest;
 import com.amazonaws.services.ecs.model.DeregisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
+import com.amazonaws.services.ecs.model.DescribeTaskDefinitionRequest;
+import com.amazonaws.services.ecs.model.DescribeTaskDefinitionResult;
 import com.amazonaws.services.ecs.model.DescribeTasksRequest;
 import com.amazonaws.services.ecs.model.DescribeTasksResult;
 import com.amazonaws.services.ecs.model.KeyValuePair;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsRequest;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsResult;
 import com.amazonaws.services.ecs.model.ListTasksRequest;
+import com.amazonaws.services.ecs.model.LogConfiguration;
+import com.amazonaws.services.ecs.model.LogDriver;
+import com.amazonaws.services.ecs.model.PortMapping;
+import com.amazonaws.services.ecs.model.RegisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.RunTaskRequest;
 import com.amazonaws.services.ecs.model.RunTaskResult;
 import com.amazonaws.services.ecs.model.Service;
 import com.amazonaws.services.ecs.model.Task;
 import com.amazonaws.services.ecs.model.TaskOverride;
+import com.amazonaws.services.ecs.model.TransportProtocol;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
 import com.amazonaws.services.ecs.model.UpdateServiceResult;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
@@ -185,8 +194,12 @@ import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
+import com.amazonaws.services.logs.model.CreateLogGroupRequest;
+import com.amazonaws.services.logs.model.DescribeLogGroupsRequest;
+import com.amazonaws.services.logs.model.DescribeLogGroupsResult;
 import com.amazonaws.services.logs.model.GetLogEventsRequest;
 import com.amazonaws.services.logs.model.GetLogEventsResult;
+import com.amazonaws.services.logs.model.LogGroup;
 import com.amazonaws.services.logs.model.OutputLogEvent;
 import com.amazonaws.services.route53.AmazonRoute53;
 import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
@@ -1337,7 +1350,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void processRole(String roleName, String roleSpec, String trustSpec)
     {
-      Name name = getNameFactory().getServiceItemName(roleName);
+      Name name = getNameFactory().getLogicalServiceItemName(roleName);
 //          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
@@ -1346,14 +1359,23 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           TRUST_ECS_DOCUMENT : 
             trustSpec, 
             policyArn);
+      
+      if(getNameFactory().getPodId() != null)
+      {
+        // delete obsolete name
+        deleteRole(getNameFactory().getPhysicalServiceItemName(roleName));
+      }
     }
 
     @Override
     protected void deleteRole(String roleName)
     {
-      Name name = getNameFactory().getServiceItemName(roleName);
+      if(getNameFactory().getPodId() != null)
+      {
+        deleteRole(getNameFactory().getPhysicalServiceItemName(roleName));
+      }
       
-      deleteRole(name);
+      deleteRole(getNameFactory().getLogicalServiceItemName(roleName));
     }
         
     private void deleteRole(Name name)
@@ -1393,7 +1415,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void saveConfig()
     {
-      String              name        = getNameFactory().getServiceName().toString();
+      String              name        = getNameFactory().getPhysicalServiceName().toString();
       String              bucketName  = environmentTypeConfigBuckets_.get(getAwsRegion());
       String              key         = CONFIG + "/" + name + DOT_JSON;
       ImmutableByteArray  dom         = getConfigDom().serialize();
@@ -1447,7 +1469,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void deleteConfig()
     {
-      String              name        = getNameFactory().getServiceName().toString();
+      String              name        = getNameFactory().getPhysicalServiceName().toString();
       String              bucketName  = environmentTypeConfigBuckets_.get(getAwsRegion());
       String              key         = CONFIG + "/" + name + DOT_JSON;
       
@@ -1508,13 +1530,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
-    protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances)
+    protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath,
+        int instances, Name roleName, String imageName, int jvmHeap, int memory)
     {
       try
       {
         if(action_.isDeploy_)
         {
-          Name    targetGroupName = getNameFactory().getServiceItemName(name);
+          Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
           String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
           String regionalHostName = getNameFactory()
               .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
@@ -1533,7 +1556,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
     //      registerTaskDef(name, port, healthCheckPath, podId);
           
-          createService(targetGroupArn, name, port, instances, paths);
+          createService(targetGroupArn, name, port, instances, paths, roleName, imageName, jvmHeap, memory);
         }
         else
         {
@@ -1550,14 +1573,17 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     
     @Override
-    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule)
+    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory)
     {
-      Name serviceName  = getNameFactory().getServiceItemName(name);
+      Name serviceName  = getNameFactory().getPhysicalServiceItemName(name);
       Name baseName     = serviceName.append("schedule");
       Name ruleName     = baseName.append("rule");
 
       if(action_.isDeploy_)
-      {
+      { 
+        registerTaskDefinition(serviceName, port, roleName, imageName, jvmHeap, memory);
+        
+        
         String policyArn =  createPolicyFromResource(baseName, "policy/eventsInvokeEcsTask.json");
         String roleArn =   createRole(baseName, TRUST_EVENTS_DOCUMENT, policyArn);
         
@@ -1649,31 +1675,32 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
-    protected void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables)
+    protected void deployLambdaContainer(String name, String imageName, 
+        String roleId, String handler, int memorySize, int timeout, Map<String, String> variables)
     {
-      Name    functionName  = getNameFactory().getServiceItemName(name);
-      Name    roleName      = getNameFactory().getServiceItemName(roleId).append(ROLE);
+      String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
+      Name    roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
       String  bucketName    = environmentTypeConfigBuckets_.get(getAwsRegion());
       String  key           = LAMBDA + "/" + getNameFactory().getServiceId() + "/" +
-                              name + "-" + getBuildId() + DOT_JAR;
+                              imageName + "-" + getBuildId() + DOT_JAR;
 
       if(action_.isDeploy_)
       {
         try
         {
           lambdaClient_.getFunction(new GetFunctionRequest()
-              .withFunctionName(functionName.toString())
+              .withFunctionName(functionName)
               );
           
           log_.info("Lambda function " + functionName + " already exists, updating...");
           lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
-              .withFunctionName(functionName.toString())
+              .withFunctionName(functionName)
               .withS3Bucket(bucketName)
               .withS3Key(key)
               );
           
           lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
-              .withFunctionName(functionName.toString())
+              .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
               .withTimeout(timeout)
@@ -1688,7 +1715,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           log_.info("Lambda function " + functionName + " does not exist, creating...");
           
           lambdaClient_.createFunction(new CreateFunctionRequest()
-              .withFunctionName(functionName.toString())
+              .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
               .withTimeout(timeout)
@@ -1709,17 +1736,46 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         try
         {
           lambdaClient_.getFunction(new GetFunctionRequest()
-              .withFunctionName(functionName.toString())
+              .withFunctionName(functionName)
               );
           
           log_.info("Deleting lambda function " + functionName + "...");
           lambdaClient_.deleteFunction(new DeleteFunctionRequest()
-              .withFunctionName(functionName.toString()));
+              .withFunctionName(functionName));
         }
         catch(ResourceNotFoundException e)
         {
           log_.info("Lambda function " + functionName + " does not exist.");
         }
+      }
+      if(!name.equals(imageName))
+      {
+        // delete the obsolete function named by the image name if it exists.
+        deleteObsoleteFunction(getNameFactory().getPhysicalServiceItemName(imageName).toString());
+      }
+      
+      if(getNameFactory().getPodId() != null)
+      {
+        deleteObsoleteFunction(getNameFactory().getPhysicalServiceItemName(name).toString());
+      }
+    }
+
+    private void deleteObsoleteFunction(String obsoleteFunctionName)
+    {
+      try
+      {
+        lambdaClient_.getFunction(new GetFunctionRequest()
+            .withFunctionName(obsoleteFunctionName)
+            );
+        
+        log_.info("Obsolete lambda function " + obsoleteFunctionName + " exists, deleting...");
+        lambdaClient_.deleteFunction(new DeleteFunctionRequest()
+            .withFunctionName(obsoleteFunctionName)
+            );
+      }
+      catch(ResourceNotFoundException e)
+      {
+        log_.info("Obsolete lambda function " + obsoleteFunctionName + " does not exist.");
       }
     }
 
@@ -1729,7 +1785,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
           "-" + getAwsRegion() + "-config/config/" +
           
-          getNameFactory().getServiceName() + ".json";
+          getNameFactory().getPhysicalServiceName() + ".json";
     }
 
     private String getClusterArn()
@@ -2146,9 +2202,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
     
     @Override
-    protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
+    protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName)
     {
-      Name taskName = getNameFactory().getServiceItemName(name);
+      Name taskName = getNameFactory().getPhysicalServiceItemName(name);
       // TODO move from groovy land
       
       createTaskDef(taskName, port, paths, healthCheckPath);
@@ -2158,6 +2214,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .withCount(1)
           .withTaskDefinition(taskName.toString())
           .withOverrides(new TaskOverride()
+              .withTaskRoleArn(getRoleArn(roleName))
               .withContainerOverrides(new ContainerOverride()
                   .withName(taskName.toString())
                   .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
@@ -2174,8 +2231,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void waitTaskComplete(Name taskName, String taskArn, TimeUnit timeUnit, long timeout)
     {
+      int debug=0;
       long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
-      String logGroupName = getNameFactory().getServiceName().toString();
+      String logGroupName = getNameFactory().getPhysicalServiceName().toString();
       String logStreamName = getService() + '/' + taskName + '/' + taskArn.substring(taskArn.lastIndexOf('/') + 1);
       String nextToken = null;
       
@@ -2184,6 +2242,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       boolean notDone = true;
       boolean stopped = false;
       boolean taskFailed = false;
+      int     logEvents  = 0;
+      int     logWait  = 3;
       
       while(notDone)
       {
@@ -2216,6 +2276,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             {
               log_.info("| " + event.getMessage());
               notDone = true; // go around at least one more time to get more log data
+              logEvents++;
             }
           }
           catch(com.amazonaws.services.logs.model.ResourceNotFoundException e)
@@ -2229,7 +2290,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             
             for(Container container : myTask.getContainers())
             {
-              if(container.getExitCode() != 0)
+              if(container.getExitCode() == null)
+              {
+                taskFailed = true;
+                
+                log_.error("Container failed to launch: " + container);
+              }
+              else if(container.getExitCode() != 0)
               {
                 taskFailed = true;
                 
@@ -2241,6 +2308,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         else
         {
           log_.info("Got " + taskDesc.getTasks().size() + " tasks");
+        }
+        
+        if(logEvents == 0 && logWait-- > 0)
+        {
+          notDone = true; // go around at least one more time to get more log data
         }
         
         if(notDone)
@@ -2268,7 +2340,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath)
     {
-      Name taskName = getNameFactory().getServiceItemName(name);
+      Name taskName = getNameFactory().getPhysicalServiceItemName(name);
       // TODO move from groovy land
       
       deleteTaskDef(taskName, port, paths, healthCheckPath);
@@ -2286,7 +2358,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           if(isPrimaryEnvironment()) // we can't find the IP addresses for this.......
             loadBalancer_ = getLoadBalancer(true);
           
-          Name targetGroupName = getNameFactory().getServiceItemName(DEFAULT);
+          Name targetGroupName = getNameFactory().getPhysicalServiceItemName(DEFAULT);
               //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
           
           if(isPrimaryEnvironment())
@@ -2406,7 +2478,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void deleteService(String name)
     {
-      Name    serviceName = getNameFactory().getServiceItemName(name);
+      Name    serviceName = getNameFactory().getPhysicalServiceItemName(name);
       
       log_.info("Deleting service " + serviceName + "...");
       
@@ -2432,11 +2504,91 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       log_.info("Deleted service " + serviceName + ".");
     }
 
-    private void createService(String targetGroupArn, String name, int port, int desiredCnt, Collection<String> paths)
+    private void registerTaskDefinition(Name serviceName, int port, Name roleName, String imageName, int jvmHeap, int memory)
+    {
+      String roleArn = getRoleArn(roleName);
+      
+      Map<String, String> logOptions = new HashMap<>();
+
+      logOptions.put("awslogs-group", createLogGroupIfNecessary());
+      logOptions.put("awslogs-region", awsRegion_);
+      logOptions.put("awslogs-stream-prefix", getNameFactory().getServiceId());
+      
+      RegisterTaskDefinitionRequest registerTaskDefinitionRequest =  new RegisterTaskDefinitionRequest()
+          .withTaskRoleArn(roleArn)
+          .withFamily(serviceName.toString())
+          .withContainerDefinitions(new ContainerDefinition()
+              .withName(serviceName.toString())
+              .withImage(awsAccountId_ + ".dkr.ecr.us-east-1.amazonaws.com/" + imageName)
+              .withPortMappings(new PortMapping()
+                  .withContainerPort(port)
+                  .withHostPort(0)
+                  .withProtocol(TransportProtocol.Tcp)
+                  )
+              .withEssential(true)
+              .withLogConfiguration(new LogConfiguration()
+                  .withLogDriver(LogDriver.Awslogs)
+                  .withOptions(logOptions)
+                  )
+              .withEnvironment(getTaskEnvironment(jvmHeap))
+              .withMemory(memory)
+              )
+          ;
+      
+
+      ecsClient_.registerTaskDefinition(registerTaskDefinitionRequest);
+    }
+
+    private Collection<KeyValuePair> getTaskEnvironment(int jvmHeap)
+    {
+      List<KeyValuePair>  env = new LinkedList<>();
+      INameFactory nf = getNameFactory();
+
+      env.add(new KeyValuePair().withName("FUGUE_ENVIRONMENT_TYPE")   .withValue(nf.getEnvironmentType()));
+      env.add(new KeyValuePair().withName("FUGUE_ENVIRONMENT")        .withValue(nf.getEnvironmentId()));
+      env.add(new KeyValuePair().withName("FUGUE_REGION")             .withValue(awsRegion_));
+      env.add(new KeyValuePair().withName("FUGUE_CONFIG")             .withValue(
+          "https://s3." + awsRegion_ + ".amazonaws.com/" + nf.getConfigBucketName(awsRegion_) +
+            "/" + CONFIG + "/" + nf.getPhysicalServiceName() + ".json"
+          ));
+      env.add(new KeyValuePair().withName("FUGUE_SERVICE")            .withValue(nf.getServiceId()));
+//      env.add(new KeyValuePair().withName("FUGUE_PRIMARY_ENVIRONMENT").withValue(nf.getEnvironmentType()));
+//      env.add(new KeyValuePair().withName("FUGUE_PRIMARY_REGION")     .withValue(nf.getEnvironmentType()));
+      env.add(new KeyValuePair().withName("FUGUE_JAVA_ARGS")          .withValue("-Xms" + jvmHeap + "m -Xmx" + jvmHeap + "m"));
+      
+      return env;
+    }
+
+    private String createLogGroupIfNecessary()
+    {
+      String name = getNameFactory().getPhysicalServiceName().toString();
+      
+      DescribeLogGroupsResult result = logsClient_.describeLogGroups(new DescribeLogGroupsRequest()
+          .withLogGroupNamePrefix(name)
+          );
+      
+      for(LogGroup group : result.getLogGroups())
+      {
+        if(group.getLogGroupName().equals(name))
+          return name;
+      }
+      
+      logsClient_.createLogGroup(new CreateLogGroupRequest()
+          .withLogGroupName(name)
+          .withTags(getTags())
+          );
+      
+      return name;
+    }
+
+    private void createService(String targetGroupArn, String name, int port, int desiredCnt,
+        Collection<String> paths, Name roleName, String imageName, int jvmHeap, int memory)
     {
       log_.info("Cluster name is " + clusterName_);
       
-      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
+      Name    serviceName = getNameFactory().getPhysicalServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
+      
+      registerTaskDefinition(serviceName, port, roleName, imageName, jvmHeap, memory);
       boolean create      = true;
       
       DescribeServicesResult describeResult = ecsClient_.describeServices(new DescribeServicesRequest()
@@ -2510,7 +2662,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private LoadBalancer getLoadBalancer(boolean createIfNecessary)
     {
-      String name = getNameFactory().getServiceName().getShortName(32);
+      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
 //          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
       
       try
@@ -2659,7 +2811,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void deleteLoadBalancer()
     {
-      String name = getNameFactory().getServiceName().getShortName(32);
+      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
       
       try
       {

@@ -48,8 +48,10 @@ public interface IQueueManager
    * @param queueName The name of the queue to be created.
    * @param tags      Tags to be applied to the queue.
    * @param dryRun    If true then log actions which would be performed but don't actually do anything.
+   * 
+   * @return The queue event source name.
    */
-  void createQueue(String queueName, @Nullable Map<String, String> tags, boolean dryRun);
+  String createQueue(String queueName, @Nullable Map<String, String> tags, boolean dryRun);
 
   /**
    * Return a sender for the given queue.

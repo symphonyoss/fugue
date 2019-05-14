@@ -34,6 +34,12 @@ import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
 
+/**
+ * A factory for producing Name instances.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class NameFactory implements INameFactory
 {
   protected final String                     CONFIG = "config";
@@ -48,12 +54,27 @@ public class NameFactory implements INameFactory
   private final String                       serviceId_;
   private final ImmutableMap<String, String> tags_;
   
-  
+  /**
+   * Constructor.
+   * 
+   * @param config Configuration.
+   */
   public NameFactory(IGlobalConfiguration config)
   {
     this(config.getGlobalNamePrefix(), config.getEnvironmentType(), config.getEnvironmentId(), config.getRegionId(), config.getPodName(), config.getPodId(), config.getServiceId());
   }
 
+  /**
+   * Constructor.
+   * 
+   * @param globalNamePrefix  Global prefix added to all Names.
+   * @param environmentType   The environmentType (e.g. dev)
+   * @param environmentId     The environment ID (e.g. s2dev1)
+   * @param regionId          The cloud service provider region ID (e.g. us-east-1)
+   * @param podName           The pod name (i.e. the physical deployment name)
+   * @param podId             The pod ID (1.e. the logical tenant ID)
+   * @param serviceId         The service ID
+   */
   public NameFactory(String globalNamePrefix, String environmentType, String environmentId, String regionId, String podName, Integer podId, String serviceId)
   {
     globalNamePrefix_ = globalNamePrefix;
@@ -208,31 +229,52 @@ public class NameFactory implements INameFactory
 //  }
   
   @Override
-  public ServiceName  getServiceName()
+  public ServiceName  getPhysicalServiceName()
   {
-    return createServiceName(serviceId_, podName_, 
+    return createServiceName(serviceId_, podName_, podId_, 
         getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getRequiredServiceId());
+  }
+  
+  @Override
+  public ServiceName  getServiceImageName()
+  {
+    return createServiceName(serviceId_, null, null, 
+        getGlobalNamePrefix(), getRequiredServiceId());
+  }
+  
+  @Override
+  public ServiceName  getLogicalServiceName()
+  {
+    return createServiceName(serviceId_, podName_, podId_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, podId_, getRequiredServiceId());
   }
   
   @Override
   public ServiceName  getRegionalServiceName()
   {
-    return createServiceName(serviceId_, podName_, 
+    return createServiceName(serviceId_, podName_, podId_, 
         getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, podName_, getRequiredServiceId());
   }
   
   @Override
   public ServiceName  getMultiTenantServiceName()
   {
-    return createServiceName(serviceId_, null, 
+    return createServiceName(serviceId_, null, null,
         getGlobalNamePrefix(), environmentType_, environmentId_, null, getRequiredServiceId());
   }
   
   @Override
-  public ServiceName  getServiceItemName(String name)
+  public ServiceName  getPhysicalServiceItemName(String name)
   {
-    return createServiceName(serviceId_, podName_, 
+    return createServiceName(serviceId_, podName_, podId_, 
         getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getRequiredServiceId(), name);
+  }
+  
+  @Override
+  public ServiceName  getLogicalServiceItemName(String name)
+  {
+    return createServiceName(serviceId_, podName_, podId_, 
+        getGlobalNamePrefix(), environmentType_, environmentId_, podId_, getRequiredServiceId(), name);
   }
   
   @Override
@@ -354,22 +396,15 @@ public class NameFactory implements INameFactory
     return createSubscriptionName(topicName, getServiceId(), subscriptionId,
         getGlobalNamePrefix(), environmentType_, environmentId_, podName_, getServiceId(), subscriptionId, topicName.getTopicId(), topicName.getServiceId());
   }
-
-  @Override
-  @Deprecated
-  public SubscriptionName getObsoleteSubscriptionName(TopicName topicName, String subscriptionId)
-  {
-    return createSubscriptionName(topicName, getServiceId(), subscriptionId, topicName.toString(), subscriptionId);
-  }
   
   protected Name createName(@Nonnull String name, String ...additional)
   {
     return new Name(name, (Object[])additional);
   }
 
-  protected ServiceName createServiceName(String serviceId, String podName, @Nonnull String name, Object ...additional)
+  protected ServiceName createServiceName(String serviceId, String podName, Integer podId, @Nonnull String name, Object ...additional)
   {
-    return new ServiceName(serviceId, podName, name, additional);
+    return new ServiceName(serviceId, podName, podId, name, additional);
   }
 
   protected TableName createTableName(String serviceId, String tableId, @Nonnull String name, String ...additional)

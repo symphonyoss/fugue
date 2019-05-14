@@ -31,12 +31,23 @@ import org.symphonyoss.s2.common.hash.Hash;
 
 import com.google.common.collect.ImmutableMap;
 
+/**
+ * A factory for producing Name instances.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public interface INameFactory
 {
-
+  /**
+   * Return a table name with the given local ID owned by the current service.
+   * 
+   * @param table The table ID.
+   * 
+   * @return A TableName.
+   */
   TableName getTableName(String table);
 
-  CredentialName getEnvironmentCredentialName(String owner);
   
   /**
    * Return a TopicName for the given topic owned by the current service.
@@ -67,9 +78,6 @@ public interface INameFactory
    */
   TopicName getTopicName(String serviceId, String topicId);
   
-  @Deprecated
-  SubscriptionName  getObsoleteSubscriptionName(TopicName topicName, String subscriptionId);
-  
   /**
    * Return a Subscription Name for the given topic and optional subscriptionId.
    * 
@@ -87,12 +95,42 @@ public interface INameFactory
    * @return the service name with no tenant element even if we are in a tenant specific context.
    */
   ServiceName getMultiTenantServiceName();
-  ServiceName getServiceName();
+
+  /**
+   * 
+   * @return the service name including the pod name element.
+   */
+  ServiceName getPhysicalServiceName();
+
+  /**
+   * 
+   * @return the service name including the pod ID element.
+   */
+  ServiceName getLogicalServiceName();
+
+  /**
+   * 
+   * @return the service name including the pod name and region elements.
+   */
   ServiceName getRegionalServiceName();
 
-  CredentialName getFugueCredentialName(String owner);
+  /**
+   * Return the service name including the pod name and the given name element.
+   * 
+   * @param name An additional name element.
+   * 
+   * @return the service name including the pod name and the given name element.
+   */
+  Name getPhysicalServiceItemName(String name);
 
-  Name getServiceItemName(String name);
+  /**
+   * Return the service name including the pod ID and the given name element.
+   * 
+   * @param name An additional name element.
+   * 
+   * @return the service name including the pod ID and the given name element.
+   */
+  Name getLogicalServiceItemName(String name);
 
   Name getConfigBucketName(String regionId);
 
@@ -153,10 +191,16 @@ public interface INameFactory
 
   INameFactory withGlobalNamePrefix(String globalNamePrefix);
 
+  CredentialName getFugueCredentialName(String owner);
+
   CredentialName getCredentialName(Integer podId, String owner);
 
   CredentialName getCredentialName(String owner);
 
   CredentialName getCredentialName(Integer podId, Hash principalBaseHash);
 
+  CredentialName getEnvironmentCredentialName(String owner);
+
+
+  ServiceName getServiceImageName();
 }

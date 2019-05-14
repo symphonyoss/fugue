@@ -53,11 +53,13 @@ import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.MutableJsonDom;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.type.provider.IIntegerProvider;
 import org.symphonyoss.s2.common.type.provider.IStringProvider;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.cmd.CommandLineHandler;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.Name;
 
 /**
  * Abstract base class for deployment utility implementations, to be subclassed for each cloud service provider.
@@ -127,6 +129,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String     CONTAINERS          = "containers";
   private static final String     SCHEDULE            = "schedule";
   private static final String     INSTANCES           = "instances";
+  private static final String     IMAGE               = "image";
 
   private static final String     DNS_SUFFIX          = "dnsSuffix";
 
@@ -415,6 +418,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private void deploy(ImmutableJsonObject multiTenantDefaults, ImmutableJsonObject environmentConfig,
       ImmutableJsonObject multiTenantOverrides)
   {
+    int debug=0;
     ImmutableJsonObject serviceJson;
     String dir = SERVICE_DIR + "/" + getService();
     
@@ -908,9 +912,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   protected abstract class DeploymentContext
   {
     private static final String FUGUE_CONFIG = "FUGUE_CONFIG";
-    
+
     private final String                                   podName_;
-    private final INameFactory                             nameFactory_;
+
+    private INameFactory                                   nameFactory_;
 
     private Map<String, String>                            policies_;
     private ImmutableJsonObject                            config_;
@@ -939,17 +944,17 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void deleteRole(String roleName);
     
-    protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
+    protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName); //TODO: maybe wrong signature
     
     protected abstract void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
     protected abstract void configureServiceNetwork();
     
-    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances);
+    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances, Name roleName, String imageName, int jvmHeap, int memory);
     
-    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule);
+    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory);
 
-    protected abstract void deployLambdaContainer(String name, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
+    protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
     
     protected abstract void deployService();
     protected abstract void undeployService();
@@ -1019,6 +1024,24 @@ public abstract class FugueDeploy extends CommandLineHandler
       configDom_           = new MutableJsonDom().add(config_).immutify();
       templateVariables_   = createTemplateVariables(config);
       sub_                 = new StringSubstitutor(templateVariables_);
+      
+      
+      String podName = templateVariables_.get("podName");
+      String podIdString = templateVariables_.get("podId");
+      
+      if(podName!=null && podIdString != null)
+      {
+        try
+        {
+          int podId = Integer.parseInt(podIdString);
+          
+          nameFactory_ = nameFactory_.withPod(podName, podId);
+        }
+        catch(NumberFormatException e)
+        {
+          throw new TransactionFault("Configured podId is not an integer", e);
+        }
+      }
     }
 
     protected void setPolicies(Map<String, String> policies)
@@ -1084,7 +1107,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       try
       {
-        templateVariables.put(FQ_SERVICE_NAME, nameFactory_.getServiceName().toString());
+        templateVariables.put(FQ_SERVICE_NAME, nameFactory_.getPhysicalServiceName().toString());
       }
       catch(IllegalStateException e)
       {
@@ -1218,8 +1241,10 @@ public abstract class FugueDeploy extends CommandLineHandler
           int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
           Collection<String>  paths = container.getListOf(String.class, PATHS);
           String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+          String              roleId = container.getRequiredString(ROLE);
+          Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
           
-          deployInitContainer(name, port, paths, healthCheckPath);
+          deployInitContainer(name, port, paths, healthCheckPath, roleName);
         }
       }
     }
@@ -1301,6 +1326,7 @@ public abstract class FugueDeploy extends CommandLineHandler
             }
             
             deployLambdaContainer(name,
+                container.getString(IMAGE, name),
                 container.getRequiredString(ROLE),
                 container.getRequiredString(HANDLER),
                 container.getRequiredInteger(MEMORY),
@@ -1314,6 +1340,7 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     private void deployDockerContainers(IBatch<Runnable> batch, ContainerType containerType, boolean scheduled)
     {
+      int debug=0;
       Map<String, JsonObject<?>> map = containerMap_.get(containerType);
       
       if(map != null)
@@ -1328,14 +1355,21 @@ public abstract class FugueDeploy extends CommandLineHandler
             int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
             Collection<String>  paths = container.getListOf(String.class, PATHS);
             int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
+            String              roleId = container.getRequiredString(ROLE);
+            Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
+            String              imageId       = container.getString(IMAGE, name);
+            String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
+            int jvmHeap = container.getInteger("jvmHeap", 512);
+            int memory = container.getInteger("memory", 1024);
             
             if(scheduled)
             {
-              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE));
+              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE), roleName, imageName, jvmHeap, memory);
             }
             else
             {
-              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"), instances);
+              deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"),
+                  instances, roleName, imageName, jvmHeap, memory);
             }
           });
         }
