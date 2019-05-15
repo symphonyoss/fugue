@@ -36,9 +36,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
@@ -61,7 +61,6 @@ import org.symphonyoss.s2.fugue.deploy.FugueDeployAction;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
-import org.symphonyoss.s2.fugue.naming.ServiceName;
 
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
@@ -87,14 +86,11 @@ import com.amazonaws.services.ecs.model.DeleteServiceRequest;
 import com.amazonaws.services.ecs.model.DeregisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesRequest;
 import com.amazonaws.services.ecs.model.DescribeServicesResult;
-import com.amazonaws.services.ecs.model.DescribeTaskDefinitionRequest;
-import com.amazonaws.services.ecs.model.DescribeTaskDefinitionResult;
 import com.amazonaws.services.ecs.model.DescribeTasksRequest;
 import com.amazonaws.services.ecs.model.DescribeTasksResult;
 import com.amazonaws.services.ecs.model.KeyValuePair;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsRequest;
 import com.amazonaws.services.ecs.model.ListTaskDefinitionsResult;
-import com.amazonaws.services.ecs.model.ListTasksRequest;
 import com.amazonaws.services.ecs.model.LogConfiguration;
 import com.amazonaws.services.ecs.model.LogDriver;
 import com.amazonaws.services.ecs.model.PortMapping;
@@ -2202,12 +2198,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
     
     @Override
-    protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName)
+    protected void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName, String imageName, int jvmHeap, int memory)
     {
       Name taskName = getNameFactory().getPhysicalServiceItemName(name);
-      // TODO move from groovy land
-      
-      createTaskDef(taskName, port, paths, healthCheckPath);
+
+      registerTaskDefinition(taskName, port, roleName, imageName, jvmHeap, memory);
       
       RunTaskResult run = ecsClient_.runTask(new RunTaskRequest()
           .withCluster(clusterName_)
@@ -2444,22 +2439,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String listenerArn = listeners.get(0).getListenerArn();
       log_.info("Listener " + listenerArn + " created.");
       return listenerArn;
-    }
-    
-
-    
-    private void createTaskDef(Name name, int port, Collection<String> paths, String healthCheckPath)
-    {
-//      Name    serviceName = getNameFactory().getServiceItemName(name); //new Name(getEnvironmentType(), getEnvironment(), getRealm(), getRegion(), podId, name);
-//      boolean create      = true;
-//      
-//      ContainerDefinition containerDefinition = new ContainerDefinition()
-//          .withName(serviceName.toString())
-//          .withImage(image)
-//          ;
-//      ecsClient_.registerTaskDefinition(new RegisterTaskDefinitionRequest()
-//          .withContainerDefinitions(containerDefinition)
-//          );
     }
     
     private void deleteTaskDef(Name name, int port, Collection<String> paths, String healthCheckPath)

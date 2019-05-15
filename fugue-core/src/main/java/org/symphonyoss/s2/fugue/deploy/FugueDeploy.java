@@ -944,7 +944,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void deleteRole(String roleName);
     
-    protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName); //TODO: maybe wrong signature
+    protected abstract void deployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath, Name roleName, String imageName, int jvmHeap, int memory); //TODO: maybe wrong signature
     
     protected abstract void undeployInitContainer(String name, int port, Collection<String> paths, String healthCheckPath); //TODO: maybe wrong signature
     
@@ -1244,7 +1244,12 @@ public abstract class FugueDeploy extends CommandLineHandler
           String              roleId = container.getRequiredString(ROLE);
           Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
           
-          deployInitContainer(name, port, paths, healthCheckPath, roleName);
+          String              imageId       = container.getString(IMAGE, name);
+          String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
+          int jvmHeap = container.getInteger("jvmHeap", 512);
+          int memory = container.getInteger("memory", 1024);
+          
+          deployInitContainer(name, port, paths, healthCheckPath, roleName, imageName, jvmHeap, memory);
         }
       }
     }
@@ -1340,7 +1345,6 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     private void deployDockerContainers(IBatch<Runnable> batch, ContainerType containerType, boolean scheduled)
     {
-      int debug=0;
       Map<String, JsonObject<?>> map = containerMap_.get(containerType);
       
       if(map != null)
