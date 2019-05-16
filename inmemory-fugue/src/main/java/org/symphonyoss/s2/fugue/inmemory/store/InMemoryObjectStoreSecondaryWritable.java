@@ -25,11 +25,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.TreeMap;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
  * IFundamentalObjectStoreSecondaryWritable implementation based on DynamoDB and S3.
@@ -93,7 +96,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
       List<Hash> absoluteSequenceHashes, Instant createdDate)
   {
     doSaveToSequences(absoluteHash, payload,
@@ -102,7 +105,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {
     doSaveToSequences(absoluteHash, payload,
@@ -111,7 +114,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
       List<Hash> absoluteSequenceHashes, Instant createdDate,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {
@@ -120,7 +123,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
         currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
   }
 
-  private void doSaveToSequences(Hash absoluteHash, IFugueObject payload,
+  private void doSaveToSequences(Hash absoluteHash, String payload,
       List<Hash> absoluteSequenceHashes, Instant createdDate,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {

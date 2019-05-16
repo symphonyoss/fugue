@@ -45,10 +45,11 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
+   * @param podId                     The podId if the message relates to a pod.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    */
-  void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
       List<Hash> absoluteSequenceHashes, Instant createdDate);
   
   /**
@@ -56,12 +57,13 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
+   * @param podId                     The podId if the message relates to a pod.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
    * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    */
-  void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate);
   
   /**
@@ -69,6 +71,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
+   * @param podId                     The podId if the message relates to a pod.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
@@ -76,7 +79,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    */
-  void saveToSequences(Hash absoluteHash, IFugueObject payload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
       List<Hash> absoluteSequenceHashes, Instant createdDate,
       List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate);
 
