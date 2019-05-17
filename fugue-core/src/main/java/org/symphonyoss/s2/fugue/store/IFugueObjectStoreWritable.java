@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
- * A low level database within which Fugue can be stored.
+ * A low level database within which Fugue objects can be stored.
  * 
  * @author Bruce Skingle
  *

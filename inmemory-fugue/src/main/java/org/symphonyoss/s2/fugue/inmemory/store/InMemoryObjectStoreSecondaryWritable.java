@@ -97,7 +97,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate)
+      List<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         absoluteSequenceHashes, createdDate,
@@ -106,7 +106,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
 
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         null, null,
@@ -116,7 +116,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
       List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         absoluteSequenceHashes, createdDate,
