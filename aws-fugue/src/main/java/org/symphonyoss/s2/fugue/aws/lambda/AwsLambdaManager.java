@@ -38,6 +38,12 @@ import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.CreateEventSourceMappingRequest;
 import com.amazonaws.services.lambda.model.CreateEventSourceMappingResult;
+import com.amazonaws.services.lambda.model.EventSourceMappingConfiguration;
+import com.amazonaws.services.lambda.model.GetEventSourceMappingRequest;
+import com.amazonaws.services.lambda.model.ListEventSourceMappingsRequest;
+import com.amazonaws.services.lambda.model.ListEventSourceMappingsResult;
+import com.amazonaws.services.lambda.model.UpdateEventSourceMappingRequest;
+import com.amazonaws.services.lambda.model.UpdateEventSourceMappingResult;
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -92,6 +98,30 @@ public class AwsLambdaManager implements ILambdaManager
   @Override
   public void subscribe(String functionName, String eventSourceArn)
   {
+    ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
+        .withFunctionName(functionName)
+        .withEventSourceArn(eventSourceArn)
+        );
+    
+    for(EventSourceMappingConfiguration mapping : mappingResult.getEventSourceMappings())
+    {
+      if("Enabled".equals(mapping.getState()))
+      {
+        log_.info("Mapping exists.");
+        return;
+      }
+      
+      log_.info("Mapping exists but is " + mapping.getState());
+      
+      UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
+          .withUUID(mapping.getUUID())
+          .withEnabled(true)
+          );
+      
+      log_.info("Mapping updated to state " + updateResult.getState());
+      
+      return;
+    }
     CreateEventSourceMappingResult result = lambdaClient_.createEventSourceMapping(new CreateEventSourceMappingRequest()
         .withEnabled(true)
         .withBatchSize(BATCH_SIZE)
