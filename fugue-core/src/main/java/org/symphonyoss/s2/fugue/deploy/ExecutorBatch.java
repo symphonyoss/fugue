@@ -115,8 +115,19 @@ public class ExecutorBatch<T extends Runnable> implements IBatch<T>
       
       return task;
     }
-    catch (InterruptedException | ExecutionException e)
+    catch (InterruptedException e)
     {
+      throw new IllegalStateException("Batch task interrupted", e);
+    }
+    catch (ExecutionException e)
+    {
+      if(e.getCause() instanceof Error)
+      {
+        // Something really bad happened, it's pointless attempting any error handling.
+        
+        throw (Error)e.getCause();
+      }
+      
       throw new IllegalStateException("Batch task failed", e);
     }
   }
@@ -145,8 +156,6 @@ public class ExecutorBatch<T extends Runnable> implements IBatch<T>
 
     while(taskCnt_>0)
     {
-//      log_.info("Waiting for " + taskCnt_ + " tasks...");
-
       taskCnt_--;
       
       try

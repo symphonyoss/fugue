@@ -25,7 +25,6 @@ package org.symphonyoss.s2.fugue.pubsub;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +34,6 @@ import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.counter.ScaleAction;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
-import org.symphonyoss.s2.fugue.pipeline.FatalConsumerException;
-import org.symphonyoss.s2.fugue.pipeline.RetryableConsumerException;
 
 public abstract class AbstractPullSubscriber implements Runnable
 {
@@ -65,10 +62,7 @@ public abstract class AbstractPullSubscriber implements Runnable
 
   protected abstract IPullSubscriberContext getContext() throws IOException;
   
-//  protected abstract Collection<M>  nonBlockingPull(C context);
-//  protected abstract Collection<M>  blockingPull(C context);
   protected abstract Runnable       getNonIdleSubscriber();
-//  protected abstract void handleMessage(C context, M message);
   
   protected void getSomeMessages()
   {
@@ -137,52 +131,34 @@ public abstract class AbstractPullSubscriber implements Runnable
       if(counter_ != null)
         counter_.increment(messages.size());
       
-      try
+      for(IPullSubscriberMessage message : messages)
       {
-        for(IPullSubscriberMessage message : messages)
-        {
-          log_.debug("handle message " + message.getMessageId());
-          batch.submit(message);
-        }
-        
-        Collection<IPullSubscriberMessage> incompleteTasks;
-        do
-        {
-          incompleteTasks = batch.waitForAllTasks(extensionFrequency_);
-          
-          for(IPullSubscriberMessage message : incompleteTasks)
-          {
-            log_.debug("extend message " + message.getMessageId());
-            message.extend();
-          }
-        } while(!incompleteTasks.isEmpty());
+        log_.debug("handle message " + message.getMessageId());
+        batch.submit(message);
       }
-      catch(RuntimeException e)
+      
+      Collection<IPullSubscriberMessage> incompleteTasks;
+      do
       {
-        Throwable cause = e.getCause();
+        incompleteTasks = batch.waitForAllTasks(extensionFrequency_);
         
-        if(cause instanceof ExecutionException)
-          cause = cause.getCause();
-        
-        if(cause instanceof RetryableConsumerException)
+        for(IPullSubscriberMessage message : incompleteTasks)
         {
-          throw (RetryableConsumerException)cause;
-        }            
-        if(cause instanceof FatalConsumerException)
-        {
-          throw (FatalConsumerException)cause;
+          log_.debug("extend message " + message.getMessageId());
+          message.extend();
         }
-        throw e;
-      }
+      } while(!incompleteTasks.isEmpty());
     }
     catch(RuntimeException e)
     {
       log_.error("Error processing message", e);
+      
+      throw e;
     }
-    catch (Throwable e)
+    catch (Error e)
     {
       /*
-       * This method is called from an executor so I am catching Throwable because otherwise Errors will
+       * This method is called from an executor so I am catching Error because otherwise they will
        * be swallowed.
        * 
        * If we are catching an OutOfMemoryError then it may be futile to try to log this but on balance
