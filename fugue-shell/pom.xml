@@ -26,7 +26,7 @@
 	<parent>
 		<groupId>org.symphonyoss.s2.fugue</groupId>
 		<artifactId>fugue</artifactId>
-		<version>0.2.7-SNAPSHOT</version>
+		<version>0.2.7</version>
 	</parent>
 	<artifactId>fugue-shell</artifactId>
 	<packaging>pom</packaging>
