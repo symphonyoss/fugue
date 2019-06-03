@@ -22,9 +22,9 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 
-import java.util.List;
 import java.util.TreeMap;
 
+import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
@@ -77,26 +77,40 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
-      List<? extends IFugueObject> additionalObjects)
+  public String saveIfNotExists(IFugueObject idObject, IFugueObject payload, ITraceContext trace)
   {
-    synchronized(absoluteMap_)
+    if(payload.getPayload() instanceof IFugueVersionedObject && ((IFugueVersionedObject)payload.getPayload()).getBaseHash().equals(idObject.getAbsoluteHash()))
     {
-      String current = absoluteMap_.get(idObject.getAbsoluteHash());
-      
-      if(current == null)
+      synchronized(absoluteMap_)
       {
-        doSave(idObject);
+        String current = absoluteMap_.get(idObject.getAbsoluteHash());
         
-        for(IFugueObject additionalObject : additionalObjects)
+        if(current == null)
         {
-          doSave(additionalObject);
+          doSave(idObject);
+          save(payload, trace);
+          
+          return null;
+        }
+  
+        try
+        {
+          current = fetchCurrent(idObject.getAbsoluteHash());
+        }
+        catch (NoSuchObjectException e)
+        {
+          /* This can't happen because we already know that the id object exists,
+           * but if it did the value of current would be the id object which is what actually should be
+           * returned so all is good after all.
+           */
         }
         
-        return null;
+        return current;
       }
-
-      return current;
+    }
+    else
+    {
+      throw new IllegalArgumentException("Payload baseHash must be ID absoluteHash");
     }
   }
   
