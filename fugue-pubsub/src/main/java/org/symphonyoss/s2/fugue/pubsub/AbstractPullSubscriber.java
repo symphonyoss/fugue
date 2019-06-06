@@ -134,6 +134,7 @@ public abstract class AbstractPullSubscriber implements Runnable
       for(IPullSubscriberMessage message : messages)
       {
         log_.debug("handle message " + message.getMessageId());
+//        log_.debug("handle message " + message);
         batch.submit(message);
       }
       

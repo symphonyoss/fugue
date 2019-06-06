@@ -207,10 +207,18 @@ public class GoogleSubscriber extends AbstractPullSubscriber
     }
 
     @Override
+    public String toString()
+    {
+      return receivedMessage_.toString();
+    }
+
+    @Override
     public void run()
     {
       PubsubMessage message = receivedMessage_.getMessage();
       Timestamp     ts      = message.getPublishTime();
+      
+      log_.debug("process message " + getMessageId());
       
       try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:Google", message.getMessageId(),
           tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
@@ -237,6 +245,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
             
             subscriber_.acknowledgeCallable().call(acknowledgeRequest);
             traceTransaction.finished();
+            log_.debug("ACK message " + getMessageId());
           }
           else
           {
@@ -254,6 +263,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
             subscriber_.modifyAckDeadlineCallable().call(request);
             
             traceTransaction.aborted();
+            log_.debug("NAK message " + getMessageId());
           }
         }
       }
