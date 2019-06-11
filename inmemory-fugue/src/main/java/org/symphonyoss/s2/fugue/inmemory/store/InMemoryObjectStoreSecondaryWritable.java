@@ -22,7 +22,7 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 import java.util.TreeMap;
 
 import javax.annotation.Nullable;
@@ -97,7 +97,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         absoluteSequenceHashes, createdDate,
@@ -106,7 +106,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
 
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         null, null,
@@ -115,8 +115,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   
   @Override
   public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
         absoluteSequenceHashes, createdDate,
@@ -124,8 +124,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   private void doSaveToSequences(Hash absoluteHash, String payload,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {
     String payloadString = payload.toString();
     
@@ -141,7 +141,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
     } 
   }
   
-  private void processSequences(String rangeKey, String payload, List<Hash> sequenceHashes)
+  private void processSequences(String rangeKey, String payload, Collection<Hash> sequenceHashes)
   {
     synchronized (sequenceMap_)
     {

@@ -28,6 +28,12 @@ import java.time.Instant;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 
+/**
+ * Base class for object store implementations.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public abstract class AbstractFugueObjectStore implements IFugueObjectStoreReadOnly, IFugueComponent
 {
   protected static final String              Separator                = "#";

@@ -24,7 +24,7 @@
 package org.symphonyoss.s2.fugue.store;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 
 import javax.annotation.Nullable;
 
@@ -51,7 +51,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param trace                     A trace context.
    */
   void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
   
   /**
    * Save the given object to the given sequences.
@@ -66,7 +66,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param trace                     A trace context.
    */
   void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
   
   /**
    * Save the given object to the given sequences.
@@ -83,8 +83,8 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param trace                     A trace context.
    */
   void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
 
   /**
    * Save the given object to secondary storage.
