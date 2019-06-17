@@ -25,14 +25,12 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.TreeMap;
 
-import javax.annotation.Nullable;
-
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
+import org.symphonyoss.s2.fugue.store.IFugueObjectPayload;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
  * IFundamentalObjectStoreSecondaryWritable implementation based on DynamoDB and S3.
@@ -94,9 +92,9 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
     
     return payloadString;
   }
-  
+
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId, String payloadTypeId,
+  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
@@ -105,7 +103,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId, String payloadTypeId,
+  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload,
@@ -114,7 +112,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId, String payloadTypeId,
+  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
