@@ -24,6 +24,8 @@ package org.symphonyoss.s2.fugue.inmemory.store;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.time.Instant;
+
 import org.junit.Test;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
@@ -148,6 +150,18 @@ public class TestInMemoryObjectStore
               return 101;
             }
           };
+    }
+
+    @Override
+    public String getPayloadType()
+    {
+      return "test.payload.type.id";
+    }
+
+    @Override
+    public Instant getPurgeDate()
+    {
+      return null;
     }
   };
   
