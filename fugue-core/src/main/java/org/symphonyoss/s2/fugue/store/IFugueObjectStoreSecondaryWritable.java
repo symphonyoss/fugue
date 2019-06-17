@@ -46,11 +46,12 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
    * @param podId                     The podId if the message relates to a pod.
+   * @param payloadType               The typeId of the payload.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId, String payloadType,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
   
   /**
@@ -59,13 +60,14 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
    * @param podId                     The podId if the message relates to a pod.
+   * @param payloadType               The typeId of the payload.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
    * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId, String payloadType,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
   
   /**
@@ -74,6 +76,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload (if available).
    * @param podId                     The podId if the message relates to a pod.
+   * @param payloadType               The typeId of the payload.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
@@ -82,7 +85,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId, String payloadType,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
 
