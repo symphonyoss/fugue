@@ -21,25 +21,23 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
-
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-
-import com.google.common.collect.ImmutableSet;
+package org.symphonyoss.s2.fugue.counter;
 
 /**
- * A subscription.
+ * Factory for topic busy counters.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
+@FunctionalInterface
+public interface ITopicBusyCounterFactory
 {
   /**
-   * Return the set of subscription names.
+   * Create a busy counter for the given topic ID.
    * 
-   * @return The subscription names for this subscription.
+   * @param topicId The topic ID which will be processed when the counter indicates it is busy.
+   * 
+   * @return A busy counter for the given topic.
    */
-  @Override
-  ImmutableSet<SubscriptionName> getSubscriptionNames();
-
+  IBusyCounter create(String topicId);
 }

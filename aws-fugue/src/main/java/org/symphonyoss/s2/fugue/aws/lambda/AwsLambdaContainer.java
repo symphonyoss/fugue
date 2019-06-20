@@ -17,6 +17,8 @@ import org.symphonyoss.s2.fugue.IFugueAssembly;
 import org.symphonyoss.s2.fugue.IFugueAssemblyBuilder;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.counter.BusyCounter;
+import org.symphonyoss.s2.fugue.counter.IBusyCounter;
+import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
@@ -65,7 +67,7 @@ public abstract class AwsLambdaContainer implements RequestStreamHandler
       
       IFugueAssembly assembly = builder
           .withContainer(container)
-          .withBusyCounter(new LambdaBusyCounter(container,
+          .withBusyCounterFactory(new LambdaBusyCounterFactory(container,
               builder.getConfiguration().getConfiguration("com/symphony/s2/legacy/message/forwarder/AwsForwarderComponent")))
           .build();
             
@@ -104,6 +106,25 @@ public abstract class AwsLambdaContainer implements RequestStreamHandler
         log_.error("Failed to write error", e1);
       }
     }
+  }
+  
+  class LambdaBusyCounterFactory implements ITopicBusyCounterFactory
+  {
+    private final FugueComponentContainer container_;
+    private final IConfiguration config_;
+
+    public LambdaBusyCounterFactory(FugueComponentContainer container, IConfiguration config)
+    {
+      container_ = container;
+      config_ = config;
+    }
+
+    @Override
+    public IBusyCounter create(String topicId)
+    {
+      return new LambdaBusyCounter(container_, config_);
+    }
+    
   }
   
   class LambdaBusyCounter extends BusyCounter

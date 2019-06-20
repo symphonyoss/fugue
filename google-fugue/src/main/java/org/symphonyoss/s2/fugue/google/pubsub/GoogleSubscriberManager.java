@@ -16,6 +16,7 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.fugue.naming.Name;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
@@ -132,9 +133,9 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
         log_.info("Validating subscription " + subscriptionName + "...");
         
         validateSubcription(subscriptionAdminClient, subscriptionName.toString());
-  
+        
         GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
-            getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
+            getTraceFactory(), subscription.getConsumer(), getCounter(), createBusyCounter(subscriptionName), nameFactory_.getPodName());
   
         subscribers_.add(subscriber);
         log_.info("Subscribing to " + subscriptionName + "...");  

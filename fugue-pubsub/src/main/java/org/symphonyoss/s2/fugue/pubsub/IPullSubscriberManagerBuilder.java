@@ -23,7 +23,7 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.fugue.counter.IBusyCounter;
+import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
 
 /**
  * A builder for a pull subscriber manager of payload type P.
@@ -37,12 +37,12 @@ public interface IPullSubscriberManagerBuilder<T extends IPullSubscriberManagerB
 extends ISubscriberManagerBuilder<T,B>
 {
   /**
-   * Set the IBusyCounter to use.
+   * Set the ITopicBusyCounterFactory to use.
    * 
-   * @param busyCounter An IBusyCounter to use.
+   * @param busyCounterFactory An ITopicBusyCounterFactory to use.
    * 
    * @return this (fluent method)
    */
-  T withBusyCounter(IBusyCounter busyCounter);
+  T withBusyCounterFactory(ITopicBusyCounterFactory busyCounterFactory);
 
 }
