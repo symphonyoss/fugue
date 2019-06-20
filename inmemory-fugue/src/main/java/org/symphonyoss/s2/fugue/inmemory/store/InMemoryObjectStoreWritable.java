@@ -31,6 +31,7 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreWritable;
 import org.symphonyoss.s2.fugue.store.IFugueVersionedObject;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 /**
  * IFundamentalObjectStoreWritable implementation based on DynamoDB and S3.
@@ -77,7 +78,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public String saveIfNotExists(IFugueObject idObject, IFugueObject payload, ITraceContext trace)
+  public void saveIfNotExists(IFugueObject idObject, IFugueObject payload, ITraceContext trace) throws ObjectExistsException
   {
     if(payload.getPayload() instanceof IFugueVersionedObject && ((IFugueVersionedObject)payload.getPayload()).getBaseHash().equals(idObject.getAbsoluteHash()))
     {
@@ -89,23 +90,11 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
         {
           doSave(idObject);
           save(payload, trace);
-          
-          return null;
         }
-  
-        try
+        else
         {
-          current = fetchCurrent(idObject.getAbsoluteHash());
+          throw new ObjectExistsException("Object exists");
         }
-        catch (NoSuchObjectException e)
-        {
-          /* This can't happen because we already know that the id object exists,
-           * but if it did the value of current would be the id object which is what actually should be
-           * returned so all is good after all.
-           */
-        }
-        
-        return current;
       }
     }
     else

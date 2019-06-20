@@ -36,6 +36,7 @@ import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectPayload;
 import org.symphonyoss.s2.fugue.store.IFuguePodId;
 import org.symphonyoss.s2.fugue.store.IFugueVersionedObject;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 /**
  * Unit test for in memory object store.
@@ -70,7 +71,7 @@ public class TestInMemoryObjectStore
   }
   
   @Test
-  public void testStoreIfNotExist() throws NoSuchObjectException
+  public void testStoreIfNotExist() throws NoSuchObjectException, ObjectExistsException
   {
     FugueObject  id = new FugueObject("ID Object");
     FugueObject  payload1 = new FugueObject(id.getAbsoluteHash(), "Object One");
@@ -86,13 +87,18 @@ public class TestInMemoryObjectStore
       // expected
     }
 
-    String v1 = objectStore_.saveIfNotExists(id, payload1, NoOpTraceContext.INSTANCE);
+    objectStore_.saveIfNotExists(id, payload1, NoOpTraceContext.INSTANCE);
     
-    assertEquals(null, v1);
-    
-    String v2 = objectStore_.saveIfNotExists(id, payload2, NoOpTraceContext.INSTANCE);
-    
-    assertEquals(payload1.toString(), v2.toString());
+    try
+    {
+      objectStore_.saveIfNotExists(id, payload2, NoOpTraceContext.INSTANCE);
+      
+      fail("Request should throw ObjectExistsException");
+    }
+    catch(ObjectExistsException e)
+    {
+      // expected
+    }
   }
   
   class FugueObjectPayload implements IFugueObjectPayload
