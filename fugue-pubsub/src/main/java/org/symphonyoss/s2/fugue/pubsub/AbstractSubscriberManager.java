@@ -63,7 +63,7 @@ implements ISubscriberManager<T>
   protected static final long          MESSAGE_PROCESSED_OK          = -1;
 
   private static final Logger                     log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
-  private static final Integer                    FAILURE_CNT_LIMIT             = 5;
+  private static final Integer                    FAILURE_CNT_LIMIT             = 25;
 
 
   protected final INameFactory                     nameFactory_;
@@ -293,20 +293,20 @@ implements ISubscriberManager<T>
     {
       consumer.consume(payload, trace);
     }
-    catch (TransientTransactionFault e)
+    catch (TransientTransactionFault | RetryableConsumerException e)
     {
-      log_.warn("TransientTransactionFault, will retry (forever)", e);
+      log_.warn("Transient processing failure, will retry (forever)", e);
       return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, true);
     }
-    catch (RetryableConsumerException e)
-    {
-      log_.warn("Unprocessable message, will retry", e);
-      
-      if(e.getRetryTime() == null || e.getRetryTimeUnit() == null)
-        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
-      
-      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()), false);
-    }
+//    catch (RetryableConsumerException e)
+//    {
+//      log_.warn("Unprocessable message, will retry", e);
+//      
+//      if(e.getRetryTime() == null || e.getRetryTimeUnit() == null)
+//        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
+//      
+//      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()), false);
+//    }
     catch (RuntimeException  e)
     {
       return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
@@ -338,6 +338,7 @@ implements ISubscriberManager<T>
       {
         if(cnt >= FAILURE_CNT_LIMIT)
         {
+          log_.error("Retryable processing error failed " + cnt + " times, aborting messageId " + messageId);
           trace.trace("MESSAGE_RETRIES_EXCEEDED");
           failureCache_.invalidate(messageId);
           return abortMessage(payload, trace, cause);
