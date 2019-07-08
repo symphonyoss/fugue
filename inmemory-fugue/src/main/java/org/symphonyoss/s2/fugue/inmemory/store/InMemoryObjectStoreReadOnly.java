@@ -129,6 +129,12 @@ public class InMemoryObjectStoreReadOnly extends AbstractFugueObjectStore implem
   }
   
   @Override
+  public String fetchCurrent(Hash baseHash, boolean consistentRead) throws NoSuchObjectException
+  {
+    return fetchCurrent(baseHash);
+  }
+
+  @Override
   public String fetchVersions(Hash baseHash, @Nullable Integer pLimit, @Nullable String after, Consumer<String> consumer)
   {
     TreeMap<String, String> sequence          = currentMap_.get(baseHash);
