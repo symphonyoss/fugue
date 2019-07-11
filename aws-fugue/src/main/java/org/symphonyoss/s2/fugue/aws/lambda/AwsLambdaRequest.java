@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.aws.lambda;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
 import java.util.Map;
 
@@ -189,5 +190,10 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   public String getHttpMethod()
   {
     return httpMethod_;
+  }
+
+  public BufferedReader getReader()
+  {
+    return new BufferedReader(body_.getReader());
   }
 }
