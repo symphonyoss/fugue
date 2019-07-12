@@ -1498,11 +1498,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         String hostName;
 
-        if(isPrimaryEnvironment() && getPodName() != null)
+        if(isPrimaryEnvironment())
         {
-          String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
-
-          hostName = isPrimaryEnvironment() ? getServiceHostName(podId) : null;
+          if(getPodName() == null)
+          {
+            hostName = getServiceHostName(null);
+          }
+          else
+          {
+            String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
+  
+            hostName = getServiceHostName(podId);
+          }
         }
         else
         {

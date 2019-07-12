@@ -120,7 +120,12 @@
                 "dynamodb:DescribeGlobalTableSettings",
                 "sqs:ListDeadLetterSourceQueues",
                 "s3:GetBucketLocation",
-                "lambda:GetPolicy"
+                "lambda:GetPolicy",
+                "acm:ExportCertificate",
+                "acm:DescribeCertificate",
+                "acm:GetCertificate",
+                "acm:ListCertificates",
+                "acm:ListTagsForCertificate"
             ],
             "Resource": "*"
         },
