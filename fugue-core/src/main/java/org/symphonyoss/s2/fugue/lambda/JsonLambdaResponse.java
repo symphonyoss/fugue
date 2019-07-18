@@ -26,8 +26,6 @@ package org.symphonyoss.s2.fugue.lambda;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import com.fasterxml.jackson.core.JsonGenerationException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -37,9 +35,14 @@ public abstract class JsonLambdaResponse extends LambdaResponse
   
   private final ObjectNode  json_ = mapper_.createObjectNode();
 
-  protected void put(String name, Object value)
+  protected void put(String name, String value)
   {
-    json_.put(name, value.toString());
+    json_.put(name, value);
+  }
+  
+  protected void put(String name, int value)
+  {
+    json_.put(name, value);
   }
   
   protected ObjectNode putObject(String name)

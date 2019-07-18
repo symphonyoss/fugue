@@ -26,6 +26,7 @@ package org.symphonyoss.s2.fugue.aws.lambda;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.codec.binary.Base64;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -95,10 +96,11 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   private final Map<String, String> pathParams_;
   private final Map<String, String> requestHeaders_;
   private final ImmutableByteArray  body_;
-  private Map<String, String> stageVariables_;
-  private String awsRequestId_ = "UNKNOWN";
-  private long awsRequestEpoch_;
-  private String httpMethod_;
+  private final Map<String, String>       stageVariables_;
+  private String                    awsRequestId_ = "UNKNOWN-" + UUID.randomUUID().toString();
+  private long                      awsRequestEpoch_;
+  private final String                    httpMethod_;
+  private final String                    path_;
   
   public AwsLambdaRequest(InputStream inputStream)
   {
@@ -145,6 +147,22 @@ public class AwsLambdaRequest extends JsonLambdaRequest
     }
     
     httpMethod_ = getString("httpMethod");
+    
+    JsonNode pathParameters = getJson().get("pathParameters");
+    
+    if(pathParameters != null)
+    {
+      JsonNode proxy = pathParameters.get("proxy");
+      
+      if(proxy != null)
+        path_ = "/" + proxy.asText();
+      else
+        path_ = getString("path");
+    }
+    else
+    {
+      path_ = getString("path");
+    }
   }
 
   public String getAwsRequestId()
@@ -195,5 +213,10 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   public BufferedReader getReader()
   {
     return new BufferedReader(body_.getReader());
+  }
+
+  public String getPath()
+  {
+    return path_;
   }
 }

@@ -13,7 +13,6 @@ import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.fugue.FugueComponentContainer;
-import org.symphonyoss.s2.fugue.IFugueAssembly;
 import org.symphonyoss.s2.fugue.IFugueAssemblyBuilder;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.counter.BusyCounter;
@@ -23,14 +22,15 @@ import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
 
-public abstract class AwsLambdaContainer implements RequestStreamHandler
+/**
+ * A lambda function implementation based on a Fugue Assembly.
+ * 
+ * @author Bruce Skingle
+ *
+ */
+public abstract class AwsAssemblyLambda implements RequestStreamHandler
 {
-  private static final Logger log_ = LoggerFactory.getLogger(AwsLambdaContainer.class);
-
-  public AwsLambdaContainer()
-  {
-  }
-
+  private static final Logger log_ = LoggerFactory.getLogger(AwsAssemblyLambda.class);
 
   protected abstract IFugueAssemblyBuilder<?,?> createBuilder();
 
@@ -39,36 +39,14 @@ public abstract class AwsLambdaContainer implements RequestStreamHandler
   {
     try
     {
-//      ByteArrayOutputStream bout = new ByteArrayOutputStream();
-//      byte[] buf = new byte[1024];
-//      int nbytes;
-//      
-//      while((nbytes = inputStream.read(buf))>0)
-//      {
-//        bout.write(buf, 0, nbytes);
-//      }
-//      
-//      ImmutableByteArray  bytes = ImmutableByteArray.newInstance(bout.toByteArray());
-//      
-//      IForwarderRequest request = ForwarderRequest.FACTORY.newInstance(JacksonAdaptor.parseObject(bytes).immutify());
-//      
-//      log_.info("Started, request=" + request);
-//      
-//      final String[] topics = new String[request.getTopics().size()];
-//      
-//      for(int i=0 ; i<topics.length ; i++)
-//        topics[i] = request.getTopics().get(i);
-//      
-//      System.setProperty(Fugue.FUGUE_CONFIG, request.getFugueConfig());
-      
       FugueComponentContainer container = new FugueComponentContainer();
       
       IFugueAssemblyBuilder<?, ?> builder = createBuilder();
       
-      IFugueAssembly assembly = builder
+      builder
           .withContainer(container)
           .withBusyCounterFactory(new LambdaBusyCounterFactory(container,
-              builder.getConfiguration().getConfiguration("com/symphony/s2/legacy/message/forwarder/AwsForwarderComponent")))
+              builder.getConfiguration().getConfiguration("com/symphony/s2/legacy/message/forwarder/AwsForwarderComponent"))) // TODO: refactor this into Symphony code
           .build();
             
       container.start();
