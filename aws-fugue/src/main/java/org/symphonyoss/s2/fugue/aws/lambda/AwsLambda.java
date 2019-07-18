@@ -32,23 +32,20 @@ import org.symphonyoss.s2.fugue.lambda.LambdaResponse;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
 
+/**
+ * Base lambda function implementation.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public abstract class AwsLambda implements RequestStreamHandler
 {
-
-
-  public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context)
+  @Override
+  public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) throws IOException
   {
     LambdaResponse  response = doHandle(inputStream);
 
-    try
-    {
-      response.write(outputStream);
-    }
-    catch (IOException e)
-    {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
+    response.write(outputStream);
   }
 
   private LambdaResponse doHandle(InputStream inputStream)
@@ -58,37 +55,6 @@ public abstract class AwsLambda implements RequestStreamHandler
       AwsLambdaRequest request = new AwsLambdaRequest(inputStream);
       
       return handle(request);
-      
-//      String body = getBody(event);
-      
-      
-      
-      
-
-//      if (event.get("body") != null)
-//      {
-//        JSONObject body = (JSONObject) parser.parse((String) event.get("body"));
-//        if (body.get("time") != null)
-//        {
-//          time = (String) body.get("time");
-//        }
-//      }
-//
-//      String greeting = "Good " + time + ", " + name + " of " + city + ". ";
-//      if (day != null && day != "")
-//        greeting += "Happy " + day + "!";
-//
-//      JSONObject responseBody = new JSONObject();
-//      responseBody.put("input", event.toJSONString());
-//      responseBody.put("message", greeting);
-//
-//      JSONObject headerJson = new JSONObject();
-//      headerJson.put("x-custom-header", "my custom header value");
-//
-//      responseJson.put("isBase64Encoded", false);
-//      responseJson.put("statusCode", responseCode);
-//      responseJson.put("headers", headerJson);
-//      responseJson.put("body", responseBody.toString());
     }
     catch (IllegalArgumentException e)
     {
@@ -101,26 +67,4 @@ public abstract class AwsLambda implements RequestStreamHandler
   }
 
   protected abstract LambdaResponse handle(AwsLambdaRequest request);
-
-  
-
-//  private String getBody(ObjectNode event)
-//  {
-//    JsonNode node = event.get("body");
-//    
-//    if(node == null)
-//      return "";
-//    
-//    String body = node.asText();
-//    
-//    node = event.get("isBase64Encoded");
-//    
-//    if(node != null && node.asBoolean())
-//    {
-//      body = Base64.decodeBase64(body);
-//    }
-//  }
-
-  
-
 }

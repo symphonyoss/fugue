@@ -23,27 +23,88 @@
 
 package org.symphonyoss.s2.fugue.aws.lambda;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import javax.servlet.http.HttpServletResponse;
+
 import org.symphonyoss.s2.fugue.lambda.JsonLambdaResponse;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class AwsLambdaResponse extends JsonLambdaResponse
 {
-  private static final String STATUS_CODE = "statusCode";
-  private static final String BODY = "body";
+  private static final String RESPONSE_STATUS = "statusCode";
+  private static final String RESPONSE_EXCEPTION = "exception";
+  private static final String RESPONSE_MESSAGE = "message";
+  private static final String RESPONSE_BODY = "body";
+  private static final String RESPONSE_HEADERS = "headers";
+  private static final String RESPONSE_BASE64 = "isBase64Encoded";
+  
+
+  private StringWriter           stringWriter_ = new StringWriter();
+  private PrintWriter            writer_ = new PrintWriter(stringWriter_);
+  private ObjectNode headers_;
 
   public AwsLambdaResponse(int statusCode, String message)
   {
-    put(STATUS_CODE, statusCode);
-    put(BODY, message);
+    setStatus(statusCode);
+    setMessage(message);
 }
   
   public AwsLambdaResponse(Throwable cause)
   {
-    this(500, cause);
+    this(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, cause);
   }
   
   public AwsLambdaResponse(int statusCode, Throwable cause)
   {
-    put(STATUS_CODE, statusCode);
-    put(BODY, cause.getLocalizedMessage());
+    setStatus(statusCode);
+    setMessage(cause.getLocalizedMessage());
+  }
+
+  @Override
+  public void write(OutputStream outputStream) throws IOException
+  {
+    String body = stringWriter_.toString();
+    
+    if(body != null && body.length()>0)
+    {
+      put(RESPONSE_BODY, body);
+    }
+    
+    super.write(outputStream);
+  }
+
+  public PrintWriter getWriter()
+  {
+    return writer_;
+  }
+
+  public void setStatus(int statusCode)
+  {
+    put(RESPONSE_STATUS, statusCode);
+  }
+  
+  public void setMessage(String message)
+  {
+    //put(RESPONSE_MESSAGE, message);
+  }
+  
+  public void setContentType(String contentType)
+  {
+    setHeader("Content-Type", contentType);
+  }
+  
+  public synchronized void setHeader(String name, String value)
+  {
+    if(headers_ == null)
+    {
+      headers_ = putObject(RESPONSE_HEADERS);
+    }
+    
+    headers_.put(name, value);
   }
 }

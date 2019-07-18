@@ -60,18 +60,6 @@ public interface IFugueObjectStoreReadOnly
    * Equivalent to fetchCurrent(baseHash, false);
    */
   @Nonnull String fetchCurrent(Hash baseHash) throws NoSuchObjectException;
-
-  /**
-   * Fetch the current (latest) version of the object with the given baseHash.
-   * 
-   * @param baseHash        The ID of the required object.
-   * @param consistentRead  If true then perform a consistent read.
-   * @return                The required object.
-   * 
-   * @throws NoSuchObjectException  If there is no object with the given baseHash.
-   */
-  @Nonnull String fetchCurrent(Hash baseHash, boolean consistentRead)
-      throws NoSuchObjectException;
   
   /**
    * Return objects from the given sequence, with more recent objects before older ones.

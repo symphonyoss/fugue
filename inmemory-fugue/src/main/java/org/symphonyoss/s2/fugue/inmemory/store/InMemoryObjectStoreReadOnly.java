@@ -127,12 +127,6 @@ public class InMemoryObjectStoreReadOnly extends AbstractFugueObjectStore implem
       //return versions.values().iterator().next();
     }
   }
-  
-  @Override
-  public String fetchCurrent(Hash baseHash, boolean consistentRead) throws NoSuchObjectException
-  {
-    return fetchCurrent(baseHash);
-  }
 
   @Override
   public String fetchVersions(Hash baseHash, @Nullable Integer pLimit, @Nullable String after, Consumer<String> consumer)

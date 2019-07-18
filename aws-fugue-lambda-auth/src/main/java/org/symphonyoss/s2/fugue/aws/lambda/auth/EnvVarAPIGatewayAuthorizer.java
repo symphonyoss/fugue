@@ -36,7 +36,7 @@ public class EnvVarAPIGatewayAuthorizer extends APIGatewayAuthorizer
   @Override
   protected boolean allowRequest(LambdaRequest request)
   {
-    String apiKey = request.getQueryParams().get(apiKeyName_);
+    String apiKey = request.getParameter(apiKeyName_);
 
     System.out.println("apiKeyName_ = " + apiKeyName_);
     System.out.println("apiKeyValues_ = " + apiKeyValues_[0]);
