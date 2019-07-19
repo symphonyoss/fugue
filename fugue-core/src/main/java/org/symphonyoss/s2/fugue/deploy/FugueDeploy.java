@@ -28,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -438,6 +439,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     Map<ContainerType, Map<String, JsonObject<?>>>  singleTenantContainerMap     = new HashMap<>();
     Map<ContainerType, Map<String, JsonObject<?>>>  multiTenantContainerMap      = new HashMap<>();
 
+    int singleTenantPathCnt = 0;
+    int multiTenantPathCnt = 0;
+    
     if(action_.processContainers_)
     { 
       // Load all the containers
@@ -453,24 +457,32 @@ public abstract class FugueDeploy extends CommandLineHandler
         {
           JsonObject<?> container = (JsonObject<?>)c;
           Tenancy       tenancy   = Tenancy.parse(container.getRequiredString("tenancy"));
+          ContainerType containerType = ContainerType.parse(container.getString("containerType", null));
           
           Map<ContainerType, Map<String, JsonObject<?>>>  containerMap;
+          Collection<String> paths = 
+              containerType==ContainerType.LAMBDA ?     // FIXME: remove when we move service endpoints to ApiGateway
+              container.getListOf(String.class, PATHS)
+              : new ArrayList<>();
+          
           
           switch(tenancy)
           {
             case SINGLE:
               containerMap = singleTenantContainerMap;
+              singleTenantPathCnt += paths.size();
               break;
               
             case MULTI:
               containerMap = multiTenantContainerMap;
+              multiTenantPathCnt += paths.size();
               break;
               
             default:
               throw new CodingFault("Unknown tenancy type " + tenancy);
           }
           
-          ContainerType containerType = ContainerType.parse(container.getString("containerType", null));
+          
           
           Map<String, JsonObject<?>> map = containerMap.get(containerType);
           
@@ -491,6 +503,7 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     multiTenantContext_.setPolicies(fetchPolicies(dir, MULTI_TENANT));
     multiTenantContext_.setContainers(multiTenantContainerMap);
+    multiTenantContext_.setPathCount(multiTenantPathCnt);
     
     Map<String, String> singleTenantPolicies  = fetchPolicies(dir, SINGLE_TENANT);
         
@@ -498,6 +511,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       context.setPolicies(singleTenantPolicies);
       context.setContainers(singleTenantContainerMap);
+      context.setPathCount(singleTenantPathCnt);
     }
     
     // deploy Multi tenant config
@@ -922,6 +936,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     private ImmutableJsonDom                               configDom_;
     private Map<String, String>                            templateVariables_;
     private StringSubstitutor                              sub_;
+    private int                                            pathCnt_;
 
     private Map<ContainerType, Map<String, JsonObject<?>>> containerMap_;
 
@@ -930,7 +945,6 @@ public abstract class FugueDeploy extends CommandLineHandler
       podName_ = podName;
       nameFactory_ = nameFactory;
     }
-
 
     protected abstract void createEnvironmentType();
     
@@ -954,7 +968,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory);
 
-    protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables);
+    protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths);
     
     protected abstract void deployService();
     protected abstract void undeployService();
@@ -979,6 +993,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected Map<String, String> getPolicies()
     {
       return policies_;
+    }
+
+    protected int getPathCnt()
+    {
+      return pathCnt_;
     }
 
     protected ImmutableJsonDom getConfigDom()
@@ -1047,6 +1066,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected void setPolicies(Map<String, String> policies)
     {
       policies_ = policies;
+    }
+    
+    protected void setPathCount(int pathCnt)
+    {
+      pathCnt_ = pathCnt;
     }
     
     protected void setContainers(Map<ContainerType, Map<String, JsonObject<?>>> containerMap)
@@ -1226,8 +1250,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployInitContainers()
     {
-      // Deploy service level assets, load balancers, DNS zones etc
-      deployService();
+      if(getPodName() == null)
+      {
+        // Deploy service level assets, load balancers, DNS zones etc
+        deployService();
+      }
       
       Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
       
@@ -1330,13 +1357,16 @@ public abstract class FugueDeploy extends CommandLineHandler
               environment.put(FUGUE_CONFIG, getFugueConfig());
             }
             
+            Collection<String> paths = container.getListOf(String.class, PATHS);
+            
             deployLambdaContainer(name,
                 container.getString(IMAGE, name),
                 container.getRequiredString(ROLE),
                 container.getRequiredString(HANDLER),
                 container.getRequiredInteger(MEMORY),
                 container.getRequiredInteger(TIMEOUT),
-                environment
+                environment,
+                paths
                 );
           });
         }

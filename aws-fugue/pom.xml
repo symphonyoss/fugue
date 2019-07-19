@@ -132,6 +132,11 @@
 			<artifactId>aws-java-sdk-lambda</artifactId>
 			<version>${aws.java.sdk.version}</version>
 		</dependency>
+		<dependency>
+		    <groupId>com.amazonaws</groupId>
+		    <artifactId>aws-java-sdk-api-gateway</artifactId>
+		    <version>${aws.java.sdk.version}</version>
+		</dependency>
 
 		<!-- These are needed so we can deploy to Java11 they used to be part of 
 			the JDK classpath by default -->

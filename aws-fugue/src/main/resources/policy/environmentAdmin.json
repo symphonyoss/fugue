@@ -63,18 +63,6 @@
             ]
         },
         {
-            "Sid": "ElbRead",
-            "Effect": "Allow",
-            "Action": [
-                "elasticloadbalancing:DescribeLoadBalancers",
-                "elasticloadbalancing:DescribeListeners",
-                "elasticloadbalancing:DescribeTargetHealth",
-                "elasticloadbalancing:DescribeTargetGroups",
-                "elasticloadbalancing:DescribeRules"
-            ],
-            "Resource": "*"
-        },
-        {
             "Sid": "All",
             "Effect": "Allow",
             "Action": [
@@ -95,7 +83,17 @@
                 "logs:DescribeLogGroups",
                 "logs:CreateLogGroup",
                 "events:PutTargets",
-                "events:PutRule"
+                "events:PutRule",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeRules",
+                "apigateway:GET",
+                "apigateway:DELETE",
+                "apigateway:PUT",
+                "apigateway:POST",
+                "apigateway:PATCH"
             ],
             "Resource": [
                 "*"

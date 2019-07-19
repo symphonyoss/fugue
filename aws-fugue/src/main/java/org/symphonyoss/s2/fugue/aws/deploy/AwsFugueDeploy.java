@@ -62,6 +62,57 @@ import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
 
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.apigateway.AmazonApiGateway;
+import com.amazonaws.services.apigateway.AmazonApiGatewayClientBuilder;
+import com.amazonaws.services.apigateway.model.BasePathMapping;
+import com.amazonaws.services.apigateway.model.ConnectionType;
+import com.amazonaws.services.apigateway.model.CreateBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.CreateBasePathMappingResult;
+import com.amazonaws.services.apigateway.model.CreateDeploymentRequest;
+import com.amazonaws.services.apigateway.model.CreateDeploymentResult;
+import com.amazonaws.services.apigateway.model.CreateDomainNameRequest;
+import com.amazonaws.services.apigateway.model.CreateDomainNameResult;
+import com.amazonaws.services.apigateway.model.CreateResourceRequest;
+import com.amazonaws.services.apigateway.model.CreateResourceResult;
+import com.amazonaws.services.apigateway.model.CreateRestApiRequest;
+import com.amazonaws.services.apigateway.model.CreateRestApiResult;
+import com.amazonaws.services.apigateway.model.CreateStageRequest;
+import com.amazonaws.services.apigateway.model.CreateStageResult;
+import com.amazonaws.services.apigateway.model.DeleteMethodRequest;
+import com.amazonaws.services.apigateway.model.DeleteRestApiRequest;
+import com.amazonaws.services.apigateway.model.EndpointConfiguration;
+import com.amazonaws.services.apigateway.model.EndpointType;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingResult;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingsRequest;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingsResult;
+import com.amazonaws.services.apigateway.model.GetDomainNameRequest;
+import com.amazonaws.services.apigateway.model.GetDomainNameResult;
+import com.amazonaws.services.apigateway.model.GetMethodRequest;
+import com.amazonaws.services.apigateway.model.GetMethodResult;
+import com.amazonaws.services.apigateway.model.GetResourcesRequest;
+import com.amazonaws.services.apigateway.model.GetResourcesResult;
+import com.amazonaws.services.apigateway.model.GetRestApisRequest;
+import com.amazonaws.services.apigateway.model.GetRestApisResult;
+import com.amazonaws.services.apigateway.model.GetStageRequest;
+import com.amazonaws.services.apigateway.model.GetStageResult;
+import com.amazonaws.services.apigateway.model.IntegrationType;
+import com.amazonaws.services.apigateway.model.Method;
+import com.amazonaws.services.apigateway.model.Op;
+import com.amazonaws.services.apigateway.model.PatchOperation;
+import com.amazonaws.services.apigateway.model.PutIntegrationRequest;
+import com.amazonaws.services.apigateway.model.PutIntegrationResult;
+import com.amazonaws.services.apigateway.model.PutMethodRequest;
+import com.amazonaws.services.apigateway.model.PutMethodResult;
+import com.amazonaws.services.apigateway.model.Resource;
+import com.amazonaws.services.apigateway.model.RestApi;
+import com.amazonaws.services.apigateway.model.SecurityPolicy;
+import com.amazonaws.services.apigateway.model.TagResourceRequest;
+import com.amazonaws.services.apigateway.model.UpdateBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.UpdateDomainNameRequest;
+import com.amazonaws.services.apigateway.model.UpdateStageRequest;
+import com.amazonaws.services.apigateway.model.UpdateStageResult;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEvents;
@@ -328,6 +379,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private Map<String, String>            environmentTypeConfigBuckets_ = new HashMap<>();
   private String                         configBucket_;
   private String                         callerRefPrefix_              = UUID.randomUUID().toString() + "-";
+  private String                         clusterName_;
 
   private AmazonElasticLoadBalancing     elbClient_;
   private AmazonRoute53                  r53Clinet_;
@@ -335,14 +387,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private AmazonCloudWatch               cwClient_;
   private AmazonCloudWatchEvents         cweClient_;
   private AWSLambda                      lambdaClient_;
-
-  private AmazonECS ecsClient_;
-
-  private String clusterName_;
-//
-//  private String clusterArn_;
-
-  private AWSLogs logsClient_;
+  private AmazonECS                      ecsClient_;
+  private AWSLogs                        logsClient_;
+  private AmazonApiGateway               apiClient_;
 
 
 
@@ -375,6 +422,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return getIamPolicy("policy", policyName);
   }
   
+  private String getApiArn(String name)
+  {
+    // arn:aws:execute-api:region:account-id:api-id/stage-name/HTTP-VERB/resource-path-specifier
+    // arn:aws:apigateway:region::resource-path-specifier.
+    return getNoAccountArn("apigateway", "/restapis", name);
+  }
+  
+  private String getFunctionInvocationArn(String name)
+  {
+    return String.format("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/arn:aws:lambda:%s:%s:function:%s/invocations",
+        awsRegion_,
+        awsRegion_,
+        awsAccountId_,
+        name);
+  }
+  
   private String getIamPolicy(String type, String name)
   {
     return getArn("iam", type, name);
@@ -383,6 +446,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private String getArn(String service, String type, String name)
   {
     return String.format("arn:aws:%s::%s:%s/%s", service, awsAccountId_, type, name);
+  }
+
+  private String getNoAccountArn(String service, String type, String name)
+  {
+    return String.format("arn:aws:%s:%s::%s/%s", service, awsRegion_, type, name);
+  }
+
+  private String getArn(String service, String type)
+  {
+    return String.format("arn:aws:%s::%s:%s", service, awsAccountId_, type);
   }
   
   private void abort(String message, Throwable cause)
@@ -675,6 +748,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       lambdaClient_ =
           AWSLambdaClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      apiClient_ = 
+          AmazonApiGatewayClientBuilder.standard()
           .withRegion(awsClientRegion_)
           .build();
     }
@@ -1146,9 +1224,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
 
+  protected String getEnvironmentPrefix()
+  {
+    return isPrimaryEnvironment() ? "" : getEnvironment() + "-";
+  }
   
-  
-  
+  protected String getStageName()
+  {
+    return "master";
+  }
   
   
   
@@ -1160,11 +1244,25 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
   protected class AwsDeploymentContext extends DeploymentContext
   {
+    private static final String API_GATEWAY_PATH = "(none)";
+
+    private static final String ANY = "ANY";
+
+    private static final String NONE = "NONE";
+
     private LoadBalancer loadBalancer_;
   
     private String defaultTargetGroupArn_;
   
     private String listenerArn_;
+
+    private String apiGatewayArn_;
+
+    private String apiGatewayId_;
+
+    private String apiGatewayDomainName_;
+
+    private String apiGatewayTargetDomain_;
     
     protected AwsDeploymentContext(String podName, INameFactory nameFactory)
     {
@@ -1516,10 +1614,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           hostName = null;
         }
         
-        String regionalHostName = getNameFactory()
-            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+        createR53RecordSet(hostName);
         
         getOrCreateCluster();
         
@@ -1542,8 +1637,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         {
           Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
           String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-          String regionalHostName = getNameFactory()
-              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+//          String regionalHostName = getNameFactory()
+//              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
           
           String wildCardHostName = getNameFactory()
               .withRegionId("*")
@@ -1679,7 +1774,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     @Override
     protected void deployLambdaContainer(String name, String imageName, 
-        String roleId, String handler, int memorySize, int timeout, Map<String, String> variables)
+        String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths)
     {
       String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
       Name    roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
@@ -1689,6 +1784,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
+        if(!paths.isEmpty())
+          createApiGatewayPaths(getFunctionInvocationArn(functionName), paths);
+        
         try
         {
           lambdaClient_.getFunction(new GetFunctionRequest()
@@ -1763,6 +1861,343 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
+    private void createApiGatewayPaths(String functionInvokeArn, Collection<String> paths)
+    {
+      try
+      {
+      Set<String> remainingPaths = new HashSet<>();
+      Set<String> remainingMethods = new HashSet<>();
+      
+      for(String path : paths)
+      {
+        remainingPaths.add(path.replace("*", "{proxy+}"));
+      }
+      
+      String rootResourceId = null;
+      
+
+      GetResourcesResult resources = apiClient_.getResources(new GetResourcesRequest()
+        .withRestApiId(apiGatewayId_)
+        );
+      
+      for(Resource resource : resources.getItems())
+      {
+        if(resource.getPath().equals("/"))
+          rootResourceId = resource.getId();
+        
+        if(remainingPaths.remove(resource.getPath()))
+        {
+          log_.info("Resource " + resource.getPath() + " exists.");
+        
+          // Are they correct?
+          
+          
+          
+          if(resource.getResourceMethods() == null)
+          {
+            log_.info("Resource " + resource.getPath() + " has no methods, will add...");
+            remainingMethods.add(resource.getId());
+          }
+          else
+          {
+            for(String methodName : resource.getResourceMethods().keySet())
+            {
+              log_.info("Existing method " + methodName);
+              
+              if(ANY.equals(methodName))
+              {
+                GetMethodResult method = apiClient_.getMethod(new GetMethodRequest()
+                  .withHttpMethod(ANY)
+                  .withResourceId(resource.getId())
+                  .withRestApiId(apiGatewayId_)
+                  );
+                
+                if(NONE.equals(method.getAuthorizationType())
+                    && IntegrationType.AWS_PROXY.toString().equals(method.getMethodIntegration().getType())
+                    && functionInvokeArn.equals(method.getMethodIntegration().getUri())
+                    )
+                {
+                  log_.info("Existing method is good.");
+                }
+                else
+                {
+                  log_.info("Existing method needs to be updated.");
+                  deleteMethod(method.getHttpMethod(), resource.getId());
+                  remainingMethods.add(resource.getId());
+                }
+              }
+              else
+              {
+                deleteMethod(methodName, resource.getId());
+              }
+            }
+          }
+        }
+      }
+      
+      if(rootResourceId == null)
+        throw new IllegalStateException("Unable to locste root resource for api gateway " + apiGatewayId_);
+      
+      boolean deploy = false;
+      
+      for(String path : remainingPaths)
+      {
+        log_.info("Creating path " + path);
+        
+        createApiGatewayPath(functionInvokeArn, rootResourceId, path.split("/"), 1);
+        deploy=true;
+      }
+      
+      for(String resourceId : remainingMethods)
+      {
+        log_.info("Creating method for resource " + resourceId);
+        
+        createMethod(functionInvokeArn, resourceId);
+        deploy=true;
+      }
+      
+      boolean createStage = false;
+      
+      try
+      {
+        GetStageResult stage = apiClient_.getStage(new GetStageRequest()
+          .withRestApiId(apiGatewayId_)
+          .withStageName(getStageName())
+          );
+        
+        log_.info("Stage exists as " + stage);
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Stage does not exist.");
+        createStage = true;
+        deploy=true;
+      }
+      
+      if(deploy)
+      {
+        CreateDeploymentResult deployment = apiClient_.createDeployment(new CreateDeploymentRequest()
+            .withRestApiId(apiGatewayId_)
+            .withStageName(getStageName())
+            );
+        
+        if(createStage)
+        {
+          CreateStageResult stage = apiClient_.createStage(new CreateStageRequest()
+            .withDeploymentId(deployment.getId())
+            .withRestApiId(apiGatewayId_)
+            .withStageName(getStageName())
+            .withTags(getTags())
+            );
+        
+          log_.info("Created stage " + stage);
+        }
+        else
+        {
+          UpdateStageResult stage = apiClient_.updateStage(new UpdateStageRequest()
+              .withRestApiId(apiGatewayId_)
+              .withStageName(getStageName())
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/deploymentId")
+                  .withValue(deployment.getId())
+                  )
+              );
+          
+          log_.info("Updated stage " + stage);
+        }
+      }
+            
+      createApiGatewayBasePath();
+      
+      
+      }
+      catch(Exception e)
+      {
+        e.printStackTrace();
+        e.printStackTrace();
+      }
+    }
+
+    private void deleteMethod(String httpMethod, String resourceId)
+    {
+      log_.info("Deleting method: " + httpMethod);
+      
+      try
+      {
+        apiClient_.deleteMethod(new DeleteMethodRequest()
+            .withHttpMethod(httpMethod)
+            .withResourceId(resourceId)
+            .withRestApiId(apiGatewayId_)
+            );
+      }
+      catch(RuntimeException e)
+      {
+        log_.warn("Failed to delete method", e);
+      }
+    }
+
+    private void createApiGatewayPath(String functionInvokeArn, String parentResourceId, String[] pathElements, int cnt)
+    {
+      CreateResourceResult resource = apiClient_.createResource(new CreateResourceRequest()
+          .withRestApiId(apiGatewayId_)
+          .withParentId(parentResourceId)
+          .withPathPart(pathElements[cnt])
+          .withRestApiId(apiGatewayId_)
+          );
+      
+      if(pathElements.length > ++cnt)
+      {
+        createApiGatewayPath(functionInvokeArn, resource.getId(), pathElements, cnt);
+      }
+      else
+      {
+        createMethod(functionInvokeArn, resource.getId());
+      }
+    }
+
+    private void createMethod(String functionInvokeArn, String resourceId)
+    {
+      PutMethodResult method = apiClient_.putMethod(new PutMethodRequest()
+          .withHttpMethod(ANY)
+          .withResourceId(resourceId)
+          .withRestApiId(apiGatewayId_)
+          .withAuthorizationType(NONE)
+          );
+      
+      PutIntegrationResult integration = apiClient_.putIntegration(new PutIntegrationRequest()
+          .withResourceId(resourceId)
+          .withRestApiId(apiGatewayId_)
+          .withHttpMethod(ANY)
+          .withUri(functionInvokeArn)
+          .withIntegrationHttpMethod(ANY)
+          .withType(IntegrationType.AWS_PROXY)
+          .withConnectionType(ConnectionType.INTERNET)
+          );
+      
+      log_.info("Created method " + method.getHttpMethod() + " with integration " + integration.getType() + " to " + integration.getUri());
+    }
+
+    private void createApiGatewayBasePath()
+    {
+      try
+      {
+      if(apiGatewayId_ != null)
+      {
+        try
+        {
+          GetDomainNameResult existingDomain = apiClient_.getDomainName(new GetDomainNameRequest()
+              .withDomainName(apiGatewayDomainName_)
+              );
+          
+          if(awsLoadBalancerCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
+              existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
+          {
+            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists with correct certificate.");
+          }
+          else
+          {
+            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists, but the certificate is wrong.");
+            
+            apiClient_.updateDomainName(new UpdateDomainNameRequest()
+                .withDomainName(apiGatewayDomainName_)
+                .withPatchOperations(new PatchOperation()
+                    .withOp(Op.Replace)
+                    .withPath("/regionalCertificateArn")
+                    .withValue(awsLoadBalancerCertArn_)
+                    ,
+                    new PatchOperation()
+                    .withOp(Op.Replace)
+                    .withPath("/securityPolicy")
+                    .withValue(SecurityPolicy.TLS_1_2.toString())
+                    )
+                );
+            
+            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + awsLoadBalancerCertArn_);
+          }
+        }
+        catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+        {
+          CreateDomainNameResult newDomain = apiClient_.createDomainName(new CreateDomainNameRequest()
+              .withDomainName(apiGatewayDomainName_)
+              .withRegionalCertificateArn(awsLoadBalancerCertArn_)
+              .withSecurityPolicy(SecurityPolicy.TLS_1_2)
+              .withEndpointConfiguration(new EndpointConfiguration()
+                  .withTypes(EndpointType.REGIONAL)
+                  )
+              );
+          
+          apiGatewayTargetDomain_ = newDomain.getRegionalDomainName();
+          
+          log_.info("Created API Gateway domain in hosted zone " + newDomain.getRegionalHostedZoneId());
+        }
+
+        // whats the ARN format for this?
+//        try
+//        {
+//          apiClient_.tagResource(new TagResourceRequest()
+//            .withResourceArn(getNoAccountArn("apigateway", "/domainname", apiGatewayDomainName_)));
+//        }
+//        catch(RuntimeException e)
+//        {
+//          log_.info("Failed to tag domain", e);
+//        }
+        try
+        {
+          GetBasePathMappingResult existsingPath = apiClient_.getBasePathMapping(new GetBasePathMappingRequest()
+            .withDomainName(apiGatewayDomainName_)
+            .withBasePath(API_GATEWAY_PATH)
+            );
+          
+          if(existsingPath.getRestApiId().equals(apiGatewayId_) && getStageName().equals(existsingPath.getStage()))
+          {
+            log_.info("API Gateway path exists");
+          }
+          else
+          {
+            log_.info("API Gateway path exists, but to wrong API Gateway and/ stage");
+            
+            apiClient_.updateBasePathMapping(new UpdateBasePathMappingRequest()
+                .withDomainName(apiGatewayDomainName_)
+                .withBasePath(API_GATEWAY_PATH)
+                .withPatchOperations(new PatchOperation()
+                    .withOp(Op.Replace)
+                    .withPath("/restapiId")
+                    .withValue(apiGatewayId_)
+                    ,
+                    new PatchOperation()
+                    .withOp(Op.Replace)
+                    .withPath("/stage")
+                    .withValue(getStageName())
+                    )
+                );
+            
+            log_.info("Updated API Gateway path exists to " + apiGatewayId_);
+          }
+        }
+        catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+        {
+          log_.info("Creating API Gateway path...");
+          CreateBasePathMappingResult newPath = apiClient_.createBasePathMapping(new CreateBasePathMappingRequest()
+              .withBasePath("")
+              .withDomainName(apiGatewayDomainName_)
+              .withRestApiId(apiGatewayId_)
+              .withStage(getStageName())
+              );
+          
+          log_.info("API Gateway path created to API " + newPath.getRestApiId());
+        }
+      }
+      }
+      catch(Exception e)
+      {
+        e.printStackTrace();
+        int debug=2;
+        
+        e.printStackTrace();
+      }
+    }
+
     private void deleteObsoleteFunction(String obsoleteFunctionName)
     {
       try
@@ -1806,16 +2241,19 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return "arn:aws:iam::" + awsAccountId_ + ":role/" + name;
     }
 
-    private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
+    private void createR53RecordSet(String host)
     {
-      if(host != null)
-        createR53RecordSet(host, regionalHost, true);
+      String regionalHostName = getNameFactory()
+          .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
       
-      if(loadBalancer != null)
-        createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
+      if(host != null)
+        doCreateR53RecordSet(host, regionalHostName, true);
+      
+      if(loadBalancer_ != null)
+        doCreateR53RecordSet(regionalHostName, loadBalancer_.getDNSName(), false);
     }
     
-    private void createR53RecordSet(String source, String target, boolean multiValue)
+    private void doCreateR53RecordSet(String source, String target, boolean multiValue)
     {
       String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
       
@@ -2353,12 +2791,24 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       // createDnsZones();
       
+      if(action_.isDeploy_)
+      {
+        getApiGateway(getPathCnt() > 0);
+      }
+      
+      if(action_.isUndeploy_)
+      {
+        getApiGateway(false);
+      }
+      
       if(hasDockerContainers())
       {
         if(action_.isDeploy_)
         {
-          if(isPrimaryEnvironment()) // we can't find the IP addresses for this.......
-            loadBalancer_ = getLoadBalancer(true);
+          if(isPrimaryEnvironment())
+          {
+            getLoadBalancer(true /* FIXME: getPathCnt() > 0 */);
+          }
           
           Name targetGroupName = getNameFactory().getPhysicalServiceItemName(DEFAULT);
               //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
@@ -2373,7 +2823,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         if(action_.isUndeploy_)
         {
-          loadBalancer_ = getLoadBalancer(false);
+          getLoadBalancer(false);
         }
       }
     }
@@ -2385,6 +2835,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(hasDockerContainers())
       {
+        deleteApiGateway();
         deleteLoadBalancer();
       }
     }
@@ -2646,7 +3097,78 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private LoadBalancer getLoadBalancer(boolean createIfNecessary)
+    private void getApiGateway(boolean createIfNecessary)
+    {
+      String name = getEnvironmentPrefix() + getNameFactory().getServiceImageName();
+      
+      try
+      {
+        String pos = null;
+        
+        do
+        {
+          GetRestApisResult getResult = apiClient_.getRestApis(new GetRestApisRequest().withPosition(pos));
+          
+          for(RestApi api : getResult.getItems())
+          {
+            if(api.getName().equals(name))
+            {
+              apiGatewayId_ = api.getId();
+              log_.info("ApiGateway " + name + " exists as Api ID " + apiGatewayId_);
+              break;
+            }
+          }
+          pos = getResult.getPosition();
+        }while(apiGatewayId_==null && pos!=null);
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {}
+      
+      if(createIfNecessary)
+      {
+        if(apiGatewayId_ == null)
+        {
+          CreateRestApiResult createResult = apiClient_.createRestApi(new CreateRestApiRequest()
+              .withName(name)
+              .withDescription(name + (getPodName() == null ? " Service" : " Pod " + getPodName()) + " API")
+              .withEndpointConfiguration(new EndpointConfiguration()
+                  .withTypes(EndpointType.REGIONAL)
+                  )
+              );
+          
+          apiGatewayId_ = createResult.getId();
+          log_.info("ApiGateway " + name + " created as Api ID " + apiGatewayId_);
+        }
+        
+        setApiGatewayArn();
+        
+        apiClient_.tagResource(new TagResourceRequest()
+            .withResourceArn(apiGatewayArn_)
+            .withTags(getTags())
+            );
+      }
+      else if(apiGatewayId_ != null)
+        setApiGatewayArn();
+    }
+    
+    private void setApiGatewayArn()
+    {
+      apiGatewayArn_ = getApiArn(apiGatewayId_);
+      
+      apiGatewayDomainName_ = getEnvironmentPrefix() + getService().toLowerCase() + "-api." + getDnsSuffix();
+    }
+    
+    private void deleteApiGateway()
+    {
+      if(apiGatewayArn_ != null)
+      {
+        apiClient_.deleteRestApi(new DeleteRestApiRequest()
+            .withRestApiId(apiGatewayId_)
+            );
+      }
+    }
+
+    private void getLoadBalancer(boolean createIfNecessary)
     {
       String name = getNameFactory().getPhysicalServiceName().getShortName(32);
 //          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
@@ -2661,18 +3183,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
         {
-          LoadBalancer loadBalancer = loadBalancerList.get(0);
+          loadBalancer_ = loadBalancerList.get(0);
     
-          log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+          log_.info("Load balancer exists as " + loadBalancer_.getLoadBalancerArn() + " at " + loadBalancer_.getDNSName());
           
           if(!createIfNecessary)
-            return loadBalancer;
+            return;
           
           boolean ok = true;
           
-          if(!loadBalancer.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
+          if(!loadBalancer_.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
           {
-            log_.info("Load balancer is not Internal but " + loadBalancer.getScheme());
+            log_.info("Load balancer is not Internal but " + loadBalancer_.getScheme());
             ok = false;
           }
           
@@ -2681,7 +3203,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             // So the LB exists, check that it has the correct security groups and subnets
             int     cnt = awsLoadBalancerSecurityGroups_.size();
             
-            for(String sg : loadBalancer.getSecurityGroups())
+            for(String sg : loadBalancer_.getSecurityGroups())
             {
               if(awsLoadBalancerSecurityGroups_.contains(sg))
               {
@@ -2704,7 +3226,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             if(ok)
             {
               cnt = awsLoadBalancerSubnets_.size();
-              for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
+              for(AvailabilityZone az : loadBalancer_.getAvailabilityZones())
               {
                 if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
                 {
@@ -2729,13 +3251,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           if(ok)
           {
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
-            elbTag(loadBalancer.getLoadBalancerArn());
-            return loadBalancer;
+            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " is good, no more to do");
+            elbTag(loadBalancer_.getLoadBalancerArn());
+            return;
           }
           else
           {
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
+            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " needs to be updated...");
             
 //            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
 //            throw new IllegalStateException("Loadbalancer needs to be updated");
@@ -2744,20 +3266,20 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             
             // disabled for testing
             elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
-                .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
+                .withLoadBalancerArn(loadBalancer_.getLoadBalancerArn())
                 );
             
 
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " waiting for deletion...");
+            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " waiting for deletion...");
             
             elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
                 new DescribeLoadBalancersRequest()
-                  .withLoadBalancerArns(loadBalancer.getLoadBalancerArn())
+                  .withLoadBalancerArns(loadBalancer_.getLoadBalancerArn())
                 )
                 );
             
 
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " deleted.");
+            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " deleted.");
             
             // TODO: delete this return when we delete the load balancer
             //return loadBalancer;
@@ -2773,7 +3295,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         else
         {
           log_.info("Load balancer " + name + " does not exist.");
-          return null;
+          return;
         }
       }
 
@@ -2784,13 +3306,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .withScheme(LoadBalancerSchemeEnum.Internal)
           );
       
-      LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
+      loadBalancer_ = createResponse.getLoadBalancers().get(0);
       
-      log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
+      log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " created.");
       
-      elbTag(loadBalancer.getLoadBalancerArn());
-      
-      return loadBalancer;
+      elbTag(loadBalancer_.getLoadBalancerArn());
     }
     
 
