@@ -148,18 +148,18 @@ public class AwsLambdaRequest extends JsonLambdaRequest
     
     httpMethod_ = getString("httpMethod");
     
-    JsonNode pathParameters = getJson().get("pathParameters");
-    
-    if(pathParameters != null)
-    {
-      JsonNode proxy = pathParameters.get("proxy");
-      
-      if(proxy != null)
-        path_ = "/" + proxy.asText();
-      else
-        path_ = getString("path");
-    }
-    else
+//    JsonNode pathParameters = getJson().get("pathParameters");
+//    
+//    if(pathParameters != null)
+//    {
+//      JsonNode proxy = pathParameters.get("proxy");
+//      
+//      if(proxy != null)
+//        path_ = "/" + proxy.asText();
+//      else
+//        path_ = getString("path");
+//    }
+//    else
     {
       path_ = getString("path");
     }

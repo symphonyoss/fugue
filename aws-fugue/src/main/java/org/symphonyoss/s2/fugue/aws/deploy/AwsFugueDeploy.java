@@ -231,11 +231,15 @@ import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AddPermissionRequest;
+import com.amazonaws.services.lambda.model.AddPermissionResult;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
 import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
+import com.amazonaws.services.lambda.model.RemovePermissionRequest;
+import com.amazonaws.services.lambda.model.RemovePermissionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
@@ -1831,6 +1835,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   )
               );
         }
+        
+        if(!paths.isEmpty())
+        {
+          setLambdaApiGatewayPolicy(functionName);
+        }
       }
       if(action_.isUndeploy_)
       {
@@ -1858,6 +1867,45 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       if(getNameFactory().getPodId() != null)
       {
         deleteObsoleteFunction(getNameFactory().getPhysicalServiceItemName(name).toString());
+      }
+    }
+
+    private void setLambdaApiGatewayPolicy(String functionName)
+    {
+      //                                          "arn:aws:execute-api:%s:%s:%s/*/POST/hello",
+      String apiGatewaySourceArn_ = String.format("arn:aws:execute-api:%s:%s:%s/*",
+          awsRegion_,
+          awsAccountId_,
+          apiGatewayId_);
+      try
+      {
+        try
+        {
+          RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
+              .withFunctionName(functionName)
+              .withStatementId("apiGatewayInvoke")
+              );
+          
+          log_.info("Removed existing lambda permission " + removeResult);
+        }
+        catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
+        {
+          // does not exist anyway which is fine.
+        }
+        AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
+            .withFunctionName(functionName)
+            .withAction("lambda:InvokeFunction")
+            .withPrincipal("apigateway.amazonaws.com")
+            .withStatementId("apiGatewayInvoke")
+            .withSourceArn(apiGatewaySourceArn_)
+            );
+      
+        log_.info("Added lambda permission " + permissionResult);
+      }
+      catch(Exception e)
+      {
+        e.printStackTrace();
+        e.printStackTrace();
       }
     }
 
@@ -2070,7 +2118,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .withRestApiId(apiGatewayId_)
           .withHttpMethod(ANY)
           .withUri(functionInvokeArn)
-          .withIntegrationHttpMethod(ANY)
+          .withIntegrationHttpMethod("POST")
           .withType(IntegrationType.AWS_PROXY)
           .withConnectionType(ConnectionType.INTERNET)
           );
@@ -2093,6 +2141,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           if(awsLoadBalancerCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
               existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
           {
+            apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
             log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists with correct certificate.");
           }
           else
@@ -2113,6 +2162,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                     )
                 );
             
+            apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
             log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + awsLoadBalancerCertArn_);
           }
         }
@@ -2188,11 +2238,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           log_.info("API Gateway path created to API " + newPath.getRestApiId());
         }
       }
+      
+      doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, false);
+      
       }
       catch(Exception e)
       {
         e.printStackTrace();
-        int debug=2;
         
         e.printStackTrace();
       }
