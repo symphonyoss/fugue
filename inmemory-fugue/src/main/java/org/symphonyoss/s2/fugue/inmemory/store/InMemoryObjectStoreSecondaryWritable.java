@@ -94,52 +94,52 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deleted,
         absoluteSequenceHashes, createdDate,
         null, null, null, null);
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deleted,
         null, null,
         currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deleted,
         absoluteSequenceHashes, createdDate,
         currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
   }
 
-  private void doSaveToSequences(Hash absoluteHash, String payload,
+  private void doSaveToSequences(Hash absoluteHash, String payload, boolean deleted,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {
     String payloadString = payload.toString();
     
     if(absoluteSequenceHashes != null)
-      processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, absoluteSequenceHashes);
+      processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, false, absoluteSequenceHashes);
 
     if(currentSequenceHashes != null)
-      processSequences(generateRangeKey(baseHash, baseCreatedDate), payloadString, currentSequenceHashes);
+      processSequences(generateRangeKey(baseHash, baseCreatedDate), payloadString, deleted, currentSequenceHashes);
     
     if(hashCurrentSequenceHashes != null)
     {
-      processSequences(baseHash.toStringBase64(), payloadString, hashCurrentSequenceHashes);
+      processSequences(baseHash.toStringBase64(), payloadString, deleted, hashCurrentSequenceHashes);
     } 
   }
   
-  private void processSequences(String rangeKey, String payload, Collection<Hash> sequenceHashes)
+  private void processSequences(String rangeKey, String payload, boolean deleted, Collection<Hash> sequenceHashes)
   {
     synchronized (sequenceMap_)
     {

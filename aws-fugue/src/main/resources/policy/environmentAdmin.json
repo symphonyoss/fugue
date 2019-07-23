@@ -157,6 +157,8 @@
                 "lambda:UpdateFunctionConfiguration",
                 "lambda:GetFunctionConfiguration",
                 "lambda:GetPolicy",
+                "lambda:AddPermission",
+                "lambda:RemovePermission",
                 "s3:GetObject"
             ],
             "Resource": [
