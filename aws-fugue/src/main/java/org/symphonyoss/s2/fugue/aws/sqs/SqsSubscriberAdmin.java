@@ -23,7 +23,9 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -33,16 +35,27 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
 
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.policy.Policy;
+import com.amazonaws.auth.policy.Principal;
+import com.amazonaws.auth.policy.Resource;
+import com.amazonaws.auth.policy.Statement;
+import com.amazonaws.auth.policy.Statement.Effect;
+import com.amazonaws.auth.policy.actions.SQSActions;
+import com.amazonaws.auth.policy.conditions.ConditionFactory;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
-import com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest;
-import com.amazonaws.services.sns.util.Topics;
+import com.amazonaws.services.sns.model.SubscribeRequest;
+import com.amazonaws.services.sns.model.SubscribeResult;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
+import com.amazonaws.services.sqs.model.QueueAttributeName;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
+import com.amazonaws.services.sqs.model.SetQueueAttributesRequest;
 import com.amazonaws.services.sqs.model.TagQueueRequest;
 import com.google.common.collect.ImmutableMap;
 
@@ -250,9 +263,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       }
       else
       {
-        String subscriptionArn = Topics.subscribeQueue(snsClient_, sqsClient_, getTopicARN(subscriptionName.getTopicName()), queueUrl);
-        
-        snsClient_.setSubscriptionAttributes(new SetSubscriptionAttributesRequest(subscriptionArn, "RawMessageDelivery", "true"));
+        String subscriptionArn = subscribeQueue(snsClient_, sqsClient_, getTopicARN(subscriptionName.getTopicName()), queueUrl, true);
         
         log_.info("Created subscription " + subscriptionName + " as " + queueUrl + " with subscriptionArn " + subscriptionArn);
       }
@@ -262,6 +273,41 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
         .withQueueUrl(queueUrl)
         .withTags(tags_)
         );
+  }
+  
+  /*
+   * Copied from Topics.subscribeQueue() because we need to set the raw delivery attrbute.
+   */
+  private static String subscribeQueue(AmazonSNS sns, AmazonSQS sqs, String snsTopicArn, String sqsQueueUrl,
+      boolean extendPolicy) throws AmazonClientException, AmazonServiceException
+  {
+    List<String> sqsAttrNames = Arrays.asList(QueueAttributeName.QueueArn.toString(),
+        QueueAttributeName.Policy.toString());
+    Map<String, String> sqsAttrs = sqs.getQueueAttributes(sqsQueueUrl, sqsAttrNames).getAttributes();
+    String sqsQueueArn = sqsAttrs.get(QueueAttributeName.QueueArn.toString());
+
+    String policyJson = sqsAttrs.get(QueueAttributeName.Policy.toString());
+    Policy policy = extendPolicy && policyJson != null && policyJson.length() > 0 ? Policy.fromJson(policyJson)
+        : new Policy();
+    policy.getStatements()
+        .add(new Statement(Effect.Allow).withId("topic-subscription-" + snsTopicArn).withPrincipals(Principal.AllUsers)
+            .withActions(SQSActions.SendMessage).withResources(new Resource(sqsQueueArn))
+            .withConditions(ConditionFactory.newSourceArnCondition(snsTopicArn)));
+
+    Map<String, String> newAttrs = new HashMap<String, String>();
+    newAttrs.put(QueueAttributeName.Policy.toString(), policy.toJson());
+    sqs.setQueueAttributes(new SetQueueAttributesRequest(sqsQueueUrl, newAttrs));
+    
+    SubscribeResult subscribeResult = 
+        sns.subscribe(new SubscribeRequest()
+            .addAttributesEntry("RawMessageDelivery", "true")
+            .withEndpoint(sqsQueueArn)
+            .withProtocol("sqs")
+            .withReturnSubscriptionArn(true)
+            .withTopicArn(snsTopicArn)
+            );
+    
+    return subscribeResult.getSubscriptionArn();
   }
   
   @Override
