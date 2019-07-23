@@ -1596,80 +1596,61 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void configureServiceNetwork()
     {
-      try
-      {
-        String hostName;
+      String hostName;
 
-        if(isPrimaryEnvironment())
+      if(isPrimaryEnvironment())
+      {
+        if(getPodName() == null)
         {
-          if(getPodName() == null)
-          {
-            hostName = getServiceHostName(null);
-          }
-          else
-          {
-            String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
-  
-            hostName = getServiceHostName(podId);
-          }
+          hostName = getServiceHostName(null);
         }
         else
         {
-          hostName = null;
+          String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
+
+          hostName = getServiceHostName(podId);
         }
-        
-        createR53RecordSet(hostName);
-        
-        getOrCreateCluster();
-        
       }
-      catch(RuntimeException e)
+      else
       {
-        e.printStackTrace();
-        
-        throw e;
+        hostName = null;
       }
+      
+      createR53RecordSet(hostName);
+      
+      getOrCreateCluster();
     }
 
     @Override
     protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath,
         int instances, Name roleName, String imageName, int jvmHeap, int memory)
     {
-      try
+      if(action_.isDeploy_)
       {
-        if(action_.isDeploy_)
-        {
-          Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
-          String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+        Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
+        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
 //          String regionalHostName = getNameFactory()
 //              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-          
-          String wildCardHostName = getNameFactory()
-              .withRegionId("*")
-              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-          
-  //        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-  //        
-          configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
-  //        
-  //        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
-          
-          getOrCreateCluster();
-          
-    //      registerTaskDef(name, port, healthCheckPath, podId);
-          
-          createService(targetGroupArn, name, port, instances, paths, roleName, imageName, jvmHeap, memory);
-        }
-        else
-        {
-          deleteService(name);
-        }
-      }
-      catch(RuntimeException e)
-      {
-        e.printStackTrace();
         
-        throw e;
+        String wildCardHostName = getNameFactory()
+            .withRegionId("*")
+            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
+        
+//        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+//        
+        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+//        
+//        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+        
+        getOrCreateCluster();
+        
+  //      registerTaskDef(name, port, healthCheckPath, podId);
+        
+        createService(targetGroupArn, name, port, instances, paths, roleName, imageName, jvmHeap, memory);
+      }
+      else
+      {
+        deleteService(name);
       }
     }
     
@@ -1872,47 +1853,37 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void setLambdaApiGatewayPolicy(String functionName)
     {
-      //                                          "arn:aws:execute-api:%s:%s:%s/*/POST/hello",
       String apiGatewaySourceArn_ = String.format("arn:aws:execute-api:%s:%s:%s/*",
           awsRegion_,
           awsAccountId_,
           apiGatewayId_);
+
       try
       {
-        try
-        {
-          RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
-              .withFunctionName(functionName)
-              .withStatementId("apiGatewayInvoke")
-              );
-          
-          log_.info("Removed existing lambda permission " + removeResult);
-        }
-        catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
-        {
-          // does not exist anyway which is fine.
-        }
-        AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
+        RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
             .withFunctionName(functionName)
-            .withAction("lambda:InvokeFunction")
-            .withPrincipal("apigateway.amazonaws.com")
             .withStatementId("apiGatewayInvoke")
-            .withSourceArn(apiGatewaySourceArn_)
             );
-      
-        log_.info("Added lambda permission " + permissionResult);
+        
+        log_.info("Removed existing lambda permission " + removeResult);
       }
-      catch(Exception e)
+      catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
       {
-        e.printStackTrace();
-        e.printStackTrace();
+        // does not exist anyway which is fine.
       }
+      AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
+          .withFunctionName(functionName)
+          .withAction("lambda:InvokeFunction")
+          .withPrincipal("apigateway.amazonaws.com")
+          .withStatementId("apiGatewayInvoke")
+          .withSourceArn(apiGatewaySourceArn_)
+          );
+    
+      log_.info("Added lambda permission " + permissionResult);      
     }
 
     private void createApiGatewayPaths(String functionInvokeArn, Collection<String> paths)
     {
-      try
-      {
       Set<String> remainingPaths = new HashSet<>();
       Set<String> remainingMethods = new HashSet<>();
       
@@ -2057,14 +2028,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
             
       createApiGatewayBasePath();
-      
-      
-      }
-      catch(Exception e)
-      {
-        e.printStackTrace();
-        e.printStackTrace();
-      }
     }
 
     private void deleteMethod(String httpMethod, String resourceId)
@@ -2128,8 +2091,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void createApiGatewayBasePath()
     {
-      try
-      {
       if(apiGatewayId_ != null)
       {
         try
@@ -2240,14 +2201,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       
       doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, false);
-      
-      }
-      catch(Exception e)
-      {
-        e.printStackTrace();
-        
-        e.printStackTrace();
-      }
     }
 
     private void deleteObsoleteFunction(String obsoleteFunctionName)
