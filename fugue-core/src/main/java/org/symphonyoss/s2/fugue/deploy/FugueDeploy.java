@@ -969,6 +969,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory);
 
     protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths);
+    protected abstract void postDeployContainers();
     
     protected abstract void deployService();
     protected abstract void undeployService();
@@ -1250,11 +1251,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployInitContainers()
     {
-      if(getPodName() == null)
-      {
-        // Deploy service level assets, load balancers, DNS zones etc
-        deployService();
-      }
+      deployService();
       
       Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
       
@@ -1317,6 +1314,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployDockerContainers(batch, ContainerType.SERVICE,    false);
         deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
         deployLambdaContainers(batch, ContainerType.LAMBDA);
+        postDeployContainers();
         
         if(action_.isUndeploy_)
         {

@@ -36,6 +36,7 @@ import org.symphonyoss.s2.fugue.naming.Name;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
+import com.amazonaws.services.identitymanagement.model.AccessKeyMetadata;
 import com.amazonaws.services.identitymanagement.model.AddUserToGroupRequest;
 import com.amazonaws.services.identitymanagement.model.AttachGroupPolicyRequest;
 import com.amazonaws.services.identitymanagement.model.AttachUserPolicyRequest;
@@ -43,9 +44,12 @@ import com.amazonaws.services.identitymanagement.model.AttachedPolicy;
 import com.amazonaws.services.identitymanagement.model.CreateAccessKeyRequest;
 import com.amazonaws.services.identitymanagement.model.CreateGroupRequest;
 import com.amazonaws.services.identitymanagement.model.CreateUserRequest;
+import com.amazonaws.services.identitymanagement.model.DeleteAccessKeyRequest;
 import com.amazonaws.services.identitymanagement.model.GetGroupRequest;
 import com.amazonaws.services.identitymanagement.model.GetUserRequest;
 import com.amazonaws.services.identitymanagement.model.Group;
+import com.amazonaws.services.identitymanagement.model.ListAccessKeysRequest;
+import com.amazonaws.services.identitymanagement.model.ListAccessKeysResult;
 import com.amazonaws.services.identitymanagement.model.ListAttachedGroupPoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListAttachedUserPoliciesRequest;
 import com.amazonaws.services.identitymanagement.model.ListGroupsForUserRequest;
@@ -124,6 +128,8 @@ public class CreateUserForPolicy
   
   private void createUser() throws IOException
   {
+    System.out.println("V2");
+    boolean addUserToGroup = true;
     try
     {
       iam_.getUser(new GetUserRequest()
@@ -138,8 +144,46 @@ public class CreateUserForPolicy
         if(group.getGroupName().equals(groupName_))
         {
           System.out.println("User \"" + userName_ + "\" is already a member of group \"" + groupName_ + "\"");
-          return;
+          addUserToGroup = false;
+          break;
         }
+      }
+      
+      ListAccessKeysResult keysResponse = iam_.listAccessKeys(new ListAccessKeysRequest()
+          .withUserName(userName_)
+          );
+      
+      AccessKeyMetadata activeKey = null;
+      AccessKeyMetadata inactiveKey = null;
+      
+      for(AccessKeyMetadata key : keysResponse.getAccessKeyMetadata())
+      {
+        System.out.format("Access key %s is %s%n", key.getAccessKeyId(), key.getStatus());
+        
+        if("Active".equals(key.getStatus()))
+        {
+          activeKey = key;
+        }
+        if("Inactive".equals(key.getStatus()))
+        {
+          inactiveKey = key;
+        }
+      }
+      
+      if(activeKey == null)
+      {
+        System.out.println("No active access key");
+        
+        if(inactiveKey != null)
+        {
+          System.out.println("Deleting inactive access key " + inactiveKey.getAccessKeyId());
+          iam_.deleteAccessKey(new DeleteAccessKeyRequest()
+              .withAccessKeyId(inactiveKey.getAccessKeyId())
+              .withUserName(userName_)
+              );
+        }
+        
+        createAccessKey();
       }
     }
     catch(NoSuchEntityException e)
@@ -151,27 +195,11 @@ public class CreateUserForPolicy
       
       System.out.println("Created user \"" + userName_ + "\"");
       
-      AccessKey accessKey = iam_.createAccessKey(new CreateAccessKeyRequest()
-          .withUserName(userName_)).getAccessKey();
-        
-        System.out.println("#######################################################");
-        System.out.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
-        System.out.println("#######################################################");
-        System.out.format("[%s]%n", userName_);
-        System.out.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
-        System.out.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
-        System.out.println("#######################################################");
-        
-        System.out.println("credentials is " + credentialsFile_.getAbsolutePath());
-        
-        try(PrintWriter out = new PrintWriter(new FileWriter(credentialsFile_, true)))
-        {
-          out.format("%n[%s]%n", userName_);
-          out.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
-          out.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
-        }
+      createAccessKey();
     }
     
+    if(addUserToGroup)
+    {
 //    System.out.println("Adding policy \"" + policyName_ + "\" to user \"" + userName_ + "\"");
 //    
 //    iam_.attachUserPolicy(new AttachUserPolicyRequest()
@@ -183,6 +211,30 @@ public class CreateUserForPolicy
     iam_.addUserToGroup(new AddUserToGroupRequest()
         .withUserName(userName_)
         .withGroupName(groupName_));
+    }
+  }
+
+  private void createAccessKey() throws IOException
+  {
+    AccessKey accessKey = iam_.createAccessKey(new CreateAccessKeyRequest()
+        .withUserName(userName_)).getAccessKey();
+      
+      System.out.println("#######################################################");
+      System.out.println("# SAVE THIS ACCESS KEY IN ~/.aws/credentials");
+      System.out.println("#######################################################");
+      System.out.format("[%s]%n", userName_);
+      System.out.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
+      System.out.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
+      System.out.println("#######################################################");
+      
+      System.out.println("credentials is " + credentialsFile_.getAbsolutePath());
+      
+      try(PrintWriter out = new PrintWriter(new FileWriter(credentialsFile_, true)))
+      {
+        out.format("%n[%s]%n", userName_);
+        out.format("aws_access_key_id = %s%n", accessKey.getAccessKeyId());
+        out.format("aws_secret_access_key = %s%n", accessKey.getSecretAccessKey());
+      }
   }
 
   private String createGroup(String groupName, String policyArn)

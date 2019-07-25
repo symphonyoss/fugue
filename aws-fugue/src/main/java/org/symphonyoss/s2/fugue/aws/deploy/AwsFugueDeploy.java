@@ -1267,6 +1267,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     private String apiGatewayDomainName_;
 
     private String apiGatewayTargetDomain_;
+
+    private boolean deploy_;
+
+    private boolean createStage_;
     
     protected AwsDeploymentContext(String podName, INameFactory nameFactory)
     {
@@ -1957,14 +1961,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       if(rootResourceId == null)
         throw new IllegalStateException("Unable to locste root resource for api gateway " + apiGatewayId_);
       
-      boolean deploy = false;
-      
       for(String path : remainingPaths)
       {
         log_.info("Creating path " + path);
         
         createApiGatewayPath(functionInvokeArn, rootResourceId, path.split("/"), 1);
-        deploy=true;
+        deploy_=true;
       }
       
       for(String resourceId : remainingMethods)
@@ -1972,10 +1974,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         log_.info("Creating method for resource " + resourceId);
         
         createMethod(functionInvokeArn, resourceId);
-        deploy=true;
+        deploy_=true;
       }
-      
-      boolean createStage = false;
       
       try
       {
@@ -1989,29 +1989,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       catch(com.amazonaws.services.apigateway.model.NotFoundException e)
       {
         log_.info("Stage does not exist.");
-        createStage = true;
-        deploy=true;
+        createStage_ = true;
+        deploy_=true;
       }
       
-      if(deploy)
+      
+    }
+
+    @Override
+    protected void postDeployContainers()
+    {
+      log_.info("postDeployContainers deploy_ = " + deploy_ + ":" + apiGatewayId_ + ", createStage_ = " + createStage_ + ":" + getStageName());
+      if(deploy_)
       {
+        checkStage();
         CreateDeploymentResult deployment = apiClient_.createDeployment(new CreateDeploymentRequest()
             .withRestApiId(apiGatewayId_)
             .withStageName(getStageName())
             );
-        
-        if(createStage)
-        {
-          CreateStageResult stage = apiClient_.createStage(new CreateStageRequest()
-            .withDeploymentId(deployment.getId())
-            .withRestApiId(apiGatewayId_)
-            .withStageName(getStageName())
-            .withTags(getTags())
-            );
-        
-          log_.info("Created stage " + stage);
-        }
-        else
+        checkStage();
+        if(!createStage_)
         {
           UpdateStageResult stage = apiClient_.updateStage(new UpdateStageRequest()
               .withRestApiId(apiGatewayId_)
@@ -2028,6 +2025,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
             
       createApiGatewayBasePath();
+    }
+
+    private void checkStage()
+    {
+      log_.info("Check Stage " + getStageName());
+      try
+      {
+        GetStageResult stage = apiClient_.getStage(new GetStageRequest()
+          .withRestApiId(apiGatewayId_)
+          .withStageName(getStageName())
+          );
+        
+        log_.info("Stage exists as " + stage);
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Stage does not exist.");
+        createStage_ = true;
+        deploy_=true;
+      }
     }
 
     private void deleteMethod(String httpMethod, String resourceId)
@@ -2198,9 +2215,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           log_.info("API Gateway path created to API " + newPath.getRestApiId());
         }
+        doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, false);
       }
-      
-      doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, false);
     }
 
     private void deleteObsoleteFunction(String obsoleteFunctionName)
@@ -3104,7 +3120,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void getApiGateway(boolean createIfNecessary)
     {
-      String name = getEnvironmentPrefix() + getNameFactory().getServiceImageName();
+      String name = getNameFactory().getLogicalServiceName().toString();
+          //getEnvironmentPrefix() + getNameFactory().getServiceImageName();
       
       try
       {
