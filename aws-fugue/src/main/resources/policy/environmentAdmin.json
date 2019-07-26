@@ -32,6 +32,12 @@
             ]
         },
         {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": "iam:CreateServiceLinkedRole",
+            "Resource": "arn:aws:iam::*:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway"
+        },
+        {
             "Sid": "ElbCreate",
             "Effect": "Allow",
             "Action": [
