@@ -95,7 +95,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload, deletionType,
@@ -104,7 +105,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
     doSaveToSequences(absoluteHash, payload, deletionType,
@@ -113,7 +115,8 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {

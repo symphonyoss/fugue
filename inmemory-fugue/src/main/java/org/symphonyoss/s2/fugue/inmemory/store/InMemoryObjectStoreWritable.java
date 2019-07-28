@@ -80,7 +80,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public void saveIfNotExists(IFugueObject idObject, IFugueObject payload, ITraceContext trace) throws ObjectExistsException
+  public void saveIfNotExists(IFugueObject idObject, IFugueObject payload, int payloadLimit, ITraceContext trace) throws ObjectExistsException
   {
     if(payload.getPayload() instanceof IFugueVersionedObject && ((IFugueVersionedObject)payload.getPayload()).getBaseHash().equals(idObject.getAbsoluteHash()))
     {
@@ -91,7 +91,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
         if(current == null)
         {
           doSave(idObject);
-          save(payload, trace);
+          save(payload, payloadLimit, trace);
         }
         else
         {
@@ -146,7 +146,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public void save(IFugueObject fundamentalObject, ITraceContext trace)
+  public void save(IFugueObject fundamentalObject, int payloadLimit, ITraceContext trace)
   {
     String blob = fundamentalObject.toString();
     

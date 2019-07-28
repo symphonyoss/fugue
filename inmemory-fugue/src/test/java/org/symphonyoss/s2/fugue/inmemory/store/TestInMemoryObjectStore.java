@@ -49,6 +49,8 @@ public class TestInMemoryObjectStore
   private InMemoryObjectStoreWritable objectStore_ = new InMemoryObjectStoreWritable.Builder()
       .build();
   
+  private int payloadLimit_ = 400 * 1024;
+  
   /**
    * Test store and retrieve.
    * 
@@ -60,8 +62,8 @@ public class TestInMemoryObjectStore
     FugueObject  objectOne = new FugueObject("Object One");
     FugueObject  objectTwo = new FugueObject("Object Two");
 
-    objectStore_.save(objectOne, NoOpTraceContext.INSTANCE);
-    objectStore_.save(objectTwo, NoOpTraceContext.INSTANCE);
+    objectStore_.save(objectOne, payloadLimit_, NoOpTraceContext.INSTANCE);
+    objectStore_.save(objectTwo, payloadLimit_, NoOpTraceContext.INSTANCE);
     
     String retOne = objectStore_.fetchAbsolute(objectOne.getAbsoluteHash());
     String retTwo = objectStore_.fetchAbsolute(objectTwo.getAbsoluteHash());
@@ -100,7 +102,7 @@ public class TestInMemoryObjectStore
     
     try
     {
-      objectStore_.saveIfNotExists(payload1, payload2, NoOpTraceContext.INSTANCE);
+      objectStore_.saveIfNotExists(payload1, payload2, payloadLimit_, NoOpTraceContext.INSTANCE);
       fail("Should throw exception");
     }
     catch(IllegalArgumentException e)
@@ -108,11 +110,11 @@ public class TestInMemoryObjectStore
       // expected
     }
 
-    objectStore_.saveIfNotExists(id, payload1, NoOpTraceContext.INSTANCE);
+    objectStore_.saveIfNotExists(id, payload1, payloadLimit_, NoOpTraceContext.INSTANCE);
     
     try
     {
-      objectStore_.saveIfNotExists(id, payload2, NoOpTraceContext.INSTANCE);
+      objectStore_.saveIfNotExists(id, payload2, payloadLimit_, NoOpTraceContext.INSTANCE);
       
       fail("Request should throw ObjectExistsException");
     }

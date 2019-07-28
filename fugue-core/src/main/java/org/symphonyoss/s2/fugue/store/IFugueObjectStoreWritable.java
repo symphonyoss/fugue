@@ -36,10 +36,11 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
   /**
    * Save the given object.
    * 
-   * @param object An object to be stored.
-   * @param trace  A trace context.
+   * @param object            An object to be stored.
+   * @param payloadLimit      Max size of payload which will be written to primary storage.
+   * @param trace             A trace context.
    */
-  void save(IFugueObject object, ITraceContext trace);
+  void save(IFugueObject object, int payloadLimit, ITraceContext trace);
 
   /**
    * If the given ID object does not exist then save it and all of the additional objects in a single transaction and return null,
@@ -47,9 +48,10 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
    * 
    * @param idObject          An ID object.
    * @param payload           An additional object to be stored if the given ID object does not already exist.
+   * @param payloadLimit      Max size of payload which will be written to primary storage.
    * @param trace             A trace context.
    * 
    * @throws ObjectExistsException if the given idObject already exists, and no change has been made to the object store.
    */
-  void saveIfNotExists(IFugueObject idObject, IFugueObject payload, ITraceContext trace) throws ObjectExistsException;
+  void saveIfNotExists(IFugueObject idObject, IFugueObject payload, int payloadLimit, ITraceContext trace) throws ObjectExistsException;
 }
