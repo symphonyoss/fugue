@@ -22,6 +22,7 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -33,7 +34,6 @@ import javax.annotation.Nullable;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.common.hash.Hash;
-import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.store.AbstractFugueObjectStore;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreReadOnly;
 
@@ -47,6 +47,7 @@ public class InMemoryObjectStoreReadOnly extends AbstractFugueObjectStore implem
 {
   protected Map<Hash, String>                     absoluteMap_ = new HashMap<>();
   protected Map<Hash, TreeMap<String, String>>    currentMap_ = new HashMap<>();
+  protected Map<Hash, List<Hash>>                 baseMap_ = new HashMap<>();
   protected Map<Hash, TreeMap<String, String>>    sequenceMap_ = new HashMap<>();
   
   /**

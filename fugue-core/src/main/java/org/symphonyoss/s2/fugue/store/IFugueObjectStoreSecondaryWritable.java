@@ -45,13 +45,13 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload as a String (if available).
-   * @param deleted                   True iff the object represents a logical deletion.
+   * @param deletionType              The type of deletion.
    * @param fugueObjectPayload        The payload meta-data
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
   
   /**
@@ -59,7 +59,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload as a String (if available).
-   * @param deleted                   True iff the object represents a logical deletion.
+   * @param deletionType              The type of deletion.
    * @param fugueObjectPayload        The payload meta-data
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
    * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
@@ -67,7 +67,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
   
   /**
@@ -75,7 +75,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @param absoluteHash              The absolute hash of the object to store.
    * @param payload                   The payload as a String (if available).
-   * @param deleted                   True iff the object represents a logical deletion.
+   * @param deletionType              The type of deletion.
    * @param fugueObjectPayload        The payload meta-data
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
@@ -85,7 +85,7 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, boolean deleted, IFugueObjectPayload fugueObjectPayload,
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType, IFugueObjectPayload fugueObjectPayload,
       Collection<Hash> absoluteSequenceHashes, Instant createdDate,
       Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
 

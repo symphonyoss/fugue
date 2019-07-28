@@ -70,6 +70,27 @@ public class TestInMemoryObjectStore
     assertEquals(objectTwo.toString(), retTwo);
   }
   
+
+//  @Test(expected=NoSuchObjectException.class)
+//  public void testDelete() throws NoSuchObjectException
+//  {
+//    FugueObject  objectOne = new FugueObject("Object One");
+//    FugueObject  objectTwo = new FugueObject("Object Two");
+//
+//    objectStore_.save(objectOne, NoOpTraceContext.INSTANCE);
+//    //objectStore_.save(objectTwo, NoOpTraceContext.INSTANCE);
+//    
+//    String retOne = objectStore_.fetchAbsolute(objectOne.getAbsoluteHash());
+//    
+//    assertEquals(objectOne.toString(), retOne);
+//    
+//    objectStore_.delete(objectOne.getAbsoluteHash(), objectOne.getAbsoluteHash(), NoOpTraceContext.INSTANCE);
+//    
+//    retOne = objectStore_.fetchAbsolute(objectOne.getAbsoluteHash());
+//    
+//    assertEquals(objectOne.toString(), retOne);
+//  }
+  
   @Test
   public void testStoreIfNotExist() throws NoSuchObjectException, ObjectExistsException
   {
