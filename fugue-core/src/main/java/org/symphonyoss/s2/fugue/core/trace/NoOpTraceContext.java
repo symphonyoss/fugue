@@ -94,4 +94,10 @@ public class NoOpTraceContext implements ITraceContext
   {
     return Hash.NIL_HASH;
   }
+
+  @Override
+  public void setCounter(int count)
+  {
+    // NO OP
+  }
 }

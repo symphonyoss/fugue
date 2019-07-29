@@ -128,4 +128,11 @@ class LoggerTraceContext implements ITraceContext
   {
     return timestamp_;
   }
+
+  @Override
+  public void setCounter(int count)
+  {
+    // TODO Auto-generated method stub
+    
+  }
 }

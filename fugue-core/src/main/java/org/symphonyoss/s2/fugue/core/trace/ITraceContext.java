@@ -121,4 +121,7 @@ public interface ITraceContext
    * @return A new ITraceContext which is a sub-context of the current context.
    */
   ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time);
+
+  
+  void setCounter(int count);
 }
