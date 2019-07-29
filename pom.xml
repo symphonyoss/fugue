@@ -32,7 +32,7 @@
 
 	<groupId>org.symphonyoss.s2.fugue</groupId>
 	<artifactId>fugue</artifactId>
-	<version>0.2.18</version>
+	<version>0.2.19-SNAPSHOT</version>
 	<name>fugue</name>
 	<description>Cloud platform abstraction</description>
 	<url>https://github.com/SymphonyOSF/fuge</url>
@@ -69,7 +69,7 @@
 		<connection>scm:git:git://github.com/symphonyoss/fugue.git</connection>
 		<developerConnection>scm:git:git@github.com:symphonyoss/fugue.git</developerConnection>
 		<url>https://github.com/symphonyoss/fugue</url>
-		<tag>fugue-0.2.18</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<developers>
