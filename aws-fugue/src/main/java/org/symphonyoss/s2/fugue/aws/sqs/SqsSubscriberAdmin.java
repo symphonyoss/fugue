@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.aws.sqs;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -276,7 +277,8 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
   }
   
   /*
-   * Copied from Topics.subscribeQueue() because we need to set the raw delivery attrbute.
+   * Copied from Topics.subscribeQueue() because we need to set the raw delivery attribute.
+   * Also, we are replacing any existing policy because the AWS code just appends it.
    */
   private static String subscribeQueue(AmazonSNS sns, AmazonSQS sqs, String snsTopicArn, String sqsQueueUrl,
       boolean extendPolicy) throws AmazonClientException, AmazonServiceException
@@ -289,10 +291,14 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     String policyJson = sqsAttrs.get(QueueAttributeName.Policy.toString());
     Policy policy = extendPolicy && policyJson != null && policyJson.length() > 0 ? Policy.fromJson(policyJson)
         : new Policy();
-    policy.getStatements()
-        .add(new Statement(Effect.Allow).withId("topic-subscription-" + snsTopicArn).withPrincipals(Principal.AllUsers)
+    
+    List<Statement> statements = new ArrayList<>();
+    
+    statements.add(new Statement(Effect.Allow).withId("topic-subscription-" + snsTopicArn).withPrincipals(Principal.AllUsers)
             .withActions(SQSActions.SendMessage).withResources(new Resource(sqsQueueArn))
             .withConditions(ConditionFactory.newSourceArnCondition(snsTopicArn)));
+    
+    policy.setStatements(statements);
 
     Map<String, String> newAttrs = new HashMap<String, String>();
     newAttrs.put(QueueAttributeName.Policy.toString(), policy.toJson());

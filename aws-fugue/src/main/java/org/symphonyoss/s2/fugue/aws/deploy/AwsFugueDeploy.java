@@ -1888,6 +1888,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void createApiGatewayPaths(String functionInvokeArn, Collection<String> paths)
     {
+      Map<String, String> pathIdMap = new HashMap<>();
       Set<String> remainingPaths = new HashSet<>();
       Set<String> remainingMethods = new HashSet<>();
       
@@ -1905,6 +1906,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       for(Resource resource : resources.getItems())
       {
+        pathIdMap.put(resource.getPath(), resource.getId());
+        
         if(resource.getPath().equals("/"))
           rootResourceId = resource.getId();
         
@@ -1965,7 +1968,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         log_.info("Creating path " + path);
         
-        createApiGatewayPath(functionInvokeArn, rootResourceId, path.split("/"), 1);
+        createApiGatewayPath(pathIdMap, functionInvokeArn, rootResourceId, path.split("/"), 1, "");
         deploy_=true;
       }
       
@@ -2065,22 +2068,31 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private void createApiGatewayPath(String functionInvokeArn, String parentResourceId, String[] pathElements, int cnt)
+    private void createApiGatewayPath(Map<String, String> pathIdMap, String functionInvokeArn, String parentResourceId, String[] pathElements, int cnt, String currentPath)
     {
-      CreateResourceResult resource = apiClient_.createResource(new CreateResourceRequest()
-          .withRestApiId(apiGatewayId_)
-          .withParentId(parentResourceId)
-          .withPathPart(pathElements[cnt])
-          .withRestApiId(apiGatewayId_)
-          );
+      currentPath = currentPath + "/" + pathElements[cnt];
+      
+      String resourceId = pathIdMap.get(currentPath);
+      
+      if(resourceId == null)
+      {
+        CreateResourceResult resource = apiClient_.createResource(new CreateResourceRequest()
+            .withRestApiId(apiGatewayId_)
+            .withParentId(parentResourceId)
+            .withPathPart(pathElements[cnt])
+            .withRestApiId(apiGatewayId_)
+            );
+        
+        resourceId = resource.getId();
+      }
       
       if(pathElements.length > ++cnt)
       {
-        createApiGatewayPath(functionInvokeArn, resource.getId(), pathElements, cnt);
+        createApiGatewayPath(pathIdMap, functionInvokeArn, resourceId, pathElements, cnt, currentPath);
       }
       else
       {
-        createMethod(functionInvokeArn, resource.getId());
+        createMethod(functionInvokeArn, resourceId);
       }
     }
 

@@ -176,9 +176,9 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
         else
           s.append(",");
         
-        s.append("\"");
+        s.append("\"arn:aws:iam::");
         s.append(subscriberAccountId);
-        s.append("\"");
+        s.append(":root\"");
       }
       
       s.append( 
