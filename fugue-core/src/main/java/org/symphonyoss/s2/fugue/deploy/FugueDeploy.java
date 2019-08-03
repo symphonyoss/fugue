@@ -110,6 +110,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   /** The prefix for the names of fugue entities in the CSP */
   public static final String FUGUE_PREFIX = "fugue-";
+  
+  // DEBUGGING FLAGS
+  private static final boolean SKIP_DEPLOY_CONFIG = Fugue.getBooleanProperty("SKIP_DEPLOY_CONFIG", false);
+  private static final boolean SKIP_INIT_CONTAINERS = Fugue.getBooleanProperty("SKIP_INIT_CONTAINERS", false);
 
   private static final String     CONFIG_DIR          = CONFIG + "/";
   private static final String     SERVICE_DIR         = CONFIG_DIR + SERVICE;
@@ -353,7 +357,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     if(podName_ != null && !tenantContextMap_.containsKey(podName_))
       tenantContextMap_.put(podName_, createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, null, service_)));
 
-    log_.info("FugueDeploy v1.3");
+    log_.info("FugueDeploy v3.1");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
@@ -419,7 +423,6 @@ public abstract class FugueDeploy extends CommandLineHandler
   private void deploy(ImmutableJsonObject multiTenantDefaults, ImmutableJsonObject environmentConfig,
       ImmutableJsonObject multiTenantOverrides)
   {
-    int debug=0;
     ImmutableJsonObject serviceJson;
     String dir = SERVICE_DIR + "/" + getService();
     
@@ -592,6 +595,13 @@ public abstract class FugueDeploy extends CommandLineHandler
       }
       
       containerBatch.waitForAllTasks();
+      
+      multiTenantContext_.postDeployServiceContainers();
+      
+      for(DeploymentContext context : tenantContextMap_.values())
+      {
+        context.postDeployServiceContainers();
+      }
     }
     
     if(action_.isUndeploy_)
@@ -969,6 +979,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory);
 
     protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths);
+    protected abstract void postDeployLambdaContainer(String name, Collection<String> paths);
     protected abstract void postDeployContainers();
     
     protected abstract void deployService();
@@ -1224,7 +1235,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     private void processConfigAndPolicies()
     {
-      if(2>1) return; // TODO: REMOVE
+      if(SKIP_DEPLOY_CONFIG)
+        return;
+      
       IBatch<Runnable> batch = createBatch();
       
       batch.submit(() ->
@@ -1254,29 +1267,32 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       deployService();
       
-//      Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
-//      
-//      if(action_.isDeploy_ && initContainerMap != null && !initContainerMap.isEmpty())
-//      {
-//        for(String name : initContainerMap.keySet())
-//        {
-//          JsonObject<?> container = initContainerMap.get(name);
-//          
-//          IJsonDomNode        portNode = container.get(PORT);
-//          int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
-//          Collection<String>  paths = container.getListOf(String.class, PATHS);
-//          String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
-//          String              roleId = container.getRequiredString(ROLE);
-//          Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
-//          
-//          String              imageId       = container.getString(IMAGE, name);
-//          String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
-//          int jvmHeap = container.getInteger("jvmHeap", 512);
-//          int memory = container.getInteger("memory", 1024);
-//          
-//          deployInitContainer(name, port, paths, healthCheckPath, roleName, imageName, jvmHeap, memory);
-//        }
-//      }
+      if(SKIP_INIT_CONTAINERS)
+        return;
+      
+      Map<String, JsonObject<?>> initContainerMap = containerMap_.get(ContainerType.INIT);
+      
+      if(action_.isDeploy_ && initContainerMap != null && !initContainerMap.isEmpty())
+      {
+        for(String name : initContainerMap.keySet())
+        {
+          JsonObject<?> container = initContainerMap.get(name);
+          
+          IJsonDomNode        portNode = container.get(PORT);
+          int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+          Collection<String>  paths = container.getListOf(String.class, PATHS);
+          String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+          String              roleId = container.getRequiredString(ROLE);
+          Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
+          
+          String              imageId       = container.getString(IMAGE, name);
+          String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
+          int jvmHeap = container.getInteger("jvmHeap", 512);
+          int memory = container.getInteger("memory", 1024);
+          
+          deployInitContainer(name, port, paths, healthCheckPath, roleName, imageName, jvmHeap, memory);
+        }
+      }
     }
     
     protected void undeployInitContainers()
@@ -1315,7 +1331,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         deployDockerContainers(batch, ContainerType.SERVICE,    false);
         deployDockerContainers(batch, ContainerType.SCHEDULED,  true);
         deployLambdaContainers(batch, ContainerType.LAMBDA);
-        postDeployContainers();
+        
         
         if(action_.isUndeploy_)
         {
@@ -1323,7 +1339,7 @@ public abstract class FugueDeploy extends CommandLineHandler
         }
       }
     }
-
+    
     private void deployLambdaContainers(IBatch<Runnable> batch, ContainerType containerType)
     {
       Map<String, JsonObject<?>> map = containerMap_.get(containerType);
@@ -1368,6 +1384,34 @@ public abstract class FugueDeploy extends CommandLineHandler
                 paths
                 );
           });
+        }
+      }
+    }
+    
+    protected void postDeployServiceContainers()
+    {
+      if(!getContainerMap().isEmpty())
+      {
+        postDeployLambdaContainers(ContainerType.LAMBDA);
+      }
+      postDeployContainers();
+    }
+
+    private void postDeployLambdaContainers(ContainerType containerType)
+    {
+      Map<String, JsonObject<?>> map = containerMap_.get(containerType);
+      
+      if(map != null)
+      {
+        for(String name : map.keySet())
+        {
+          JsonObject<?> container = map.get(name);
+
+          Collection<String> paths = container.getListOf(String.class, PATHS);
+          
+          postDeployLambdaContainer(name,
+              paths
+              );
         }
       }
     }

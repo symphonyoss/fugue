@@ -1762,6 +1762,20 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
+    protected void postDeployLambdaContainer(String name, Collection<String> paths)
+    {
+      String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
+
+      log_.info("postDeployLambdaContainer(" + name + ", " + paths + ");");
+      
+      if(action_.isDeploy_)
+      {
+        if(!paths.isEmpty())
+          createApiGatewayPaths(getFunctionInvocationArn(functionName), paths);
+      }
+    }
+
+    @Override
     protected void deployLambdaContainer(String name, String imageName, 
         String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths)
     {
@@ -1773,9 +1787,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
-        if(!paths.isEmpty())
-          createApiGatewayPaths(getFunctionInvocationArn(functionName), paths);
-        
         try
         {
           lambdaClient_.getFunction(new GetFunctionRequest()
@@ -2084,6 +2095,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             );
         
         resourceId = resource.getId();
+        pathIdMap.put(currentPath, resourceId);
       }
       
       if(pathElements.length > ++cnt)
