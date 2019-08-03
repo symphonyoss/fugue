@@ -45,6 +45,7 @@ import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 public abstract class InMemoryPublisherBase<T extends InMemoryPublisherBase<T>> extends AbstractPublisherManager<T>
 {
   protected static final int                   MAX_MESSAGE_SIZE  = 256 * 1024; // 256K
+  protected static final int                   BILLABLE_MESSAGE_SIZE  = 64 * 1024;
 
   protected final Map<TopicName, InMemoryPublisher> publisherNameMap_ = new HashMap<>();
   protected final List<InMemoryPublisher>           publishers_       = new ArrayList<>();

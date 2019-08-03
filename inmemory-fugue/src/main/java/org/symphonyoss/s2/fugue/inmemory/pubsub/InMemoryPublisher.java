@@ -60,4 +60,10 @@ class InMemoryPublisher implements IPublisher
   {
     return InMemoryPublisherManager.MAX_MESSAGE_SIZE;
   }
+
+  @Override
+  public int getBillableMessageSize()
+  {
+    return InMemoryPublisherManager.BILLABLE_MESSAGE_SIZE;
+  }
 }
