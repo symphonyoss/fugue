@@ -43,8 +43,7 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
   void save(IFugueObject object, int payloadLimit, ITraceContext trace);
 
   /**
-   * If the given ID object does not exist then save it and all of the additional objects in a single transaction and return null,
-   * otherwise return the existing object.
+   * If the given ID object does not exist then save it and the additional object in a single transaction.
    * 
    * @param idObject          An ID object.
    * @param payload           An additional object to be stored if the given ID object does not already exist.
