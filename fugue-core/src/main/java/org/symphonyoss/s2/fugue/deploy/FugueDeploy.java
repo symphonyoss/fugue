@@ -137,6 +137,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   private static final String     IMAGE               = "image";
 
   private static final String     DNS_SUFFIX          = "dnsSuffix";
+  private static final String     PUBLIC_DNS_SUFFIX   = "publicDnsSuffix";
 
   private final String            cloudServiceProvider_;
   private final ConfigProvider    provider_;
@@ -159,6 +160,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   protected boolean               dryRun_;
   
   private String                  dnsSuffix_;
+  private String                  publicDnsSuffix_;
 
   private ExecutorService         executor_           = Executors.newFixedThreadPool(20,
       new NamedThreadFactory("Batch", true));
@@ -327,6 +329,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     return dnsSuffix_;
   }
   
+  public String getPublicDnsSuffix()
+  {
+    return publicDnsSuffix_;
+  }
+  
   protected void populateTags(Map<String, String> tags)
   {
     tagIfNotNull("FUGUE_ENVIRONMENT_TYPE",  environmentType_);
@@ -382,7 +389,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 
     validateAccount(multiTenantConfig);
     
-    dnsSuffix_   = multiTenantConfig.getRequiredString(DNS_SUFFIX);
+    dnsSuffix_      = multiTenantConfig.getRequiredString(DNS_SUFFIX);
+    publicDnsSuffix_= multiTenantConfig.getRequiredString(PUBLIC_DNS_SUFFIX);
     
     
     switch (action_)

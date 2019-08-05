@@ -62,10 +62,8 @@ import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
 
-import com.amazonaws.HttpMethod;
 import com.amazonaws.services.apigateway.AmazonApiGateway;
 import com.amazonaws.services.apigateway.AmazonApiGatewayClientBuilder;
-import com.amazonaws.services.apigateway.model.BasePathMapping;
 import com.amazonaws.services.apigateway.model.ConnectionType;
 import com.amazonaws.services.apigateway.model.CreateBasePathMappingRequest;
 import com.amazonaws.services.apigateway.model.CreateBasePathMappingResult;
@@ -77,16 +75,12 @@ import com.amazonaws.services.apigateway.model.CreateResourceRequest;
 import com.amazonaws.services.apigateway.model.CreateResourceResult;
 import com.amazonaws.services.apigateway.model.CreateRestApiRequest;
 import com.amazonaws.services.apigateway.model.CreateRestApiResult;
-import com.amazonaws.services.apigateway.model.CreateStageRequest;
-import com.amazonaws.services.apigateway.model.CreateStageResult;
 import com.amazonaws.services.apigateway.model.DeleteMethodRequest;
 import com.amazonaws.services.apigateway.model.DeleteRestApiRequest;
 import com.amazonaws.services.apigateway.model.EndpointConfiguration;
 import com.amazonaws.services.apigateway.model.EndpointType;
 import com.amazonaws.services.apigateway.model.GetBasePathMappingRequest;
 import com.amazonaws.services.apigateway.model.GetBasePathMappingResult;
-import com.amazonaws.services.apigateway.model.GetBasePathMappingsRequest;
-import com.amazonaws.services.apigateway.model.GetBasePathMappingsResult;
 import com.amazonaws.services.apigateway.model.GetDomainNameRequest;
 import com.amazonaws.services.apigateway.model.GetDomainNameResult;
 import com.amazonaws.services.apigateway.model.GetMethodRequest;
@@ -98,7 +92,6 @@ import com.amazonaws.services.apigateway.model.GetRestApisResult;
 import com.amazonaws.services.apigateway.model.GetStageRequest;
 import com.amazonaws.services.apigateway.model.GetStageResult;
 import com.amazonaws.services.apigateway.model.IntegrationType;
-import com.amazonaws.services.apigateway.model.Method;
 import com.amazonaws.services.apigateway.model.Op;
 import com.amazonaws.services.apigateway.model.PatchOperation;
 import com.amazonaws.services.apigateway.model.PutIntegrationRequest;
@@ -300,6 +293,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            CLUSTER_NAME                  = "ecsCluster";
   private static final String            VPC_ID                        = "vpcId";
   private static final String            LOAD_BALANCER_CERTIFICATE_ARN = "loadBalancerCertificateArn";
+  private static final String            PUBLIC_CERTIFICATE_ARN        = "publicCertificateArn";
   private static final String            LOAD_BALANCER_SECURITY_GROUPS = "loadBalancerSecurityGroups";
   private static final String            LOAD_BALANCER_SUBNETS         = "loadBalancerSubnets";
 //  private static final String            IALB_ARN                      = "ialbArn";
@@ -373,6 +367,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private String                         awsClientRegion_ = "us-east-1"; // used to create client instances
   private String                         awsVpcId_;
   private String                         awsLoadBalancerCertArn_;
+  private String                         awsPublicCertArn_;
   private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
   private List<String>                   awsLoadBalancerSubnets_        = new LinkedList<>();
 //  private String                         awsIalbArn_;
@@ -659,6 +654,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       awsVpcId_               = amazon.getRequiredString(VPC_ID);
       clusterName_            = amazon.getRequiredString(CLUSTER_NAME);
       awsLoadBalancerCertArn_ = amazon.getRequiredString(LOAD_BALANCER_CERTIFICATE_ARN);
+      awsPublicCertArn_       = amazon.getRequiredString(PUBLIC_CERTIFICATE_ARN);
 
       if(awsRegion_ != null)
         awsClientRegion_ = awsRegion_;
@@ -1261,16 +1257,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     private String listenerArn_;
 
     private String apiGatewayArn_;
-
     private String apiGatewayId_;
-
     private String apiGatewayDomainName_;
-
     private String apiGatewayTargetDomain_;
+    private String apiGatewayCertArn_;
 
     private boolean deploy_;
 
     private boolean createStage_;
+
     
     protected AwsDeploymentContext(String podName, INameFactory nameFactory)
     {
@@ -2140,7 +2135,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withDomainName(apiGatewayDomainName_)
               );
           
-          if(awsLoadBalancerCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
+          if(apiGatewayCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
               existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
           {
             apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
@@ -2155,7 +2150,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                 .withPatchOperations(new PatchOperation()
                     .withOp(Op.Replace)
                     .withPath("/regionalCertificateArn")
-                    .withValue(awsLoadBalancerCertArn_)
+                    .withValue(apiGatewayCertArn_)
                     ,
                     new PatchOperation()
                     .withOp(Op.Replace)
@@ -2165,14 +2160,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                 );
             
             apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
-            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + awsLoadBalancerCertArn_);
+            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + apiGatewayCertArn_);
           }
         }
         catch(com.amazonaws.services.apigateway.model.NotFoundException e)
         {
           CreateDomainNameResult newDomain = apiClient_.createDomainName(new CreateDomainNameRequest()
               .withDomainName(apiGatewayDomainName_)
-              .withRegionalCertificateArn(awsLoadBalancerCertArn_)
+              .withRegionalCertificateArn(apiGatewayCertArn_)
               .withSecurityPolicy(SecurityPolicy.TLS_1_2)
               .withEndpointConfiguration(new EndpointConfiguration()
                   .withTypes(EndpointType.REGIONAL)
@@ -2239,7 +2234,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           log_.info("API Gateway path created to API " + newPath.getRestApiId());
         }
-        doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, false);
+        doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, true, false);
       }
     }
 
@@ -2292,15 +2287,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
       
       if(host != null)
-        doCreateR53RecordSet(host, regionalHostName, true);
+        doCreateR53RecordSet(host, regionalHostName, false, true);
       
       if(loadBalancer_ != null)
-        doCreateR53RecordSet(regionalHostName, loadBalancer_.getDNSName(), false);
+        doCreateR53RecordSet(regionalHostName, loadBalancer_.getDNSName(), false, false);
     }
     
-    private void doCreateR53RecordSet(String source, String target, boolean multiValue)
+    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue)
     {
-      String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
+      String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), create);
       
       if(zoneId.startsWith("/hostedzone/"))
         zoneId = zoneId.substring(12);
@@ -2315,7 +2310,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           );
       
       List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
-      boolean                 exists        = false;
       boolean                 ok            = false;
       
       for(ResourceRecordSet recordSet : recordSetList)
@@ -2325,7 +2319,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             )
         {
           log_.info("R53 record set exists for " + source);
-          exists = true;
           
           for(ResourceRecord record : recordSet.getResourceRecords())
           {
@@ -3201,7 +3194,19 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       apiGatewayArn_ = getApiArn(apiGatewayId_);
       
-      apiGatewayDomainName_ = getEnvironmentPrefix() + getService().toLowerCase() + "-api." + getDnsSuffix();
+      
+      String envTypePrefix = "prod".equals(getEnvironmentType()) ? "" : getEnvironmentType() + ".";
+      
+      if("master".equals(getEnvironment()))
+      {
+        apiGatewayDomainName_ = envTypePrefix + "api." + getPublicDnsSuffix();
+        apiGatewayCertArn_ = awsPublicCertArn_;
+      }
+      else
+      {
+        apiGatewayDomainName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
+        apiGatewayCertArn_ = awsLoadBalancerCertArn_;
+      }
     }
     
     private void deleteApiGateway()
