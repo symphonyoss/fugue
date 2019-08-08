@@ -121,6 +121,7 @@ import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
+import com.amazonaws.services.ecs.model.AmazonECSException;
 import com.amazonaws.services.ecs.model.Container;
 import com.amazonaws.services.ecs.model.ContainerDefinition;
 import com.amazonaws.services.ecs.model.ContainerOverride;
@@ -1622,10 +1623,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     @Override
     protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath,
-        int instances, Name roleName, String imageName, int jvmHeap, int memory)
+        int instances, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted)
     {
-      if(action_.isDeploy_)
+      if(!deleted && action_.isDeploy_)
       {
+        deleteTaskDefinitions(name, 5);
+        
         Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
         String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
 //          String regionalHostName = getNameFactory()
@@ -1655,14 +1658,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     
     @Override
-    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory)
+    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted)
     {
       Name serviceName  = getNameFactory().getPhysicalServiceItemName(name);
       Name baseName     = serviceName.append("schedule");
       Name ruleName     = baseName.append("rule");
 
-      if(action_.isDeploy_)
+      if(!deleted && action_.isDeploy_)
       { 
+        deleteTaskDefinitions(name, 5);
+        
         registerTaskDefinition(serviceName, port, roleName, imageName, jvmHeap, memory);
         
         
@@ -1692,7 +1697,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
         cweClient_.putTargets(request);
       }
-      if(action_.isUndeploy_)
+      if(deleted || action_.isUndeploy_)
       {
         // undeploy
         try
@@ -1711,7 +1716,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             targetArns.add(target.getEcsParameters().getTaskDefinitionArn());
           }
           
-          deleteTaskDefinitions(targetArns);
+          deleteTaskDefinitions(targetArns, 0);
           
           
           cweClient_.removeTargets(removeTargetsRequest);
@@ -1733,26 +1738,42 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private void deleteTaskDefinitions(Iterable<String> targetArns)
+    private synchronized void deleteTaskDefinitions(Iterable<String> targetArns, int remaining)
     {
-      Set<String> taskDefFamilies = new HashSet<>();
-      
-      for(String targetArn : targetArns)
+      try
       {
-        taskDefFamilies.add(stripAfter(stripBefore(targetArn, '/'), ':'));
-      }
-
-      for(String taskDefFamily : taskDefFamilies)
-      {
-        ListTaskDefinitionsResult list = ecsClient_.listTaskDefinitions(new ListTaskDefinitionsRequest()
-            .withFamilyPrefix(taskDefFamily));
+        Set<String> taskDefFamilies = new HashSet<>();
         
-        for(String taskDefArn : list.getTaskDefinitionArns())
+        for(String targetArn : targetArns)
         {
-          log_.info("Deregistering task definition " + taskDefArn + "...");
-          ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
-              .withTaskDefinition(taskDefArn));
+          taskDefFamilies.add(stripAfter(stripBefore(targetArn, '/'), ':'));
         }
+  
+        for(String taskDefFamily : taskDefFamilies)
+        {
+          ListTaskDefinitionsResult list = ecsClient_.listTaskDefinitions(new ListTaskDefinitionsRequest()
+              .withFamilyPrefix(taskDefFamily));
+          
+          int limit = (list.getTaskDefinitionArns().size() - remaining);
+          
+          if(limit > 10)
+            limit = 10;
+          
+          for(int i=0 ; i< limit ; i++)
+          {
+            String taskDefArn = list.getTaskDefinitionArns().get(i);
+            
+            log_.info("Deregistering task definition " + taskDefArn + "...");
+            ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
+                .withTaskDefinition(taskDefArn));
+            
+            Thread.sleep(1000);
+          }
+        }
+      }
+      catch(InterruptedException | AmazonECSException e)
+      {
+        log_.warn("Failed to delete task definition", e);
       }
     }
 
@@ -2953,9 +2974,24 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void deleteService(String name)
     {
+      deleteTaskDefinitions(name, 0);
       Name    serviceName = getNameFactory().getPhysicalServiceItemName(name);
       
       log_.info("Deleting service " + serviceName + "...");
+      
+      
+      
+      ecsClient_.deleteService(new DeleteServiceRequest()
+          .withCluster(clusterName_)
+          .withForce(true)
+          .withService(serviceName.toString()));
+      
+      log_.info("Deleted service " + serviceName + ".");
+    }
+
+    private void deleteTaskDefinitions(String name, int remaining)
+    {
+      Name    serviceName = getNameFactory().getPhysicalServiceItemName(name);
       
       DescribeServicesResult services = ecsClient_.describeServices(new DescribeServicesRequest()
           .withCluster(clusterName_)
@@ -2969,14 +3005,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         targetArns.add(service.getTaskDefinition());
       }
       
-      deleteTaskDefinitions(targetArns);
-      
-      ecsClient_.deleteService(new DeleteServiceRequest()
-          .withCluster(clusterName_)
-          .withForce(true)
-          .withService(serviceName.toString()));
-      
-      log_.info("Deleted service " + serviceName + ".");
+      deleteTaskDefinitions(targetArns, remaining);
     }
 
     private void registerTaskDefinition(Name serviceName, int port, Name roleName, String imageName, int jvmHeap, int memory)

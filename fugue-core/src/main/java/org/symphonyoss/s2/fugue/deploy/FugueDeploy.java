@@ -982,9 +982,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected abstract void configureServiceNetwork();
     
-    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances, Name roleName, String imageName, int jvmHeap, int memory);
+    protected abstract void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath, int instances, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted);
     
-    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory);
+    protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted);
 
     protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths);
     protected abstract void postDeployLambdaContainer(String name, Collection<String> paths);
@@ -1436,25 +1436,26 @@ public abstract class FugueDeploy extends CommandLineHandler
           
           batch.submit(() ->
           {
-            IJsonDomNode        portNode = container.get(PORT);
-            int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
-            Collection<String>  paths = container.getListOf(String.class, PATHS);
-            int                 instances = Integer.parseInt(container.getString(INSTANCES, "1"));
-            String              roleId = container.getRequiredString(ROLE);
+            IJsonDomNode        portNode      = container.get(PORT);
+            int                 port          = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+            Collection<String>  paths         = container.getListOf(String.class, PATHS);
+            int                 instances     = Integer.parseInt(container.getString(INSTANCES, "1"));
+            String              roleId        = container.getRequiredString(ROLE);
             Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
             String              imageId       = container.getString(IMAGE, name);
             String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
-            int jvmHeap = container.getInteger("jvmHeap", 512);
-            int memory = container.getInteger("memory", 1024);
+            int                 jvmHeap       = container.getInteger("jvmHeap", 512);
+            int                 memory        = container.getInteger("memory", 1024);
+            boolean             deleted       = container.getBoolean("deleted",  false);
             
             if(scheduled)
             {
-              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE), roleName, imageName, jvmHeap, memory);
+              deployScheduledTaskContainer(name, port, paths, container.getRequiredString(SCHEDULE), roleName, imageName, jvmHeap, memory, deleted);
             }
             else
             {
               deployServiceContainer(name, port, paths, container.getString(HEALTH_CHECK_PATH, "/HealthCheck"),
-                  instances, roleName, imageName, jvmHeap, memory);
+                  instances, roleName, imageName, jvmHeap, memory, deleted);
             }
           });
         }
