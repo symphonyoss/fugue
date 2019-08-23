@@ -49,6 +49,19 @@ public class Fugue
   
   /** The name of the topic on which trace events are published */
   public static final String TRACE_TOPIC        = "trace";
+
+  /** The name of the tag for the environment type ID */
+  public static final String TAG_FUGUE_ENVIRONMENT_TYPE = "FUGUE_ENVIRONMENT_TYPE";
+  /** The name of the tag for the environment ID */
+  public static final String TAG_FUGUE_ENVIRONMENT      = "FUGUE_ENVIRONMENT";
+  /** The name of the tag for the region ID */
+  public static final String TAG_FUGUE_REGION           = "FUGUE_REGION";
+  /** The name of the tag for the service ID */
+  public static final String TAG_FUGUE_SERVICE          = "FUGUE_SERVICE";
+  /** The name of the tag for the item ID */
+  public static final String TAG_FUGUE_ITEM             = "FUGUE_ITEM";
+  /** The name of the tag for the pod ID */
+  public static final String TAG_FUGUE_POD             = "FUGUE_POD";
   
   /**
    * Get the requested value as a System Property or environment variable.

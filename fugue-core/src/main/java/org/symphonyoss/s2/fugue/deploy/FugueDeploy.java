@@ -336,10 +336,10 @@ public abstract class FugueDeploy extends CommandLineHandler
   
   protected void populateTags(Map<String, String> tags)
   {
-    tagIfNotNull("FUGUE_ENVIRONMENT_TYPE",  environmentType_);
-    tagIfNotNull("FUGUE_ENVIRONMENT",       environment_);
-    tagIfNotNull("FUGUE_REGION",            region_);
-    tagIfNotNull("FUGUE_SERVICE",           service_);
+    tagIfNotNull(Fugue.TAG_FUGUE_ENVIRONMENT_TYPE,  environmentType_);
+    tagIfNotNull(Fugue.TAG_FUGUE_ENVIRONMENT,       environment_);
+    tagIfNotNull(Fugue.TAG_FUGUE_REGION,            region_);
+    tagIfNotNull(Fugue.TAG_FUGUE_SERVICE,           service_);
   }
   
   protected void tagIfNotNull(String name, String value)

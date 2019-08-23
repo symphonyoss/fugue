@@ -52,6 +52,7 @@ import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.common.type.provider.IStringProvider;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.aws.secret.AwsSecretManager;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
@@ -143,6 +144,7 @@ import com.amazonaws.services.ecs.model.RegisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.RunTaskRequest;
 import com.amazonaws.services.ecs.model.RunTaskResult;
 import com.amazonaws.services.ecs.model.Service;
+import com.amazonaws.services.ecs.model.ServiceNotFoundException;
 import com.amazonaws.services.ecs.model.Task;
 import com.amazonaws.services.ecs.model.TaskOverride;
 import com.amazonaws.services.ecs.model.TransportProtocol;
@@ -801,8 +803,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .standard()
         .withRegion(region)
         .build();
+    
+    Map<String, String> tags = new HashMap<>(getTags());
+    
+    tags.put(Fugue.TAG_FUGUE_ITEM, name);
 
-    S3Helper.createBucketIfNecessary(s3, name, false);
+    S3Helper.createBucketIfNecessary(s3, name, tags, false);
   }
   
   
@@ -1260,6 +1266,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     private String apiGatewayArn_;
     private String apiGatewayId_;
     private String apiGatewayDomainName_;
+    private String apiGatewayAliasName_;
     private String apiGatewayTargetDomain_;
     private String apiGatewayCertArn_;
 
@@ -2256,6 +2263,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           log_.info("API Gateway path created to API " + newPath.getRestApiId());
         }
         doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, true, false);
+        
+        if(apiGatewayAliasName_ != null)
+          doCreateR53RecordSet(apiGatewayAliasName_, apiGatewayTargetDomain_, true, false);
       }
     }
 
@@ -2979,14 +2989,20 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       log_.info("Deleting service " + serviceName + "...");
       
+      try
+      {
       
-      
-      ecsClient_.deleteService(new DeleteServiceRequest()
-          .withCluster(clusterName_)
-          .withForce(true)
-          .withService(serviceName.toString()));
-      
-      log_.info("Deleted service " + serviceName + ".");
+        ecsClient_.deleteService(new DeleteServiceRequest()
+            .withCluster(clusterName_)
+            .withForce(true)
+            .withService(serviceName.toString()));
+        
+        log_.info("Deleted service " + serviceName + ".");
+      }
+      catch(ServiceNotFoundException e)
+      {
+        log_.info("Service " + serviceName + " did not exist anyway.");
+      }
     }
 
     private void deleteTaskDefinitions(String name, int remaining)
@@ -3230,11 +3246,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         apiGatewayDomainName_ = envTypePrefix + "api." + getPublicDnsSuffix();
         apiGatewayCertArn_ = awsPublicCertArn_;
+        apiGatewayAliasName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
       }
       else
       {
         apiGatewayDomainName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
         apiGatewayCertArn_ = awsLoadBalancerCertArn_;
+        apiGatewayAliasName_ = null;
       }
     }
     

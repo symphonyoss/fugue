@@ -25,6 +25,7 @@ package org.symphonyoss.s2.fugue.aws.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
+import com.amazonaws.services.s3.model.BucketTaggingConfiguration;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest.KeyVersion;
 import com.amazonaws.services.s3.model.ListObjectsV2Request;
@@ -42,6 +44,8 @@ import com.amazonaws.services.s3.model.ServerSideEncryptionByDefault;
 import com.amazonaws.services.s3.model.ServerSideEncryptionConfiguration;
 import com.amazonaws.services.s3.model.ServerSideEncryptionRule;
 import com.amazonaws.services.s3.model.SetBucketEncryptionRequest;
+import com.amazonaws.services.s3.model.SetBucketTaggingConfigurationRequest;
+import com.amazonaws.services.s3.model.TagSet;
 
 public class S3Helper
 {
@@ -106,7 +110,7 @@ public class S3Helper
     }
   }
   
-  public static void createBucketIfNecessary(AmazonS3 s3, String name, boolean dryRun)
+  public static void createBucketIfNecessary(AmazonS3 s3, String name, Map<String, String> tags, boolean dryRun)
   {
     try
     {
@@ -156,6 +160,11 @@ public class S3Helper
           abort("Unexpected S3 error looking for bucket " + name, e);
       }
     }
+    
+    s3.setBucketTaggingConfiguration(name, new BucketTaggingConfiguration()
+            .withTagSets(new TagSet(tags)
+            )
+        );
   }
 
   private static void createBucket(AmazonS3 s3, String name)
