@@ -248,6 +248,7 @@ import com.amazonaws.services.logs.model.GetLogEventsRequest;
 import com.amazonaws.services.logs.model.GetLogEventsResult;
 import com.amazonaws.services.logs.model.LogGroup;
 import com.amazonaws.services.logs.model.OutputLogEvent;
+import com.amazonaws.services.logs.model.PutRetentionPolicyRequest;
 import com.amazonaws.services.route53.AmazonRoute53;
 import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
 import com.amazonaws.services.route53.model.Change;
@@ -3098,6 +3099,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private String createLogGroupIfNecessary()
     {
+      boolean create = true;
+      
       String name = getNameFactory().getPhysicalServiceName().toString();
       
       DescribeLogGroupsResult result = logsClient_.describeLogGroups(new DescribeLogGroupsRequest()
@@ -3107,13 +3110,23 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       for(LogGroup group : result.getLogGroups())
       {
         if(group.getLogGroupName().equals(name))
-          return name;
+        {
+          create = false;
+          break;
+        }
       }
       
-      logsClient_.createLogGroup(new CreateLogGroupRequest()
+      if(create)
+      {
+        logsClient_.createLogGroup(new CreateLogGroupRequest()
+            .withLogGroupName(name)
+            .withTags(getTags())
+            );
+      }
+      
+      logsClient_.putRetentionPolicy(new PutRetentionPolicyRequest()
           .withLogGroupName(name)
-          .withTags(getTags())
-          );
+          .withRetentionInDays(14));
       
       return name;
     }
