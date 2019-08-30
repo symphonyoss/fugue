@@ -1263,13 +1263,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
     private String listenerArn_;
 
+    // ARN and ID of the actual API gateway
     private String apiGatewayArn_;
     private String apiGatewayId_;
-    private String apiGatewayDomainName_;
-    private String apiGatewayAliasName_;
-    private String apiGatewayTargetDomain_;
-    private String apiGatewayCertArn_;
+    
+    // For master environments the public domain name mapping
+    private String apiGatewayMasterDomainName_;
+    private String apiGatewayMasterTargetDomain_;
 
+    // For all environments the private domain name mapping
+    private String apiGatewayPrivateDomainName_;
+    private String apiGatewayPrivateTargetDomain_;
+    
     private boolean deploy_;
 
     private boolean createStage_;
@@ -2157,57 +2162,72 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       if(apiGatewayId_ != null)
       {
-        try
+        if(apiGatewayMasterDomainName_ != null)
         {
-          GetDomainNameResult existingDomain = apiClient_.getDomainName(new GetDomainNameRequest()
-              .withDomainName(apiGatewayDomainName_)
-              );
-          
-          if(apiGatewayCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
-              existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
-          {
-            apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
-            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists with correct certificate.");
-          }
-          else
-          {
-            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists, but the certificate is wrong.");
-            
-            apiClient_.updateDomainName(new UpdateDomainNameRequest()
-                .withDomainName(apiGatewayDomainName_)
-                .withPatchOperations(new PatchOperation()
-                    .withOp(Op.Replace)
-                    .withPath("/regionalCertificateArn")
-                    .withValue(apiGatewayCertArn_)
-                    ,
-                    new PatchOperation()
-                    .withOp(Op.Replace)
-                    .withPath("/securityPolicy")
-                    .withValue(SecurityPolicy.TLS_1_2.toString())
-                    )
-                );
-            
-            apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
-            log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + apiGatewayCertArn_);
-          }
+          apiGatewayMasterTargetDomain_ = createApiGatewayBasePath(apiGatewayMasterDomainName_, awsPublicCertArn_);
+          doCreateR53RecordSet(apiGatewayMasterDomainName_, apiGatewayMasterTargetDomain_, true, false);
         }
-        catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+        
+        apiGatewayPrivateTargetDomain_ = createApiGatewayBasePath(apiGatewayPrivateDomainName_, awsLoadBalancerCertArn_);
+        doCreateR53RecordSet(apiGatewayPrivateDomainName_, apiGatewayPrivateTargetDomain_, true, false);
+      }
+    }
+
+    private String createApiGatewayBasePath(String apiGatewayDomainName_, String apiGatewayCertArn_)
+    {
+      String apiGatewayTargetDomain_;
+      
+      try
+      {
+        GetDomainNameResult existingDomain = apiClient_.getDomainName(new GetDomainNameRequest()
+            .withDomainName(apiGatewayDomainName_)
+            );
+        
+        if(apiGatewayCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
+            existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
         {
-          CreateDomainNameResult newDomain = apiClient_.createDomainName(new CreateDomainNameRequest()
+          apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists with correct certificate.");
+        }
+        else
+        {
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists, but the certificate is wrong.");
+          
+          apiClient_.updateDomainName(new UpdateDomainNameRequest()
               .withDomainName(apiGatewayDomainName_)
-              .withRegionalCertificateArn(apiGatewayCertArn_)
-              .withSecurityPolicy(SecurityPolicy.TLS_1_2)
-              .withEndpointConfiguration(new EndpointConfiguration()
-                  .withTypes(EndpointType.REGIONAL)
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/regionalCertificateArn")
+                  .withValue(apiGatewayCertArn_)
+                  ,
+                  new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/securityPolicy")
+                  .withValue(SecurityPolicy.TLS_1_2.toString())
                   )
               );
           
-          apiGatewayTargetDomain_ = newDomain.getRegionalDomainName();
-          
-          log_.info("Created API Gateway domain in hosted zone " + newDomain.getRegionalHostedZoneId());
+          apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + apiGatewayCertArn_);
         }
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        CreateDomainNameResult newDomain = apiClient_.createDomainName(new CreateDomainNameRequest()
+            .withDomainName(apiGatewayDomainName_)
+            .withRegionalCertificateArn(apiGatewayCertArn_)
+            .withSecurityPolicy(SecurityPolicy.TLS_1_2)
+            .withEndpointConfiguration(new EndpointConfiguration()
+                .withTypes(EndpointType.REGIONAL)
+                )
+            );
+        
+        apiGatewayTargetDomain_ = newDomain.getRegionalDomainName();
+        
+        log_.info("Created API Gateway domain in hosted zone " + newDomain.getRegionalHostedZoneId());
+      }
 
-        // whats the ARN format for this?
+      // whats the ARN format for this?
 //        try
 //        {
 //          apiClient_.tagResource(new TagResourceRequest()
@@ -2217,56 +2237,53 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //        {
 //          log_.info("Failed to tag domain", e);
 //        }
-        try
+      try
+      {
+        GetBasePathMappingResult existsingPath = apiClient_.getBasePathMapping(new GetBasePathMappingRequest()
+          .withDomainName(apiGatewayDomainName_)
+          .withBasePath(API_GATEWAY_PATH)
+          );
+        
+        if(existsingPath.getRestApiId().equals(apiGatewayId_) && getStageName().equals(existsingPath.getStage()))
         {
-          GetBasePathMappingResult existsingPath = apiClient_.getBasePathMapping(new GetBasePathMappingRequest()
-            .withDomainName(apiGatewayDomainName_)
-            .withBasePath(API_GATEWAY_PATH)
-            );
-          
-          if(existsingPath.getRestApiId().equals(apiGatewayId_) && getStageName().equals(existsingPath.getStage()))
-          {
-            log_.info("API Gateway path exists");
-          }
-          else
-          {
-            log_.info("API Gateway path exists, but to wrong API Gateway and/ stage");
-            
-            apiClient_.updateBasePathMapping(new UpdateBasePathMappingRequest()
-                .withDomainName(apiGatewayDomainName_)
-                .withBasePath(API_GATEWAY_PATH)
-                .withPatchOperations(new PatchOperation()
-                    .withOp(Op.Replace)
-                    .withPath("/restapiId")
-                    .withValue(apiGatewayId_)
-                    ,
-                    new PatchOperation()
-                    .withOp(Op.Replace)
-                    .withPath("/stage")
-                    .withValue(getStageName())
-                    )
-                );
-            
-            log_.info("Updated API Gateway path exists to " + apiGatewayId_);
-          }
+          log_.info("API Gateway path exists");
         }
-        catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+        else
         {
-          log_.info("Creating API Gateway path...");
-          CreateBasePathMappingResult newPath = apiClient_.createBasePathMapping(new CreateBasePathMappingRequest()
-              .withBasePath("")
+          log_.info("API Gateway path exists, but to wrong API Gateway and/ stage");
+          
+          apiClient_.updateBasePathMapping(new UpdateBasePathMappingRequest()
               .withDomainName(apiGatewayDomainName_)
-              .withRestApiId(apiGatewayId_)
-              .withStage(getStageName())
+              .withBasePath(API_GATEWAY_PATH)
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/restapiId")
+                  .withValue(apiGatewayId_)
+                  ,
+                  new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/stage")
+                  .withValue(getStageName())
+                  )
               );
           
-          log_.info("API Gateway path created to API " + newPath.getRestApiId());
+          log_.info("Updated API Gateway path exists to " + apiGatewayId_);
         }
-        doCreateR53RecordSet(apiGatewayDomainName_, apiGatewayTargetDomain_, true, false);
-        
-        if(apiGatewayAliasName_ != null)
-          doCreateR53RecordSet(apiGatewayAliasName_, apiGatewayTargetDomain_, true, false);
       }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Creating API Gateway path...");
+        CreateBasePathMappingResult newPath = apiClient_.createBasePathMapping(new CreateBasePathMappingRequest()
+            .withBasePath("")
+            .withDomainName(apiGatewayDomainName_)
+            .withRestApiId(apiGatewayId_)
+            .withStage(getStageName())
+            );
+        
+        log_.info("API Gateway path created to API " + newPath.getRestApiId());
+      }
+      
+      return apiGatewayTargetDomain_;
     }
 
     private void deleteObsoleteFunction(String obsoleteFunctionName)
@@ -3244,16 +3261,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if("master".equals(getEnvironment()))
       {
-        apiGatewayDomainName_ = envTypePrefix + "api." + getPublicDnsSuffix();
-        apiGatewayCertArn_ = awsPublicCertArn_;
-        apiGatewayAliasName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
+        apiGatewayMasterDomainName_= envTypePrefix + "api." + getPublicDnsSuffix();
+        //apiGatewayMasterCertArn_ = awsPublicCertArn_;
       }
-      else
-      {
-        apiGatewayDomainName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
-        apiGatewayCertArn_ = awsLoadBalancerCertArn_;
-        apiGatewayAliasName_ = null;
-      }
+      
+      apiGatewayPrivateDomainName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
+//      apiGatewayCertArn_ = awsLoadBalancerCertArn_;
     }
     
     private void deleteApiGateway()

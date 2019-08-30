@@ -178,7 +178,11 @@
                 "iam:ListUsers",
                 "lambda:GetPolicy",
                 "ec2:DescribeConversionTasks",
-                "ecr:GetRepositoryPolicy"
+                "ecr:GetRepositoryPolicy",
+                "tag:GetResources",
+                "tag:GetTagValues",
+                "apigateway:GET",
+                "tag:GetTagKeys"
             ],
             "Resource": "*"
         }
