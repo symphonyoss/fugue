@@ -125,14 +125,7 @@
                 "acm:DescribeCertificate",
                 "acm:GetCertificate",
                 "acm:ListCertificates",
-                "acm:ListTagsForCertificate"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Sid": "CloudWatch",
-            "Effect": "Allow",
-            "Action": [
+                "acm:ListTagsForCertificate",
                 "logs:ListTagsLogGroup",
                 "cloudwatch:GetMetricData",
                 "logs:DescribeLogStreams",
@@ -158,7 +151,12 @@
                 "events:TestEventPattern",
                 "events:DescribeEventBus",
                 "logs:DescribeExportTasks",
-                "cloudwatch:DescribeAlarms"
+                "cloudwatch:DescribeAlarms",
+                "aws-portal:ViewPaymentMethods",
+                "aws-portal:ViewAccount",
+                "aws-portal:ViewBilling",
+                "aws-portal:ViewUsage",
+                "ce:*"
             ],
             "Resource": "*"
         }
