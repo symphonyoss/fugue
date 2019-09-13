@@ -113,6 +113,12 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   @Override
   public void start()
   {
+    if(totalSubscriptionCnt_ == 0)
+    {
+      log_.info("No subscriptions, not starting.");
+      return;
+    }
+    
     if(Fugue.isDebugSingleThread())
     {
       subscriberThreadPoolSize_ = totalSubscriptionCnt_ == 0 ? 1 : totalSubscriptionCnt_;
