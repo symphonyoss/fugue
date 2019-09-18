@@ -2758,7 +2758,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void waitTaskComplete(Name taskName, String taskArn, TimeUnit timeUnit, long timeout)
     {
-      int debug=0;
       long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
       String logGroupName = getNameFactory().getPhysicalServiceName().toString();
       String logStreamName = getService() + '/' + taskName + '/' + taskArn.substring(taskArn.lastIndexOf('/') + 1);
