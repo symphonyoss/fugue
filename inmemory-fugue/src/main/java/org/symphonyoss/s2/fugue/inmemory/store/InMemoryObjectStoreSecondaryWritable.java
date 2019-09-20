@@ -29,7 +29,7 @@ import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.FugueObjectDeletionType;
-import org.symphonyoss.s2.fugue.store.IFugueObject;
+import org.symphonyoss.s2.fugue.store.IFugueId;
 import org.symphonyoss.s2.fugue.store.IFugueObjectPayload;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
 
@@ -69,7 +69,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public String saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace)
+  public String saveToSecondaryStorage(Hash absoluteHash, IFugueId payload, ITraceContext trace)
   {
     String  payloadString;
     

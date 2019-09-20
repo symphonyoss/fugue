@@ -1,4 +1,6 @@
 /*
+ *
+ *
  * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
@@ -21,41 +23,31 @@
 
 package org.symphonyoss.s2.fugue.store;
 
-import javax.annotation.Nullable;
+import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 
 /**
- * An immutable object capable of storage in an IFugueObjectStore.
+ * An immutable ID  capable of storage in an IFugueObjectStore.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IFugueObject extends IFugueId
+public interface IFugueId
 {
   /**
-   * Return a short textual description of this object including its type and absoluteHash.
+   * Serialize this object.
    * 
-   * Open objects should indicate their internal type, for example an OpenBlob should indicate the
-   * type of the enclosed application payload.
-   * @return a short textual description of this object.
+   * @return The serialized form of this object.
    */
-  String getDescription();
+  ImmutableByteArray serialize();
   
   /**
-   * Return the range key for this object, which consists of the create timestamp concatenated with the hash.
+   * Return the absolute hash for this object.
    * 
-   * @return The range key for this object.
-   */
-  String  getRangeKey();
-  
-  /**
+   * This will be a hash of the type which was current when the object was created, i.e. using the hash type
+   * which is encoded in the object, not the current default hash type.
    * 
-   * @return The payload of this object.
+   * @return the absolute hash for this object.
    */
-  IFugueObjectPayload getPayload();
-
-  /**
-   * 
-   * @return The pod which owns this object, if any.
-   */
-  @Nullable IFuguePodId getPodId();
+  Hash getAbsoluteHash();
 }

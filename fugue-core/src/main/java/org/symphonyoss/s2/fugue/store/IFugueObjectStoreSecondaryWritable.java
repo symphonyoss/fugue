@@ -104,5 +104,5 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @return The payload as a string, which may have been retrieved from storage if it is not provided as an input.
    */
-  String saveToSecondaryStorage(Hash absoluteHash, @Nullable IFugueObject payload, ITraceContext trace);
+  String saveToSecondaryStorage(Hash absoluteHash, @Nullable IFugueId payload, ITraceContext trace);
 }
