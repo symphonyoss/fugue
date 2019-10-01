@@ -63,6 +63,15 @@ public interface IQueueManager
   IQueueSender getSender(String queueName);
 
   /**
+   * Return a receiver for the given queue.
+   * 
+   * @param queueName The name of the queue from which messages will be received.
+   * 
+   * @return A receiver for the given queue.
+   */
+  IQueueReceiver getReceiver(String queueName);
+
+  /**
    * Return the maximum allowed size of a message in bytes.
    * 
    * @return The maximum allowed size of a message in bytes.
