@@ -23,38 +23,27 @@
 
 package org.symphonyoss.s2.fugue.pipeline;
 
-import javax.annotation.concurrent.NotThreadSafe;
-
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import javax.annotation.concurrent.ThreadSafe;
 
 /**
- * A consumer of some payload.
+ * A thread safe consumer of some payload which cannot be processed normally.
  * 
- * Implementations of this interface may, or may not, be thread
- * safe. Implementations which <i>are</i> thread safe should
- * implement {@link IThreadSafeConsumer}.
+ * Implementations of this interface <b>MUST</b> be thread
+ * safe. Implementations which <i>are not</i> thread safe <b>MUST</b>
+ * implement {@link IConsumer} instead.
  * 
- * Callers <b>MUST NOT</b> call methods on this interface concurrently
- * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeConsumer}
- * to do so.
+ * Callers can safely call the consume method multiple times concurrently from
+ * different threads.
+ * 
+ * Note that it is only the consume method of this interface which is thread safe
+ * and this interface is not {@link ThreadSafe} (as in javax.annotation.ThreadSafe)
+ * because it is an error to call consume after close.
  * 
  * @author Bruce Skingle
  *
  * @param <T> The type of payload consumed.
  */
-@NotThreadSafe
-public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
+@FunctionalInterface
+public interface IThreadSafeSimpleErrorConsumer<T> extends ISimpleErrorConsumer<T>
 {
-  /**
-   * Consume the given item.
-   * 
-   * A normal return from this method indicates that the item has been fully processed,
-   * and the provider can discard the item. In the event that the item cannot be
-   * processed then the implementation must throw some kind of Exception.
-   * 
-   * @param item The item to be consumed.
-   * @param trace A trace context.
-   */
-  @Override
-  void consume(T item, ITraceContext trace);
 }

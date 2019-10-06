@@ -25,36 +25,33 @@ package org.symphonyoss.s2.fugue.pipeline;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
-import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-
 /**
- * A consumer of some payload.
- * 
- * Implementations of this interface may, or may not, be thread
- * safe. Implementations which <i>are</i> thread safe should
- * implement {@link IThreadSafeConsumer}.
- * 
- * Callers <b>MUST NOT</b> call methods on this interface concurrently
- * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeConsumer}
- * to do so.
+ * A closeable consumer of some payload.
  * 
  * @author Bruce Skingle
- *
- * @param <T> The type of payload consumed.
  */
 @NotThreadSafe
-public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
+public interface ICloseableConsumer extends AutoCloseable
 {
   /**
-   * Consume the given item.
+   * An indication that all items have been presented.
    * 
-   * A normal return from this method indicates that the item has been fully processed,
-   * and the provider can discard the item. In the event that the item cannot be
-   * processed then the implementation must throw some kind of Exception.
+   * It is an error to call consume() after this method has been called.
    * 
-   * @param item The item to be consumed.
-   * @param trace A trace context.
+   * The implementation may release resources when this method is called.
+   * Note that although this interface extends {@link AutoCloseable}
+   * (with the effect that an IConsumer can be used in a try with resources
+   * statement) that it throws no checked exceptions.
+   * 
+   * Since there is nothing the calling code can do about a failure to close
+   * something it seems to be incorrect to declare a close method to throw
+   * any checked exception.
+   * 
+   * It would, however, be appropriate for an implementation to throw an unchecked
+   * exception such a {@link IllegalStateException} if this method is called twice
+   * although it would also not be incorrect to allow close after successful
+   * close to be a no op.
    */
   @Override
-  void consume(T item, ITraceContext trace);
+  void close();
 }

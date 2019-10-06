@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,19 +23,19 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import javax.annotation.Nonnull;
+
 /**
- * A request to nak a queue message.
+ * A request to acknowledge a queue message.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface IQueueMessageNak extends IQueueMessageAck
+public interface IQueueMessageDelete
 {
   /**
    * 
-   * @return The re-delivery delay in seconds.
+   * @return The receipt handle.
    */
-  Integer getNakDelay();
-
-
-
+  @Nonnull String getReceiptHandle();
 }

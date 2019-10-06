@@ -39,11 +39,12 @@ public interface IQueueReceiver
   /**
    * Pull messages from the queue.
    * 
-   * @param maxMessages Max number of messages to receive.
-   * @param ackMessages Receipt handles of messages to ack.
-   * @param nakMessages Receipt handles of messages to nak
+   * @param maxMessages     Max number of messages to receive.
+   * @param waitTimeSeconds Max time to wait if messages are not immediately available.
+   * @param ackMessages     Receipt handles of messages to ack.
+   * @param nakMessages     Receipt handles of messages to nak
    * 
    * @return A collection of messages of size 0 - maxMessages.
    */
-  @Nonnull Collection<IQueueMessage> receiveMessages(int maxMessages, Set<? extends IQueueMessageAck> ackMessages, Set<? extends IQueueMessageNak> nakMessages);
+  @Nonnull Collection<IQueueMessage> receiveMessages(int maxMessages, int waitTimeSeconds, Set<? extends IQueueMessageDelete> ackMessages, Set<? extends IQueueMessageExtend> nakMessages);
 }

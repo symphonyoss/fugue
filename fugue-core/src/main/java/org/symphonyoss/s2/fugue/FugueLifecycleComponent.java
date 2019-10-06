@@ -34,6 +34,9 @@ import org.symphonyoss.s2.common.fluent.IFluent;
  */
 public abstract class FugueLifecycleComponent<T extends IFluent<T>> extends FugueLifecycleBase<T> implements IFugueLifecycleComponent
 {
+  private FugueComponentState componentState_         = FugueComponentState.OK;
+  private String              componentStatusMessage_ = "OK";
+
   /**
    * Constructor.
    * 
@@ -42,5 +45,27 @@ public abstract class FugueLifecycleComponent<T extends IFluent<T>> extends Fugu
   public FugueLifecycleComponent(Class<T> type)
   {
     super(type);
+  }
+
+  @Override
+  public FugueComponentState getComponentState()
+  {
+    return componentState_;
+  }
+
+  @Override
+  public String getComponentStatusMessage()
+  {
+    return componentStatusMessage_;
+  }
+
+  protected void setComponentState(FugueComponentState componentState)
+  {
+    componentState_ = componentState;
+  }
+
+  protected void setComponentStatusMessage(String componentStatusMessage)
+  {
+    componentStatusMessage_ = componentStatusMessage;
   }
 }

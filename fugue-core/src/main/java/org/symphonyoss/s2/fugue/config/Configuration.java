@@ -354,6 +354,9 @@ public class Configuration implements IConfiguration
     if(tree_ == null)
       throw new IllegalStateException("No configuration loaded");
     
+    if("/".equals(name))
+      return this;
+    
     Configuration subConfig = subConfigMap_.get(name);
     
     if(subConfig == null)

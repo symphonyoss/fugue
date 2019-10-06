@@ -27,11 +27,13 @@ package org.symphonyoss.s2.fugue.store;
  * An exception indicating that a conditional operation failed because
  * an object already exists.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public class ObjectExistsException extends Exception
 {
+  private static final long serialVersionUID = 1L;
+
   /**
    * Constructs a new exception with the specified detail message and
    * cause.  <p>Note that the detail message associated with

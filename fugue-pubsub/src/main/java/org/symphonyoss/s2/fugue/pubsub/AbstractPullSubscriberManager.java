@@ -45,7 +45,7 @@ import org.symphonyoss.s2.fugue.naming.SubscriptionName;
  *
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscriberManager<T>> extends AbstractSubscriberManager<T>
+public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
 {
   private static final Logger                 log_           = LoggerFactory
       .getLogger(AbstractPullSubscriberManager.class);
@@ -60,7 +60,7 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   private ThreadPoolExecutor                  handlerExecutor_;
 
   
-  protected AbstractPullSubscriberManager(Class<T> type, Builder<?,T> builder)
+  protected AbstractPullSubscriberManager(Class<T> type, Builder<?,P,T> builder)
   {
     super(type, builder);
     
@@ -82,9 +82,9 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<T extends Builder<T,B>, B extends AbstractPullSubscriberManager<B>>
-  extends AbstractSubscriberManager.Builder<T,B>
-  implements IPullSubscriberManagerBuilder<T,B>
+  public static abstract class Builder<T extends Builder<T,P,B>, P, B extends AbstractPullSubscriberManager<P,B>>
+  extends AbstractSubscriberManager.Builder<T,P,B>
+  implements IPullSubscriberManagerBuilder<T,P,B>
   {
     private ITopicBusyCounterFactory         busyCounterFactory_;
 
@@ -167,18 +167,25 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   protected void stopSubscriptions()
   {
       subscriberExecutor_.shutdown();
+      handlerExecutor_.shutdown();
       
+      stop(subscriberExecutor_, 60);
+      stop(handlerExecutor_, 10);
+  }
+
+  private void stop(ThreadPoolExecutor executor, int delay)
+  {
     try {
       // Wait a while for existing tasks to terminate
-      if (!subscriberExecutor_.awaitTermination(60, TimeUnit.SECONDS)) {
-        subscriberExecutor_.shutdownNow(); // Cancel currently executing tasks
+      if (!executor.awaitTermination(delay, TimeUnit.SECONDS)) {
+        executor.shutdownNow(); // Cancel currently executing tasks
       // Wait a while for tasks to respond to being cancelled
-      if (!subscriberExecutor_.awaitTermination(60, TimeUnit.SECONDS))
+      if (!executor.awaitTermination(delay, TimeUnit.SECONDS))
           System.err.println("Pool did not terminate");
         }
       } catch (InterruptedException ie) {
         // (Re-)Cancel if current thread also interrupted
-      subscriberExecutor_.shutdownNow();
+      executor.shutdownNow();
       // Preserve interrupt status
         Thread.currentThread().interrupt();
     }

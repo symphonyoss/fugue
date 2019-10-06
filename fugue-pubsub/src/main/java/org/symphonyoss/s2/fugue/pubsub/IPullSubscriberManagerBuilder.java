@@ -31,10 +31,11 @@ import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
  * @author Bruce Skingle
  *
  * @param <T> Type of concrete builder, needed for fluent methods.
+ * @param <P> Type of the payload.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface IPullSubscriberManagerBuilder<T extends IPullSubscriberManagerBuilder<T,B>, B extends ISubscriberManager<B>>
-extends ISubscriberManagerBuilder<T,B>
+public interface IPullSubscriberManagerBuilder<T extends IPullSubscriberManagerBuilder<T,P,B>, P, B extends ISubscriberManager<B>>
+extends ISubscriberManagerBuilder<T,P,B>
 {
   /**
    * Set the ITopicBusyCounterFactory to use.

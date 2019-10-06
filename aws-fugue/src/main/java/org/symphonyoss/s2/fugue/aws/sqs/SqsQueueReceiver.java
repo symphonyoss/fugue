@@ -34,13 +34,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.fugue.pubsub.IQueueMessage;
-import org.symphonyoss.s2.fugue.pubsub.IQueueMessageAck;
-import org.symphonyoss.s2.fugue.pubsub.IQueueMessageNak;
+import org.symphonyoss.s2.fugue.pubsub.IQueueMessageDelete;
+import org.symphonyoss.s2.fugue.pubsub.IQueueMessageExtend;
 import org.symphonyoss.s2.fugue.pubsub.IQueueReceiver;
 
 import com.amazonaws.services.sqs.AmazonSQS;
+import com.amazonaws.services.sqs.model.AmazonSQSException;
 import com.amazonaws.services.sqs.model.Message;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
@@ -76,36 +76,61 @@ public class SqsQueueReceiver implements IQueueReceiver
   }
   
   @Override
-  public @Nonnull Collection<IQueueMessage> receiveMessages(int maxMessages, Set<? extends IQueueMessageAck> ackMessages, Set<? extends IQueueMessageNak> nakMessages)
+  public @Nonnull Collection<IQueueMessage> receiveMessages(int maxMessages, int waitTimeSeconds, Set<? extends IQueueMessageDelete> deleteMessages, Set<? extends IQueueMessageExtend> extendMessages)
   {
     try
     {
       List<IQueueMessage> messages = new ArrayList<>(maxMessages);
       
-      for(IQueueMessageAck ack : ackMessages)
+      for(IQueueMessageDelete delete : deleteMessages)
       {
-        sqsClient_.deleteMessage(queueUrl_, ack.getReceiptHandle());
-      }
-      
-
-      for(IQueueMessageNak nak : nakMessages)
-      {
-        if(nak.getNakDelay() != null) 
+        try
         {
-          sqsClient_.changeMessageVisibility(queueUrl_, nak.getReceiptHandle(), nak.getNakDelay());
+          sqsClient_.deleteMessage(queueUrl_, delete.getReceiptHandle());
+          log_.debug("Deleteed message " + delete.getReceiptHandle());
+        }
+        catch(AmazonSQSException e)
+        {
+          log_.warn("Failed to delete message", e);
         }
       }
       
-      for(Message receivedMessage : sqsClient_.receiveMessage(
-          new ReceiveMessageRequest(queueUrl_)
-            .withMaxNumberOfMessages(maxMessages)
-            .withWaitTimeSeconds(20)
-            )
-          .getMessages())
+
+      for(IQueueMessageExtend extend : extendMessages)
       {
-        messages.add(new SqsQueueMessage(receivedMessage));
+        if(extend.getVisibilityTimeout() != null) 
+        {
+          try
+          {
+            sqsClient_.changeMessageVisibility(queueUrl_, extend.getReceiptHandle(), extend.getVisibilityTimeout());
+            log_.debug("Extended message " + extend.getReceiptHandle() + " with delay " +  extend.getVisibilityTimeout());
+          }
+          catch(AmazonSQSException e)
+          {
+            log_.warn("Failed to extend message", e);
+          }
+        }
+        else
+        {
+          log_.debug("Extended message " + extend.getReceiptHandle() + " with default delay delay (actually did nothing)");
+        }
       }
       
+      if(maxMessages > 0)
+      {
+        log_.debug("About to receive messages...");
+        for(Message receivedMessage : sqsClient_.receiveMessage(
+            new ReceiveMessageRequest(queueUrl_)
+              .withMaxNumberOfMessages(maxMessages)
+              .withWaitTimeSeconds(waitTimeSeconds)
+              )
+            .getMessages())
+        {
+          messages.add(new SqsQueueMessage(receivedMessage));
+        }
+      }
+      
+      log_.debug("Returning " + messages.size() + " messages");
       return messages;
     }
     catch (RuntimeException e)
@@ -113,30 +138,20 @@ public class SqsQueueReceiver implements IQueueReceiver
       throw new TransactionFault(e);
     }
   }
-
-  private static MessageAttributeValue getAttribute(Object value)
-  {
-    if(value instanceof Number)
-    {
-      return new MessageAttributeValue()
-          .withDataType("Number")
-          .withStringValue(value.toString());
-    }
-    
-    return new MessageAttributeValue()
-        .withDataType("String")
-        .withStringValue(value.toString());
-    
-  }
   
   private class SqsQueueMessage implements IQueueMessage
   {
     private final Message receivedMessage_;
     
-
     public SqsQueueMessage(Message receivedMessage)
     {
       receivedMessage_ = receivedMessage;
+    }
+
+    @Override
+    public String getMessageId()
+    {
+      return receivedMessage_.getMessageId();
     }
 
     @Override

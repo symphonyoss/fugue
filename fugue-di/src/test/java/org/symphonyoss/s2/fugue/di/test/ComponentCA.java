@@ -27,7 +27,7 @@ package org.symphonyoss.s2.fugue.di.test;
 import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
 
 /**
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public class ComponentCA implements IComponentC

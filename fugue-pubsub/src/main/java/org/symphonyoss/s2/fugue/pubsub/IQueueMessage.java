@@ -30,8 +30,14 @@ import javax.annotation.Nonnull;
  * 
  * @author Bruce Skingle
  */
-public interface IQueueMessage extends IQueueMessageAck
+public interface IQueueMessage extends IQueueMessageDelete
 {
+  /**
+   * 
+   * @return The unique ID of this message.
+   */
+  @Nonnull String getMessageId();
+  
   /**
    * 
    * @return The message payload

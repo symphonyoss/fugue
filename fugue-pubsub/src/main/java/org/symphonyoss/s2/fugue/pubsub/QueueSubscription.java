@@ -34,7 +34,7 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  * @author Bruce Skingle
  */
 @Immutable
-public class QueueSubscription  extends QueueSubscriptionAdmin implements ISubscription
+public class QueueSubscription  extends QueueSubscriptionAdmin implements ISubscription<String>
 {
   private final IThreadSafeRetryableConsumer<String> consumer_;
   

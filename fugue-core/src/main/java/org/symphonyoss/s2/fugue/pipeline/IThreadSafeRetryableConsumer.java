@@ -39,7 +39,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * and this interface is not {@link ThreadSafe} because it is an error to
  * call consume after close.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  * @param <T> The type of payload consumed.
  */
