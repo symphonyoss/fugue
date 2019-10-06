@@ -26,6 +26,8 @@ package org.symphonyoss.s2.fugue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 
 /**
@@ -62,6 +64,48 @@ public class Fugue
   public static final String TAG_FUGUE_ITEM             = "FUGUE_ITEM";
   /** The name of the tag for the pod ID */
   public static final String TAG_FUGUE_POD             = "FUGUE_POD";
+
+  private static final boolean isDebugSingleThread_;
+  private static final boolean isDeveloperMode_;
+  
+  private static final Logger log_ = LoggerFactory.getLogger(Fugue.class);
+
+  private static final String ALERT = "==========================================================================================================================================";
+  
+  static
+  {
+    isDebugSingleThread_ = getBooleanProperty("FUGUE_DEBUG_SINGLE_THREAD", false);
+    isDeveloperMode_     = getBooleanProperty("FUGUE_DEVELOPER_MODE", false);
+    
+    boolean doAlert = false;
+    
+    if(isDebugSingleThread_)
+    {
+      if(!doAlert)
+      {
+        log_.warn(ALERT);
+        doAlert = true;
+      }
+      
+      log_.warn("Environment Variable or System property FUGUE_DEBUG_SINGLE_THREAD is set, singled threaded mode enabled!");
+    }
+    
+    if(isDeveloperMode_)
+    {
+      if(!doAlert)
+      {
+        log_.warn(ALERT);
+        doAlert = true;
+      }
+      
+      log_.warn("Environment Variable or System property FUGUE_DEVELOPER_MODE is set, developer mode enabled!");
+    }
+    
+    if(doAlert)
+    {
+      log_.warn(ALERT);
+    }
+  }
   
   /**
    * Get the requested value as a System Property or environment variable.
@@ -136,8 +180,21 @@ public class Fugue
     return value;
   }
 
+  /**
+   * 
+   * @return true iff single threaded debugging mode is set.
+   */
   public static boolean isDebugSingleThread()
   {
-    return getBooleanProperty("FUGUE_DEBUG_SINGLE_THREAD", false);
+    return isDebugSingleThread_;
+  }
+
+  /**
+   * 
+   * @return true iff developer mode is set.
+   */
+  public static boolean isDeveloperMode()
+  {
+    return isDeveloperMode_;
   }
 }
