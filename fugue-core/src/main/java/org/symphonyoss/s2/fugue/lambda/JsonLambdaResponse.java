@@ -45,6 +45,11 @@ public abstract class JsonLambdaResponse extends LambdaResponse
     json_.put(name, value);
   }
   
+  protected void put(String name, boolean value)
+  {
+    json_.put(name, value);
+  }
+  
   protected ObjectNode putObject(String name)
   {
     return json_.putObject(name);
