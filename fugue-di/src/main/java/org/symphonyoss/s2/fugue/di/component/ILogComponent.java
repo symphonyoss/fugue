@@ -38,7 +38,7 @@ import org.symphonyoss.s2.fugue.di.IComponent;
  * 
  * An example of an implementation using SLF4J is included in the examples.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public interface ILogComponent extends IComponent

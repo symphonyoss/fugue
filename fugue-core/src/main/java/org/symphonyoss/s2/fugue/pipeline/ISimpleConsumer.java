@@ -43,7 +43,8 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  * @param <T> The type of payload consumed.
  */
 @NotThreadSafe
-public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
+@FunctionalInterface
+public interface ISimpleConsumer<T> extends ISimpleRetryableConsumer<T>
 {
   /**
    * Consume the given item.

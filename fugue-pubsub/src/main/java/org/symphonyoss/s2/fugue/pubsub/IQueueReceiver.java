@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2017 Symphony Communication Services, LLC.
+ * Copyright 2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,31 +21,30 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.test;
+package org.symphonyoss.s2.fugue.pubsub;
 
-import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
+import java.util.Collection;
+import java.util.Set;
+
+import javax.annotation.Nonnull;
 
 /**
+ * A component capable of sending messages to a queue.
+ * 
  * @author Bruce Skingle
  *
  */
-public class ComponentAB implements IComponentA
+public interface IQueueReceiver
 {
-
-  private IComponentB componentB_;
-
-  public ComponentAB()
-  {
-    System.err.println("ComponentAB created");
-  }
-
-  @Override
-  public ComponentDescriptor getComponentDescriptor()
-  {
-    return new ComponentDescriptor()
-        .addDependency(IComponentB.class, (v) -> componentB_ = v)
-        .addProvidedInterface(IComponentA.class)
-        .addStart(() -> System.err.println("ComponentAB started, componentB_ = " + componentB_));
-  }
-
+  /**
+   * Pull messages from the queue.
+   * 
+   * @param maxMessages     Max number of messages to receive.
+   * @param waitTimeSeconds Max time to wait if messages are not immediately available.
+   * @param ackMessages     Receipt handles of messages to ack.
+   * @param nakMessages     Receipt handles of messages to nak
+   * 
+   * @return A collection of messages of size 0 - maxMessages.
+   */
+  @Nonnull Collection<IQueueMessage> receiveMessages(int maxMessages, int waitTimeSeconds, Set<? extends IQueueMessageDelete> ackMessages, Set<? extends IQueueMessageExtend> nakMessages);
 }

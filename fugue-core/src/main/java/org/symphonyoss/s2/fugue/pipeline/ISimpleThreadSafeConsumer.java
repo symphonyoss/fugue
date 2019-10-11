@@ -23,27 +23,31 @@
 
 package org.symphonyoss.s2.fugue.pipeline;
 
-import javax.annotation.concurrent.NotThreadSafe;
+import javax.annotation.concurrent.ThreadSafe;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
- * A consumer of some payload.
+ * A thread safe consumer of some payload.
  * 
- * Implementations of this interface may, or may not, be thread
- * safe. Implementations which <i>are</i> thread safe should
- * implement {@link IThreadSafeConsumer}.
+ * Implementations of this interface <b>MUST</b> be thread
+ * safe. Implementations which <i>are not</i> thread safe <b>MUST</b>
+ * implement {@link IConsumer} instead.
  * 
- * Callers <b>MUST NOT</b> call methods on this interface concurrently
- * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeConsumer}
- * to do so.
+ * Callers can safely call the consume method multiple times concurrently from
+ * different threads.
+ * 
+ * Note that it is only the consume method of this interface which is thread safe
+ * and this interface is not {@link ThreadSafe} (as in javax.annotation.ThreadSafe)
+ * because it is an error to call consume after close.
  * 
  * @author Bruce Skingle
  *
  * @param <T> The type of payload consumed.
  */
-@NotThreadSafe
-public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
+@ThreadSafe
+@FunctionalInterface
+public interface ISimpleThreadSafeConsumer<T> extends ISimpleThreadSafeRetryableConsumer<T>, ISimpleConsumer<T>
 {
   /**
    * Consume the given item.

@@ -41,7 +41,7 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  * and this interface is not {@link ThreadSafe} (as in javax.annotation.ThreadSafe)
  * because it is an error to call consume after close.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  * @param <T> The type of payload consumed.
  */

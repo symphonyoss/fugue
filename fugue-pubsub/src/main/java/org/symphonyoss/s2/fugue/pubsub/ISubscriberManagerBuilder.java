@@ -23,16 +23,12 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
-import java.util.Collection;
-
 import org.symphonyoss.s2.common.fluent.IBuilder;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransactionFactory;
 import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pipeline.IThreadSafeErrorConsumer;
-import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 
 /**
  * A builder for a subscriber manager of payload type P.
@@ -40,79 +36,64 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
  * @author Bruce Skingle
  *
  * @param <T> Type of concrete builder, needed for fluent methods.
+ * @param <P> Type of the payloads processed.
  * @param <B> Type of concrete manager (built object), needed for fluent methods.
  */
-public interface ISubscriberManagerBuilder<T extends ISubscriberManagerBuilder<T,B>, B extends ISubscriberManager<B>> extends IBuilder<T,B>
+public interface ISubscriberManagerBuilder<T extends ISubscriberManagerBuilder<T,P,B>, P, B extends ISubscriberManager<B>> extends IBuilder<T,B>
 {
+  /**
+   * Set the name factory to be used.
+   * 
+   * @param nameFactory The name factory to be used.
+   * 
+   * @return this (fluent method)
+   */
   T withNameFactory(INameFactory nameFactory);
-  
-  
-//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, Subscription subscription);
-//  
-//  /**
-//   * Subscribe to the given subscription on the given topics.
-//   * 
-//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-//   * 
-//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-//   * 
-//   * @param consumer                A consumer for received messages.
-//   * @param subscriptionName        A subscription name.
-//   * @param topicName               A topic name.
-//   * @param additionalTopicNames    An optional list of additional topic names.
-//   * 
-//   * @return  this (fluent method)
-//   */
-//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, String topicName, String ...additionalTopicNames);
-//  
-//  /**
-//   * Subscribe to the given subscription on the given topics.
-//   * 
-//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-//   * 
-//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-//   * 
-//   * @param consumer                A consumer for received messages.
-//   * @param subscriptionName        A subscription name.
-//   * @param topicNames              A list of topic names.
-//   * 
-//   * @return  this (fluent method)
-//   * 
-//   * @throws IllegalArgumentException If the list of topics is empty.
-//   */
-//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, Collection<TopicName> topicNames);
-//
-//  /**
-//   * Subscribe to the given subscription on the given topics.
-//   * 
-//   * This method allows for the creation of the same subscription on one or more topics, the same consumer will receive 
-//   * messages received on the given subscription on any of the topics. The topics are all treated in the same way, the
-//   * method is declared with topic and additionalTopics to ensure that at least one topic is provided.
-//   * 
-//   * This method does the same thing as the other withSubscription methods, alternative signatures are provided as a convenience.
-//   * 
-//   * @param consumer                A consumer for received messages.
-//   * @param subscriptionName        A subscription name.
-//   * @param topicNames              A list of topic names.
-//   * 
-//   * @return  this (fluent method)
-//   * 
-//   * @throws IllegalArgumentException If the list of topics is empty.
-//   */
-//  T withSubscription(IThreadSafeRetryableConsumer<String> consumer, String subscriptionName, String[] topicNames);
 
+  /**
+   * Set the configuration to be used.
+   * 
+   * @param config The configuration to be used.
+   * 
+   * @return this (fluent method)
+   */
   T withConfig(IConfiguration config);
 
+  /**
+   * Set the metric counter to be used.
+   * 
+   * @param counter The metric counter to be used.
+   * 
+   * @return this (fluent method)
+   */
   T withCounter(ICounter counter);
 
+  /**
+   * Set the trace context transaction factory to be used.
+   * 
+   * @param traceFactory The trace context transaction factory to be used.
+   * 
+   * @return this (fluent method)
+   */
   T withTraceContextTransactionFactory(ITraceContextTransactionFactory traceFactory);
 
-  T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<String> unprocessableMessageConsumer);
+  /**
+   * Set the consumer for unprocessable messages.
+   * 
+   * Messages will be sent to this consumer immediately of the handler throws a fatal exception and possibly after
+   * some number of retries in the case of a retryable exception.
+   * 
+   * @param unprocessableMessageConsumer The consumer for unprocessable messages.
+   * 
+   * @return this (fluent method)
+   */
+  T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer);
 
-
-  T withSubscription(ISubscription subscription);
+  /**
+   * 
+   * @param subscription
+   * 
+   * @return this (fluent method)
+   */
+  T withSubscription(ISubscription<P> subscription);
 }

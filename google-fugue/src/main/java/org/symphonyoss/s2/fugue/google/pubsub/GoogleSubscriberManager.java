@@ -16,7 +16,6 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.fugue.naming.Name;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractPullSubscriberManager;
 import org.symphonyoss.s2.fugue.pubsub.ISubscription;
 
@@ -54,7 +53,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberManager extends AbstractPullSubscriberManager<GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractPullSubscriberManager<String, GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -75,7 +74,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, GoogleSubscriberManager>
+  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, String, GoogleSubscriberManager>
   {
     private String                 projectId_;
 
@@ -123,7 +122,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
   }
 
   @Override
-  protected void initSubscription(ISubscription subscription)
+  protected void initSubscription(ISubscription<String> subscription)
   { 
 
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())

@@ -1,12 +1,12 @@
 /*
  *
  *
- * Copyright 2017 Symphony Communication Services, LLC.
+ * Copyright 2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The SSF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
@@ -21,20 +21,29 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.http;
+package org.symphonyoss.s2.fugue.pubsub;
+
+import javax.annotation.Nonnull;
 
 /**
- * A provider of servlets.
+ * A payload received over a queue.
  * 
  * @author Bruce Skingle
- *
  */
-public interface IServletProvider
+public interface IQueueMessage extends IQueueMessageDelete
 {
   /**
-   * Register servlets provided with the given container.
    * 
-   * @param servletContainer  A servlet container with which this provider's servlets should be registered.
+   * @return The unique ID of this message.
    */
-  void registerServlets(IServletContainer servletContainer);
+  @Nonnull String getMessageId();
+  
+  /**
+   * 
+   * @return The message payload
+   */
+  @Nonnull String getPayload();
+
+
+
 }

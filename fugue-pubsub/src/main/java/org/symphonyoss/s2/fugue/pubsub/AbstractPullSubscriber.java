@@ -34,30 +34,38 @@ import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.counter.ScaleAction;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
+import org.symphonyoss.s2.fugue.pipeline.ICloseableConsumer;
 
 public abstract class AbstractPullSubscriber implements Runnable
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractPullSubscriber.class);
   
-  private final AbstractPullSubscriberManager<?> manager_;
-  private final String                           subscriptionName_;
-  private final ICounter                         counter_;
-  private final IBusyCounter                     busyCounter_;
-  private final long                             extensionFrequency_;
-  private boolean                                running_ = true;
+  private final AbstractPullSubscriberManager<?, ?> manager_;
+  private final String                              subscriptionName_;
+  private final ICounter                            counter_;
+  private final IBusyCounter                        busyCounter_;
+  private final long                                extensionFrequency_;
+  private final ICloseableConsumer                  consumer_;
+  private boolean                                   running_ = true;
 
   
-  public AbstractPullSubscriber(AbstractPullSubscriberManager<?> manager,
+  public AbstractPullSubscriber(AbstractPullSubscriberManager<?,?> manager,
       String subscriptionName,
       
       ICounter counter, IBusyCounter busyCounter,
-      long extensionFrequency)
+      long extensionFrequency, ICloseableConsumer consumer)
   {
     manager_ = manager;
     subscriptionName_ = subscriptionName;
     counter_ = counter;
     busyCounter_ = busyCounter;
     extensionFrequency_ = extensionFrequency;
+    consumer_ = consumer;
+  }
+
+  public void close()
+  {
+    consumer_.close();
   }
 
   protected abstract IPullSubscriberContext getContext() throws IOException;

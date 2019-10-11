@@ -23,19 +23,20 @@
 
 package org.symphonyoss.s2.fugue.pipeline;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
- * A consumer of some payload.
+ * A consumer of some payload which cannot be processed normally.
  * 
  * Implementations of this interface may, or may not, be thread
  * safe. Implementations which <i>are</i> thread safe should
- * implement {@link IThreadSafeConsumer}.
+ * implement {@link IThreadSafeErrorConsumer}.
  * 
  * Callers <b>MUST NOT</b> call methods on this interface concurrently
- * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeConsumer}
+ * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeErrorConsumer}
  * to do so.
  * 
  * @author Bruce Skingle
@@ -43,18 +44,23 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  * @param <T> The type of payload consumed.
  */
 @NotThreadSafe
-public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
+@FunctionalInterface
+public interface ISimpleErrorConsumer<T>
 {
   /**
-   * Consume the given item.
+   * Consume the given item which cannot be processed.
    * 
-   * A normal return from this method indicates that the item has been fully processed,
-   * and the provider can discard the item. In the event that the item cannot be
-   * processed then the implementation must throw some kind of Exception.
+   * The given item has already failed to process normally, presumably because a call to
+   * IConsumer.consume() from some normal processing consumer threw an exception.
    * 
-   * @param item The item to be consumed.
+   * If the implementation of this method throws a RuntimeException then the caller
+   * <i>should</i> retry, but given that this is already a failure scenario implementations
+   * should avoid throwing any kind of exception if at all possible. 
+   * 
+   * @param item The item which failed to be consumed normally.
    * @param trace A trace context.
+   * @param message A diagnostic message.
+   * @param cause A throwable indicating the cause of the failure to process normally.
    */
-  @Override
-  void consume(T item, ITraceContext trace);
+  void consume(T item, ITraceContext trace, @Nullable String message, @Nullable Throwable cause);
 }

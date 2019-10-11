@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2017 Symphony Communication Services, LLC.
+ * Copyright 2018 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,31 +21,30 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.di.test;
+package org.symphonyoss.s2.fugue.pipeline;
 
-import org.symphonyoss.s2.fugue.di.ComponentDescriptor;
+import javax.annotation.concurrent.ThreadSafe;
 
 /**
+ * A thread safe retryable consumer of some payload.
+ * 
+ * Implementations of this interface <b>MUST</b> be thread
+ * safe. Implementations which <i>are not</i> thread safe <b>MUST</b>
+ * implement {@link IRetryableConsumer} instead.
+ * 
+ * Callers can safely call the consume method multiple times concurrently from
+ * different threads.
+ * 
+ * Note that it is only the consume method of this interface which is thread safe
+ * and this interface is not {@link ThreadSafe} because it is an error to
+ * call consume after close.
+ * 
  * @author Bruce Skingle
  *
+ * @param <T> The type of payload consumed.
  */
-public class ComponentAB implements IComponentA
+@ThreadSafe
+@FunctionalInterface
+public interface ISimpleThreadSafeRetryableConsumer<T> extends ISimpleRetryableConsumer<T>
 {
-
-  private IComponentB componentB_;
-
-  public ComponentAB()
-  {
-    System.err.println("ComponentAB created");
-  }
-
-  @Override
-  public ComponentDescriptor getComponentDescriptor()
-  {
-    return new ComponentDescriptor()
-        .addDependency(IComponentB.class, (v) -> componentB_ = v)
-        .addProvidedInterface(IComponentA.class)
-        .addStart(() -> System.err.println("ComponentAB started, componentB_ = " + componentB_));
-  }
-
 }

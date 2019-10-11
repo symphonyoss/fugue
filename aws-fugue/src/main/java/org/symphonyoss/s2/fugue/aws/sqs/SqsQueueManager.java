@@ -25,14 +25,15 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
-import org.symphonyoss.s2.fugue.aws.sqs.SqsSubscriberAdmin.Builder;
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.pubsub.IQueueManager;
+import org.symphonyoss.s2.fugue.pubsub.IQueueReceiver;
 import org.symphonyoss.s2.fugue.pubsub.IQueueSender;
 
 import com.amazonaws.ClientConfiguration;
@@ -42,6 +43,9 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
 import com.amazonaws.services.sqs.model.TagQueueRequest;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -62,7 +66,30 @@ public class SqsQueueManager implements IQueueManager
   private final ImmutableMap<String, String> tags_;
 
   private final AmazonSQS                    sqsClient_;
-  private Map<String, SqsQueueSender>          senderMap_ = new HashMap<>();
+  //private Map<String, SqsQueueSender>          senderMap_ = new HashMap<>();
+  
+  private final LoadingCache<String, SqsQueueSender>          senderCache_ = CacheBuilder.newBuilder()
+      .maximumSize(250)
+      .build(
+          new CacheLoader<String, SqsQueueSender>()
+          {
+            @Override
+            public SqsQueueSender load(String queueName)
+            {
+              return new SqsQueueSender(sqsClient_, queueName);
+            }
+          });
+  private final LoadingCache<String, SqsQueueReceiver>          receiverCache_ = CacheBuilder.newBuilder()
+      .maximumSize(250)
+      .build(
+          new CacheLoader<String, SqsQueueReceiver>()
+          {
+            @Override
+            public SqsQueueReceiver load(String queueName)
+            {
+              return new SqsQueueReceiver(sqsClient_, queueName);
+            }
+          });
 
   private SqsQueueManager(Builder builder)
   {
@@ -76,16 +103,27 @@ public class SqsQueueManager implements IQueueManager
   @Override
   public synchronized IQueueSender getSender(String queueName)
   {
-    SqsQueueSender sender = senderMap_.get(queueName);
-    
-    if(sender == null)
+    try
     {
-      sender = new SqsQueueSender(sqsClient_, queueName);
-      
-      senderMap_.put(queueName, sender);
+      return senderCache_.get(queueName);
     }
-    
-    return sender;
+    catch (ExecutionException e)
+    {
+      throw new CodingFault("Can't Happen", e);
+    }
+  }
+  
+  @Override
+  public synchronized IQueueReceiver getReceiver(String queueName)
+  {
+    try
+    {
+      return receiverCache_.get(queueName);
+    }
+    catch (ExecutionException e)
+    {
+      throw new CodingFault("Can't Happen", e);
+    }
   }
 
   @Override
