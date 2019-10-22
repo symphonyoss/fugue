@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2018-2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -154,17 +153,11 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.elasticloadbalancingv2.model.Action;
 import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
-import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
 import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.DeleteLoadBalancerRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DeleteRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersRequest;
@@ -173,19 +166,14 @@ import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancers
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.Listener;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerNotFoundException;
-import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerSchemeEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
 import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
 import com.amazonaws.services.elasticloadbalancingv2.model.RuleCondition;
 import com.amazonaws.services.elasticloadbalancingv2.model.Tag;
-import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
-import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundException;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
@@ -298,11 +286,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            VPC_ID                        = "vpcId";
   private static final String            LOAD_BALANCER_CERTIFICATE_ARN = "loadBalancerCertificateArn";
   private static final String            PUBLIC_CERTIFICATE_ARN        = "publicCertificateArn";
-  private static final String            LOAD_BALANCER_SECURITY_GROUPS = "loadBalancerSecurityGroups";
-  private static final String            LOAD_BALANCER_SUBNETS         = "loadBalancerSubnets";
-//  private static final String            IALB_ARN                      = "ialbArn";
-//  private static final String            IALB_DNS                      = "ialbDns";
-//  private static final String            R53_ZONE                      = "r53Zone";
   
   private static final String            POLICY                         = "policy";
   private static final String            GROUP                          = "group";
@@ -372,8 +355,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private String                         awsVpcId_;
   private String                         awsLoadBalancerCertArn_;
   private String                         awsPublicCertArn_;
-  private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
-  private List<String>                   awsLoadBalancerSubnets_        = new LinkedList<>();
+//  private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
+//  private List<String>                   awsLoadBalancerSubnets_        = new LinkedList<>();
 //  private String                         awsIalbArn_;
 //  private String                         awsIalbDns_;
 //  private String                         awsR53Zone_;
@@ -681,8 +664,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       //awsUser_ = iam_.getUser().getUser();
       
-      getStringArray(amazon, LOAD_BALANCER_SUBNETS, awsLoadBalancerSubnets_);
-      getStringArray(amazon, LOAD_BALANCER_SECURITY_GROUPS, awsLoadBalancerSecurityGroups_);
+//      getStringArray(amazon, LOAD_BALANCER_SUBNETS, awsLoadBalancerSubnets_);
+//      getStringArray(amazon, LOAD_BALANCER_SECURITY_GROUPS, awsLoadBalancerSecurityGroups_);
 
       IJsonDomNode regionsNode = amazon.get(REGIONS);
       if(regionsNode instanceof IJsonObject)
@@ -1260,8 +1243,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private LoadBalancer loadBalancer_;
   
-    private String defaultTargetGroupArn_;
-  
     private String listenerArn_;
 
     // ARN and ID of the actual API gateway
@@ -1333,8 +1314,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
       createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
@@ -1368,13 +1347,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           checkAccessKey(name, userName, keys, null, true);
         }
-//        CredentialName  name = 
-//            getNameFactory().getCredentialName(podId, owner)
-//            new CredentialName("fugue-" + getEnvironmentType(),
-//          null, // environment
-//          null, // realm
-//          null, // tenant
-//          "root");
         
         CredentialName  name    = getNameFactory().getFugueCredentialName("root");
       
@@ -1405,8 +1377,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
       createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
@@ -1418,8 +1388,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String infraPolicyArn = createPolicyFromResource(baseName.append("infra-list-all"), "policy/environmentTypeInfraListAll.json");
       String appPolicyArn = createPolicyFromResource(baseName.append("app-list-all"), "policy/environmentTypeAppListAll.json");
       String fuguePolicyArn = createPolicyFromResource(name, "policy/environmentTypeSupport.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
 
       String assumeRolePolicy = loadTemplateFromResource("policy/environmentTypeSupportTrust.json");
@@ -1441,8 +1409,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
       String groupName = createGroup(name, policyArn);
       createUser(name, groupName, keys, nonKeyUsers);
-      
-//      createRole(name, policyArn);
     }
     
     @Override
@@ -1462,7 +1428,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     protected void processRole(String roleName, String roleSpec, String trustSpec)
     {
       Name name = getNameFactory().getLogicalServiceItemName(roleName);
-//          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
       
@@ -1642,26 +1607,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         deleteTaskDefinitions(name, 5);
         
-        Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
-        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-//          String regionalHostName = getNameFactory()
-//              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-        String wildCardHostName = getNameFactory()
-            .withRegionId("*")
-            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-//        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+//        Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
+//        String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
+////          String regionalHostName = getNameFactory()
+////              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
 //        
-        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+//        String wildCardHostName = getNameFactory()
+//            .withRegionId("*")
+//            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
 //        
-//        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
+////        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
+////        
+//        configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
+////        
+////        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
         
         getOrCreateCluster();
         
   //      registerTaskDef(name, port, healthCheckPath, podId);
         
-        createService(targetGroupArn, name, port, instances, paths, roleName, imageName, jvmHeap, memory);
+        createService(name, port, instances, paths, roleName, imageName, jvmHeap, memory);
       }
       else
       {
@@ -1769,7 +1734,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           int limit = (list.getTaskDefinitionArns().size() - remaining);
           
-          if(limit > 10)
+          if(action_.isDeploy_ && limit > 10)
             limit = 10;
           
           for(int i=0 ; i< limit ; i++)
@@ -1780,7 +1745,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
                 .withTaskDefinition(taskDefArn));
             
-            Thread.sleep(1000);
+            Thread.sleep(action_.isDeploy_ ? 1000 : 100);
           }
         }
       }
@@ -2065,9 +2030,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           log_.info("Updated stage " + stage);
         }
-      }
-            
-      createApiGatewayBasePath();
+        
+        createApiGatewayBasePath();
+      }   
     }
 
     private void checkStage()
@@ -2529,61 +2494,61 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return a.equals(b);
     }
 
-    private String createTargetGroup(Name name, String healthCheckPath, int port)
-    {
-      String shortName = name.getShortName(32);
-      
-      try
-      {
-        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
-        
-        List<TargetGroup> groups = desc.getTargetGroups();
-        
-        if(groups.size() != 1)
-            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
-        
-        log_.info("Target group " + name + " (" + shortName + ") already exists.");
-        return elbTag(groups.get(0).getTargetGroupArn());
-      }
-      catch(TargetGroupNotFoundException e)
-      {
-        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
-      }
-      
-      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
-          .withName(shortName)
-          .withHealthCheckPath(healthCheckPath)
-          .withHealthCheckProtocol(ProtocolEnum.HTTP)
-          .withProtocol(ProtocolEnum.HTTP)
-          .withVpcId(awsVpcId_)
-          .withPort(port)
-          );
-      
-      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
-    }
-
-
-    private String elbTag(String arn)
-    {
-      List<Tag> tags = new LinkedList<>();
-      
-      for(Entry<String, String> entry : getTags().entrySet())
-      {
-        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
-      }
-      
-      tagIfNotNull(tags, "FUGUE_TENANT", getPodName());
-      
-      if(!tags.isEmpty())
-      {
-        elbClient_.addTags(new AddTagsRequest()
-            .withResourceArns(arn)
-            .withTags(tags)
-            );
-      }
-    
-      return arn;
-    }
+//    private String createTargetGroup(Name name, String healthCheckPath, int port)
+//    {
+//      String shortName = name.getShortName(32);
+//      
+//      try
+//      {
+//        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
+//        
+//        List<TargetGroup> groups = desc.getTargetGroups();
+//        
+//        if(groups.size() != 1)
+//            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
+//        
+//        log_.info("Target group " + name + " (" + shortName + ") already exists.");
+//        return elbTag(groups.get(0).getTargetGroupArn());
+//      }
+//      catch(TargetGroupNotFoundException e)
+//      {
+//        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
+//      }
+//      
+//      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
+//          .withName(shortName)
+//          .withHealthCheckPath(healthCheckPath)
+//          .withHealthCheckProtocol(ProtocolEnum.HTTP)
+//          .withProtocol(ProtocolEnum.HTTP)
+//          .withVpcId(awsVpcId_)
+//          .withPort(port)
+//          );
+//      
+//      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
+//    }
+//
+//
+//    private String elbTag(String arn)
+//    {
+//      List<Tag> tags = new LinkedList<>();
+//      
+//      for(Entry<String, String> entry : getTags().entrySet())
+//      {
+//        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
+//      }
+//      
+//      tagIfNotNull(tags, "FUGUE_TENANT", getPodName());
+//      
+//      if(!tags.isEmpty())
+//      {
+//        elbClient_.addTags(new AddTagsRequest()
+//            .withResourceArns(arn)
+//            .withTags(tags)
+//            );
+//      }
+//    
+//      return arn;
+//    }
     
     private void tagIfNotNull(List<Tag> tags, String name, String value)
     {
@@ -2887,31 +2852,34 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         getApiGateway(false);
       }
       
-      if(hasDockerContainers())
-      {
-        if(action_.isDeploy_)
-        {
-          if(isPrimaryEnvironment())
-          {
-            getLoadBalancer(true /* FIXME: getPathCnt() > 0 */);
-          }
-          
-          Name targetGroupName = getNameFactory().getPhysicalServiceItemName(DEFAULT);
-              //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
-          
-          if(isPrimaryEnvironment())
-          {
-            defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
-          
-            listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
-          }
-        }
-        
-        if(action_.isUndeploy_)
-        {
-          getLoadBalancer(false);
-        }
-      }
+      
+      deleteLoadBalancer();
+      
+//      if(hasDockerContainers())
+//      {
+//        if(action_.isDeploy_)
+//        {
+//          if(isPrimaryEnvironment())
+//          {
+//            getLoadBalancer(true /* FIXME: getPathCnt() > 0 */);
+//          }
+//          
+//          Name targetGroupName = getNameFactory().getPhysicalServiceItemName(DEFAULT);
+//              //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
+//          
+//          if(isPrimaryEnvironment())
+//          {
+//            defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
+//          
+//            listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
+//          }
+//        }
+//        
+//        if(action_.isUndeploy_)
+//        {
+//          getLoadBalancer(false);
+//        }
+//      }
     }
 
     @Override
@@ -3130,7 +3098,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return name;
     }
 
-    private void createService(String targetGroupArn, String name, int port, int desiredCnt,
+    private void createService(String name, int port, int desiredCnt,
         Collection<String> paths, Name roleName, String imageName, int jvmHeap, int memory)
     {
       log_.info("Cluster name is " + clusterName_);
@@ -3179,15 +3147,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     //            )
             ;
         
-        if(isPrimaryEnvironment() && !paths.isEmpty())
-        {
-          request
-            .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
-              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
-              .withContainerPort(port)
-              .withTargetGroupArn(targetGroupArn)
-            );
-        }
+//        if(isPrimaryEnvironment() && !paths.isEmpty())
+//        {
+//          request
+//            .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
+//              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
+//              .withContainerPort(port)
+//              .withTargetGroupArn(targetGroupArn)
+//            );
+//        }
         CreateServiceResult createServiceResult = ecsClient_.createService(request);
         
         log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
@@ -3291,150 +3259,150 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private void getLoadBalancer(boolean createIfNecessary)
-    {
-      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
-//          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
-      
-      try
-      {
-        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
-            .withNames(name)
-            );
-        
-        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
-        
-        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
-        {
-          loadBalancer_ = loadBalancerList.get(0);
-    
-          log_.info("Load balancer exists as " + loadBalancer_.getLoadBalancerArn() + " at " + loadBalancer_.getDNSName());
-          
-          if(!createIfNecessary)
-            return;
-          
-          boolean ok = true;
-          
-          if(!loadBalancer_.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
-          {
-            log_.info("Load balancer is not Internal but " + loadBalancer_.getScheme());
-            ok = false;
-          }
-          
-          if(ok)
-          {
-            // So the LB exists, check that it has the correct security groups and subnets
-            int     cnt = awsLoadBalancerSecurityGroups_.size();
-            
-            for(String sg : loadBalancer_.getSecurityGroups())
-            {
-              if(awsLoadBalancerSecurityGroups_.contains(sg))
-              {
-                cnt--;
-              }
-              else
-              {
-                log_.info("Load balancer is missing security group " + sg);
-                ok = false;
-                break;
-              }
-            }
-            
-            if(cnt > 0)
-            {
-              log_.info("Load balancer has additional security groups");
-              ok = false;
-            }
-            
-            if(ok)
-            {
-              cnt = awsLoadBalancerSubnets_.size();
-              for(AvailabilityZone az : loadBalancer_.getAvailabilityZones())
-              {
-                if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
-                {
-                  cnt--;
-                }
-                else
-                {
-                  log_.info("Load balancer has additional subnet " + az.getSubnetId());
-                  ok = false;
-                  break;
-                }
-              }
-              
-              if(cnt > 0)
-              {
-
-                log_.info("Load balancer is missing subnets");
-                ok = false;
-              }
-            }
-          }
-          
-          if(ok)
-          {
-            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " is good, no more to do");
-            elbTag(loadBalancer_.getLoadBalancerArn());
-            return;
-          }
-          else
-          {
-            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " needs to be updated...");
-            
-//            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
-//            throw new IllegalStateException("Loadbalancer needs to be updated");
-            
-            
-            
-            // disabled for testing
-            elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
-                .withLoadBalancerArn(loadBalancer_.getLoadBalancerArn())
-                );
-            
-
-            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " waiting for deletion...");
-            
-            elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
-                new DescribeLoadBalancersRequest()
-                  .withLoadBalancerArns(loadBalancer_.getLoadBalancerArn())
-                )
-                );
-            
-
-            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " deleted.");
-            
-            // TODO: delete this return when we delete the load balancer
-            //return loadBalancer;
-          }
-        }
-      }
-      catch(LoadBalancerNotFoundException e)
-      {
-        if(createIfNecessary)
-        {
-          log_.info("Load balancer " + name + " does not exist, creating...");
-        }
-        else
-        {
-          log_.info("Load balancer " + name + " does not exist.");
-          return;
-        }
-      }
-
-      CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
-          .withName(name)
-          .withSecurityGroups(awsLoadBalancerSecurityGroups_)
-          .withSubnets(awsLoadBalancerSubnets_)
-          .withScheme(LoadBalancerSchemeEnum.Internal)
-          );
-      
-      loadBalancer_ = createResponse.getLoadBalancers().get(0);
-      
-      log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " created.");
-      
-      elbTag(loadBalancer_.getLoadBalancerArn());
-    }
+//    private void getLoadBalancer(boolean createIfNecessary)
+//    {
+//      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
+////          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
+//      
+//      try
+//      {
+//        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
+//            .withNames(name)
+//            );
+//        
+//        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
+//        
+//        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
+//        {
+//          loadBalancer_ = loadBalancerList.get(0);
+//    
+//          log_.info("Load balancer exists as " + loadBalancer_.getLoadBalancerArn() + " at " + loadBalancer_.getDNSName());
+//          
+//          if(!createIfNecessary)
+//            return;
+//          
+//          boolean ok = true;
+//          
+//          if(!loadBalancer_.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
+//          {
+//            log_.info("Load balancer is not Internal but " + loadBalancer_.getScheme());
+//            ok = false;
+//          }
+//          
+//          if(ok)
+//          {
+//            // So the LB exists, check that it has the correct security groups and subnets
+//            int     cnt = awsLoadBalancerSecurityGroups_.size();
+//            
+//            for(String sg : loadBalancer_.getSecurityGroups())
+//            {
+//              if(awsLoadBalancerSecurityGroups_.contains(sg))
+//              {
+//                cnt--;
+//              }
+//              else
+//              {
+//                log_.info("Load balancer is missing security group " + sg);
+//                ok = false;
+//                break;
+//              }
+//            }
+//            
+//            if(cnt > 0)
+//            {
+//              log_.info("Load balancer has additional security groups");
+//              ok = false;
+//            }
+//            
+//            if(ok)
+//            {
+//              cnt = awsLoadBalancerSubnets_.size();
+//              for(AvailabilityZone az : loadBalancer_.getAvailabilityZones())
+//              {
+//                if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
+//                {
+//                  cnt--;
+//                }
+//                else
+//                {
+//                  log_.info("Load balancer has additional subnet " + az.getSubnetId());
+//                  ok = false;
+//                  break;
+//                }
+//              }
+//              
+//              if(cnt > 0)
+//              {
+//
+//                log_.info("Load balancer is missing subnets");
+//                ok = false;
+//              }
+//            }
+//          }
+//          
+//          if(ok)
+//          {
+//            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " is good, no more to do");
+//            elbTag(loadBalancer_.getLoadBalancerArn());
+//            return;
+//          }
+//          else
+//          {
+//            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " needs to be updated...");
+//            
+////            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
+////            throw new IllegalStateException("Loadbalancer needs to be updated");
+//            
+//            
+//            
+//            // disabled for testing
+//            elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
+//                .withLoadBalancerArn(loadBalancer_.getLoadBalancerArn())
+//                );
+//            
+//
+//            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " waiting for deletion...");
+//            
+//            elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
+//                new DescribeLoadBalancersRequest()
+//                  .withLoadBalancerArns(loadBalancer_.getLoadBalancerArn())
+//                )
+//                );
+//            
+//
+//            log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " deleted.");
+//            
+//            // TODO: delete this return when we delete the load balancer
+//            //return loadBalancer;
+//          }
+//        }
+//      }
+//      catch(LoadBalancerNotFoundException e)
+//      {
+//        if(createIfNecessary)
+//        {
+//          log_.info("Load balancer " + name + " does not exist, creating...");
+//        }
+//        else
+//        {
+//          log_.info("Load balancer " + name + " does not exist.");
+//          return;
+//        }
+//      }
+//
+//      CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
+//          .withName(name)
+//          .withSecurityGroups(awsLoadBalancerSecurityGroups_)
+//          .withSubnets(awsLoadBalancerSubnets_)
+//          .withScheme(LoadBalancerSchemeEnum.Internal)
+//          );
+//      
+//      loadBalancer_ = createResponse.getLoadBalancers().get(0);
+//      
+//      log_.info("Load balancer " + loadBalancer_.getLoadBalancerArn() + " created.");
+//      
+//      elbTag(loadBalancer_.getLoadBalancerArn());
+//    }
     
 
 
