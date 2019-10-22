@@ -3089,11 +3089,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withLogGroupName(name)
             .withTags(getTags())
             );
+        
+        logsClient_.putRetentionPolicy(new PutRetentionPolicyRequest()
+            .withLogGroupName(name)
+            .withRetentionInDays(14));
       }
-      
-      logsClient_.putRetentionPolicy(new PutRetentionPolicyRequest()
-          .withLogGroupName(name)
-          .withRetentionInDays(14));
       
       return name;
     }
