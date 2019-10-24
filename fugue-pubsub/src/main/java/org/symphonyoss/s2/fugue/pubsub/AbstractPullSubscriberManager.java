@@ -166,10 +166,16 @@ public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSub
   @Override
   protected void stopSubscriptions()
   {
+    if(subscriberExecutor_ != null)
       subscriberExecutor_.shutdown();
+    
+    if(handlerExecutor_ != null)
       handlerExecutor_.shutdown();
       
+    if(subscriberExecutor_ != null)
       stop(subscriberExecutor_, 60);
+    
+    if(handlerExecutor_ != null)
       stop(handlerExecutor_, 10);
   }
 
