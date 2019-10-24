@@ -26,7 +26,7 @@
 	<parent>
 		<groupId>org.symphonyoss.s2.fugue</groupId>
 		<artifactId>fugue</artifactId>
-		<version>0.2.32</version>
+		<version>0.2.33-SNAPSHOT</version>
 	</parent>
 	<artifactId>aws-fugue</artifactId>
 
