@@ -52,6 +52,15 @@ public interface IQueueManager
    * @return The queue event source name.
    */
   String createQueue(String queueName, @Nullable Map<String, String> tags, boolean dryRun);
+  
+  /**
+   * Check to see if the given queue exists.
+   * 
+   * @param queueName The name of the queue.
+   * 
+   * @return true if the queue exists.
+   */
+  boolean doesQueueExist(String queueName);
 
   /**
    * Return a sender for the given queue.

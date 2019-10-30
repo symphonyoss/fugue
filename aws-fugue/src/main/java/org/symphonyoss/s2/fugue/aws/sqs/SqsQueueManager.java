@@ -261,6 +261,21 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
+  public boolean doesQueueExist(String queueName)
+  {
+    try
+    {
+      sqsClient_.getQueueUrl(queueName.toString()).getQueueUrl();
+
+      return true;
+    }
+    catch(QueueDoesNotExistException e)
+    {
+      return false;
+    }
+  }
+  
+  @Override
   public String createQueue(String queueName, Map<String, String> tags, boolean dryRun)
   {
     String  queueUrl;
