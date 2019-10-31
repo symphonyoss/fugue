@@ -114,6 +114,8 @@ public abstract class FugueDeploy extends CommandLineHandler
   // DEBUGGING FLAGS
   private static final boolean SKIP_DEPLOY_CONFIG = Fugue.getBooleanProperty("SKIP_DEPLOY_CONFIG", false);
   private static final boolean SKIP_INIT_CONTAINERS = Fugue.getBooleanProperty("SKIP_INIT_CONTAINERS", false);
+  private static final boolean SKIP_DEPLOY_CONTAINERS = Fugue.getBooleanProperty("SKIP_DEPLOY_CONTAINERS", false);
+  
 
   private static final String     CONFIG_DIR          = CONFIG + "/";
   private static final String     SERVICE_DIR         = CONFIG_DIR + SERVICE;
@@ -1329,6 +1331,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     protected void deployServiceContainers(IBatch<Runnable> batch)
     {
+      if(SKIP_DEPLOY_CONTAINERS)
+        return;
+      
       if(!getContainerMap().isEmpty())
       {
         if(action_ == FugueDeployAction.Deploy && isPrimaryEnvironment()) // we can't find the IP addresses for this.......

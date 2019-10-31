@@ -1858,9 +1858,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           log_.info("Updated stage " + stage);
         }
-        
-        createApiGatewayBasePath();
-      }   
+      }
+      createApiGatewayBasePath();
     }
 
     private void checkStage()
@@ -1959,7 +1958,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         if(apiGatewayMasterDomainName_ != null)
         {
           apiGatewayMasterTargetDomain_ = createApiGatewayBasePath(apiGatewayMasterDomainName_, awsPublicCertArn_);
-          doCreateR53RecordSet(apiGatewayMasterDomainName_, apiGatewayMasterTargetDomain_, true, false);
+          doCreateR53RecordSet(apiGatewayMasterDomainName_, apiGatewayMasterTargetDomain_, true, false, 
+              apiGatewayMasterDomainName_.length() - getPublicDnsSuffix().length());
         }
         
         apiGatewayPrivateTargetDomain_ = createApiGatewayBasePath(apiGatewayPrivateDomainName_, awsLoadBalancerCertArn_);
@@ -2137,7 +2137,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue)
     {
-      String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), create);
+      doCreateR53RecordSet(source, target, create, multiValue, source.indexOf('.') + 1);
+    }
+    
+    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue, int pos)
+    {
+      String zoneId = createOrGetHostedZone(source.substring(pos), create);
       
       if(zoneId.startsWith("/hostedzone/"))
         zoneId = zoneId.substring(12);
