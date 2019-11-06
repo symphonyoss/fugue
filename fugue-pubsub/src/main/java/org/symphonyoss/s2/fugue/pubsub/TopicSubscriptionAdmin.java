@@ -105,7 +105,7 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
      */
     public T withServiceId(String serviceId)
     {
-      subscriptionId_ = serviceId;
+      serviceId_ = serviceId;
       
       return self();
     }

@@ -106,6 +106,12 @@ public class NameFactory implements INameFactory
   }
   
   @Override
+  public INameFactory withServiceId(String serviceId)
+  {
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, podName_, podId_, serviceId);
+  }
+  
+  @Override
   public INameFactory withPod(String podName, Integer podId)
   {
     return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, podName, podId, serviceId_);

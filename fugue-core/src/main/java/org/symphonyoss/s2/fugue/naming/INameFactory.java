@@ -151,6 +151,14 @@ public interface INameFactory
   INameFactory withRegionId(String regionId);
 
 
+  /**
+   * Create a new INameFactory with the given serviceId and inheriting all other attributes from the current factory.
+   * 
+   * @param serviceId  The serviceId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given serviceId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withServiceId(String serviceId);
 
   /**
    * Create a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
