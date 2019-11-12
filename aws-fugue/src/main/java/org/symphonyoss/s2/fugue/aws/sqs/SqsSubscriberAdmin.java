@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
+import org.symphonyoss.s2.fugue.pubsub.ITopicSubscriptionAdmin;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -48,6 +50,7 @@ import com.amazonaws.auth.policy.actions.SQSActions;
 import com.amazonaws.auth.policy.conditions.ConditionFactory;
 import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
+import com.amazonaws.services.sns.model.GetSubscriptionAttributesResult;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
 import com.amazonaws.services.sns.model.SubscribeRequest;
 import com.amazonaws.services.sns.model.SubscribeResult;
@@ -69,6 +72,8 @@ import com.google.common.collect.ImmutableMap;
 public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdmin>
 {
   private static final Logger                log_ = LoggerFactory.getLogger(SqsSubscriberAdmin.class);
+  private static final String FilterPolicy = "FilterPolicy";
+  private static final String RawMessageDelivery = "RawMessageDelivery";
   private final String                       region_;
   private final String                       accountId_;
   private final ImmutableMap<String, String> tags_;
@@ -213,10 +218,15 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
   }
   
   @Override
-  protected void createSubcription(SubscriptionName subscriptionName, boolean dryRun)
+  protected void createSubcription(SubscriptionName subscriptionName, ITopicSubscriptionAdmin subscription, boolean dryRun)
   {
     boolean subscriptionOk = false;
     String  queueUrl;
+    Map<String, String> attributes = new HashMap<>();
+    
+    createFilterPolicy(attributes, subscription);
+    attributes.put(RawMessageDelivery, "true");
+    
     
     try
     {
@@ -230,6 +240,36 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       {
         if(queueArn.equals(s.getEndpoint()))
         {
+          GetSubscriptionAttributesResult r = snsClient_.getSubscriptionAttributes(s.getSubscriptionArn());
+          
+          boolean filterPolicyOk = attributes.get(FilterPolicy) == null;
+          boolean rawMessageDeliveryOk = !"true".equals(attributes.get(RawMessageDelivery));
+          
+          for(Entry<String, String> entry : r.getAttributes().entrySet())
+          {
+            switch(entry.getKey())
+            {
+              case FilterPolicy:
+                filterPolicyOk = entry.getValue().equals(attributes.get(FilterPolicy));
+                break;
+                
+              case RawMessageDelivery:
+                rawMessageDeliveryOk = entry.getValue().equals(attributes.get(RawMessageDelivery));
+                break;
+            }
+          }
+          
+          if(!filterPolicyOk)
+          {
+            log_.info("Updating subscription filter policy for " + s.getSubscriptionArn() + "...");
+            snsClient_.setSubscriptionAttributes(s.getSubscriptionArn(), FilterPolicy, attributes.get(FilterPolicy));
+          }
+          
+          if(!rawMessageDeliveryOk)
+          {
+            log_.info("Updating subscription raw delivery policy for " + s.getSubscriptionArn() + "...");
+            snsClient_.setSubscriptionAttributes(s.getSubscriptionArn(), RawMessageDelivery, attributes.get(RawMessageDelivery));
+          }
           subscriptionOk = true;
           break;
         }
@@ -264,7 +304,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       }
       else
       {
-        String subscriptionArn = subscribeQueue(snsClient_, sqsClient_, getTopicARN(subscriptionName.getTopicName()), queueUrl, true);
+        String subscriptionArn = subscribeQueue(snsClient_, sqsClient_, getTopicARN(subscriptionName.getTopicName()), queueUrl, true, attributes);
         
         log_.info("Created subscription " + subscriptionName + " as " + queueUrl + " with subscriptionArn " + subscriptionArn);
       }
@@ -280,8 +320,50 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
    * Copied from Topics.subscribeQueue() because we need to set the raw delivery attribute.
    * Also, we are replacing any existing policy because the AWS code just appends it.
    */
+  private void createFilterPolicy(Map<String, String> attributes, ITopicSubscriptionAdmin subscription)
+  {
+    if(subscription.getFilterPropertyName() == null || subscription.getFilterPropertyValues().isEmpty())
+      return;
+    
+    StringBuilder s = new StringBuilder("{\"");
+        
+    s.append(subscription.getFilterPropertyName());
+    s.append("\":[");
+    
+    if(subscription.isFilterExclude())
+      s.append("{\"anything-but\":[");
+    
+    boolean first = true;
+    
+    for(String value : subscription.getFilterPropertyValues())
+    {
+      if(first)
+        first = false;
+      else
+        s.append(",");
+      
+      s.append("\"");
+      s.append(escape(value));
+      s.append("\"");
+    }
+    attributes.put(FilterPolicy, s.toString());
+    
+    if(subscription.isFilterExclude())
+      s.append("]}");
+    
+    s.append("]");
+    s.append("}");
+    
+    attributes.put(FilterPolicy, s.toString());
+  }
+
+  private String escape(String value)
+  {
+    return value.replaceAll("\\\"", "\\\\\\\"");
+  }
+
   private static String subscribeQueue(AmazonSNS sns, AmazonSQS sqs, String snsTopicArn, String sqsQueueUrl,
-      boolean extendPolicy) throws AmazonClientException, AmazonServiceException
+      boolean extendPolicy, Map<String, String> attributes) throws AmazonClientException, AmazonServiceException
   {
     List<String> sqsAttrNames = Arrays.asList(QueueAttributeName.QueueArn.toString(),
         QueueAttributeName.Policy.toString());
@@ -303,15 +385,20 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     Map<String, String> newAttrs = new HashMap<String, String>();
     newAttrs.put(QueueAttributeName.Policy.toString(), policy.toJson());
     sqs.setQueueAttributes(new SetQueueAttributesRequest(sqsQueueUrl, newAttrs));
+
     
-    SubscribeResult subscribeResult = 
-        sns.subscribe(new SubscribeRequest()
-            .addAttributesEntry("RawMessageDelivery", "true")
-            .withEndpoint(sqsQueueArn)
-            .withProtocol("sqs")
-            .withReturnSubscriptionArn(true)
-            .withTopicArn(snsTopicArn)
-            );
+    SubscribeRequest request = new SubscribeRequest()
+        .withEndpoint(sqsQueueArn)
+        .withProtocol("sqs")
+        .withReturnSubscriptionArn(true)
+        .withTopicArn(snsTopicArn)
+        ;
+    
+   if(!attributes.entrySet().isEmpty())
+      request.withAttributes(attributes);
+   
+   SubscribeResult subscribeResult = 
+       sns.subscribe(request);
     
     return subscribeResult.getSubscriptionArn();
   }

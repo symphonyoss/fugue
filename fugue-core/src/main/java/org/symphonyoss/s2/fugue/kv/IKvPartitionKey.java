@@ -21,48 +21,29 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.kv;
 
 import javax.annotation.Nullable;
 
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-
-import com.google.common.collect.ImmutableSet;
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
- * A subscription.
+ * The partition key for a KvItem.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
+public interface IKvPartitionKey
 {
   /**
-   * Return the set of subscription names.
    * 
-   * @return The subscription names for this subscription.
+   * @return The partition key as defined by the model.
    */
-  @Override
-  ImmutableSet<SubscriptionName> getSubscriptionNames();
-
+  String getPartitionKey();
+  
   /**
-   * Return the name of the property to be used for filtering.
    * 
-   * @return The subscription names for this subscription.
+   * @return The pod which owns this object, if any.
    */
-  @Nullable String getFilterPropertyName();
-
-  /**
-   * Return true iff filtering is exclusive, otherwise it is inclusive.
-   * 
-   * @return true iff filtering is exclusive, otherwise it is inclusive.
-   */
-  boolean isFilterExclude();
-
-  /**
-   * Return the set of values to filter.
-   * 
-   * @return The set of values to filter.
-   */
-  ImmutableSet<String> getFilterPropertyValues();
-
+  @Nullable IFuguePodId getPodId();
 }

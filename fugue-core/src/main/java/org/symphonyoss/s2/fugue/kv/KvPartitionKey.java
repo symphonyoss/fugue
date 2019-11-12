@@ -21,48 +21,53 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.kv;
 
-import javax.annotation.Nullable;
-
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-
-import com.google.common.collect.ImmutableSet;
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
- * A subscription.
+ * Implementation of IKvPartitionKey for use in fetch operations.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
+public class KvPartitionKey implements IKvPartitionKey
 {
+  private final String      partitionKey_;
+  private final IFuguePodId podId_;
+
   /**
-   * Return the set of subscription names.
+   * Constructor.
    * 
-   * @return The subscription names for this subscription.
+   * @param podId         ID of the pod which owns the item.
+   * @param partitionKey  The application level partition key.
    */
+  public KvPartitionKey(IFuguePodId podId, String partitionKey)
+  {
+    podId_ = podId;
+    partitionKey_ = partitionKey;
+  }
+
+  /**
+   * Copy constructor.
+   * 
+   * @param partitionKey Key to be copied.
+   */
+  public KvPartitionKey(IKvPartitionKey partitionKey)
+  {
+    podId_ = partitionKey.getPodId();
+    partitionKey_ = partitionKey.getPartitionKey();
+  }
+
   @Override
-  ImmutableSet<SubscriptionName> getSubscriptionNames();
+  public String getPartitionKey()
+  {
+    return partitionKey_;
+  }
 
-  /**
-   * Return the name of the property to be used for filtering.
-   * 
-   * @return The subscription names for this subscription.
-   */
-  @Nullable String getFilterPropertyName();
-
-  /**
-   * Return true iff filtering is exclusive, otherwise it is inclusive.
-   * 
-   * @return true iff filtering is exclusive, otherwise it is inclusive.
-   */
-  boolean isFilterExclude();
-
-  /**
-   * Return the set of values to filter.
-   * 
-   * @return The set of values to filter.
-   */
-  ImmutableSet<String> getFilterPropertyValues();
-
+  @Override
+  public IFuguePodId getPodId()
+  {
+    return podId_;
+  }
 }

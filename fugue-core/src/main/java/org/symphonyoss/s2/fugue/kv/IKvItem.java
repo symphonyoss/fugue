@@ -21,48 +21,35 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.pubsub;
+package org.symphonyoss.s2.fugue.kv;
+
+import java.time.Instant;
 
 import javax.annotation.Nullable;
 
-import org.symphonyoss.s2.fugue.naming.SubscriptionName;
-
-import com.google.common.collect.ImmutableSet;
-
 /**
- * A subscription.
+ * An item to be stored in a KvStore or KvTable.
  * 
  * @author Bruce Skingle
+ *
  */
-public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
+public interface IKvItem extends IKvPartitionSortKey
 {
   /**
-   * Return the set of subscription names.
    * 
-   * @return The subscription names for this subscription.
+   * @return The serialized form of this item.
    */
-  @Override
-  ImmutableSet<SubscriptionName> getSubscriptionNames();
+  String getJson();
 
   /**
-   * Return the name of the property to be used for filtering.
    * 
-   * @return The subscription names for this subscription.
+   * @return The type id of the payload in this object, if any.
    */
-  @Nullable String getFilterPropertyName();
+  @Nullable String getType();
 
   /**
-   * Return true iff filtering is exclusive, otherwise it is inclusive.
    * 
-   * @return true iff filtering is exclusive, otherwise it is inclusive.
+   * @return The purge date for this object, if any.
    */
-  boolean isFilterExclude();
-
-  /**
-   * Return the set of values to filter.
-   * 
-   * @return The set of values to filter.
-   */
-  ImmutableSet<String> getFilterPropertyValues();
-
+  @Nullable Instant getPurgeDate();
 }
