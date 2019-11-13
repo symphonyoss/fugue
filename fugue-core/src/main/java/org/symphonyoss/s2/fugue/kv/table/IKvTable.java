@@ -91,4 +91,18 @@ public interface IKvTable extends IFugueComponent
    * @throws NoSuchObjectException  If there is no object with the given partition key.
    */
   String fetchLast(IKvPartitionKey partitionKey, ITraceContext trace) throws NoSuchObjectException;
+
+  /**
+   * Create the table.
+   * 
+   * @param dryRun If true then no changes are made but log messages show what would happen.
+   */
+  void createTable(boolean dryRun);
+
+  /**
+   * Delete the table.
+   * 
+   * @param dryRun If true then no changes are made but log messages show what would happen.
+   */
+  void deleteTable(boolean dryRun);
 }

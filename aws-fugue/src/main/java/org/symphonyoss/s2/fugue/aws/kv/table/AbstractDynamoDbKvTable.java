@@ -36,8 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.fault.TransientTransactionFault;
+import org.symphonyoss.s2.fugue.Fugue;
+import org.symphonyoss.s2.fugue.aws.AwsTags;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
@@ -45,7 +48,6 @@ import org.symphonyoss.s2.fugue.kv.IKvPartitionKey;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKey;
 import org.symphonyoss.s2.fugue.kv.KvPartitionSortKey;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
-import org.symphonyoss.s2.fugue.naming.TableName;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -62,8 +64,25 @@ import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
 import com.amazonaws.services.dynamodbv2.document.spec.GetItemSpec;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
+import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.BillingMode;
+import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
+import com.amazonaws.services.dynamodbv2.model.CreateTableResult;
+import com.amazonaws.services.dynamodbv2.model.DeleteTableRequest;
+import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveRequest;
+import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveResult;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputExceededException;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
+import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
+import com.amazonaws.services.dynamodbv2.model.TableDescription;
+import com.amazonaws.services.dynamodbv2.model.Tag;
+import com.amazonaws.services.dynamodbv2.model.TagResourceRequest;
+import com.amazonaws.services.dynamodbv2.model.TimeToLiveDescription;
+import com.amazonaws.services.dynamodbv2.model.TimeToLiveSpecification;
+import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveRequest;
+import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveResult;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
 
 /**
@@ -80,7 +99,6 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   protected static final String ColumnNamePartitionKey = "pk";
   protected static final String ColumnNameSortKey      = "sk";
   protected static final String ColumnNameDocument     = "d";
-//  protected static final String ColumnNameAbsoluteHash = "ah";
   protected static final String ColumnNamePodId        = "p";
   protected static final String ColumnNamePayloadType  = "pt";
   protected static final String ColumnNameTTL          = "t";
@@ -94,8 +112,9 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   protected DynamoDB            dynamoDB_;
   protected Table               objectTable_;
 
-  protected TableName           objectTableName_;
-  protected final int payloadLimit_;
+  protected final String        objectTableName_;
+  protected final int           payloadLimit_;
+  protected final boolean       validate_;
   
   protected AbstractDynamoDbKvTable(AbstractBuilder<?,?> builder)
   {
@@ -103,6 +122,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     
     region_ = builder.region_;
     payloadLimit_ = builder.payloadLimit_;
+    validate_ = builder.validate_;
   
     log_.info("Starting storage...");
     
@@ -111,8 +131,8 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     amazonDynamoDB_ = builder.amazonDynamoDBClientBuilder_.build();
     
     dynamoDB_               = new DynamoDB(amazonDynamoDB_);
-    objectTableName_        = nameFactory_.getTableName("objects");
-    objectTable_            = dynamoDB_.getTable(objectTableName_.toString());
+    objectTableName_        = nameFactory_.getTableName("objects").toString();
+    objectTable_            = dynamoDB_.getTable(objectTableName_);
     
         
     validate();
@@ -122,15 +142,18 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   
   protected void validate()
   {
-    try(FaultAccumulator report = new FaultAccumulator())
+    if(validate_)
     {
-      try
+      try(FaultAccumulator report = new FaultAccumulator())
       {
-        objectTable_.describe();
-      }
-      catch(ResourceNotFoundException e)
-      {
-        report.error("Object table does not exist");
+        try
+        {
+          objectTable_.describe();
+        }
+        catch(ResourceNotFoundException e)
+        {
+          report.error("Object table does not exist");
+        }
       }
     }
   }
@@ -443,15 +466,227 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   @Override
   public void start()
   {
-    // TODO Auto-generated method stub
-    
   }
 
   @Override
   public void stop()
   {
-    // TODO Auto-generated method stub
+    if(amazonDynamoDB_ != null)
+      amazonDynamoDB_.shutdown();
+  }
+
+//  private DynamoDbTableAdmin createTableAdmin()
+//  {
+//    return new DynamoDbTableAdmin(nameFactory_, objectTable_, getAmazonDynamoDB(), stsManager_)
+//    {
+//    
+//      @Override
+//      protected CreateTableRequest createCreateTableRequest()
+//      {
+//        return new CreateTableRequest()
+//
+//            .withTableName(objectTable_.getTableName())
+//            .withAttributeDefinitions(
+//                new AttributeDefinition(ColumnNameHashKey, ScalarAttributeType.S),
+//                new AttributeDefinition(ColumnNameSortKey, ScalarAttributeType.S)
+//                )
+//            .withKeySchema(new KeySchemaElement(ColumnNameHashKey, KeyType.HASH), new KeySchemaElement(ColumnNameSortKey, KeyType.RANGE))
+//            ;
+//      }
+//    }
+//    .withTtlColumnName(ColumnNameTTL);
+//  }
+  
+  @Override
+  public void createTable(boolean dryRun)
+  {
+    List<Tag> tags = new AwsTags(nameFactory_.getTags())
+        .put(Fugue.TAG_FUGUE_SERVICE, serviceId_)
+        .put(Fugue.TAG_FUGUE_ITEM, objectTableName_)
+        .getDynamoTags();
     
+    String tableArn;
+    
+    try
+    {
+      TableDescription tableInfo = amazonDynamoDB_.describeTable(objectTableName_).getTable();
+
+      tableArn = tableInfo.getTableArn();
+
+      log_.info("Table \"" + objectTableName_ + "\" already exists as " + tableArn);
+    }
+    catch (ResourceNotFoundException e)
+    {
+      // Table does not exist, create it
+      
+      if(dryRun)
+      {
+        log_.info("Table \"" + objectTableName_ + "\" does not exist and would be created");
+        return;
+      }
+      else
+      {
+        try
+        {
+          CreateTableRequest    request;
+          CreateTableResult     result;
+          
+          request = new CreateTableRequest()
+              .withTableName(objectTable_.getTableName())
+              .withAttributeDefinitions(
+                  new AttributeDefinition(ColumnNamePartitionKey, ScalarAttributeType.S),
+                  new AttributeDefinition(ColumnNameSortKey, ScalarAttributeType.S)
+                  )
+              .withKeySchema(new KeySchemaElement(ColumnNamePartitionKey, KeyType.HASH), new KeySchemaElement(ColumnNameSortKey, KeyType.RANGE))
+              .withBillingMode(BillingMode.PAY_PER_REQUEST)
+              ;
+          
+          result = amazonDynamoDB_.createTable(request);
+          tableArn = result.getTableDescription().getTableArn();
+          
+          log_.info("Table \"" + objectTableName_ + "\" created as " + tableArn);
+        }
+        catch (RuntimeException e2)
+        {
+          log_.error("Failed to create tables", e2);
+          throw new ProgramFault(e2);
+        }
+              
+        try
+        {
+          objectTable_.waitForActive();
+        }
+        catch (InterruptedException e2)
+        {
+          throw new ProgramFault(e2);
+        }
+      }
+    }
+    
+//    configureAutoScale();
+    
+    try
+    {
+      DescribeTimeToLiveRequest describeTimeToLiveRequest = new DescribeTimeToLiveRequest().withTableName(objectTableName_);
+      
+      DescribeTimeToLiveResult ttlDescResult = amazonDynamoDB_.describeTimeToLive(describeTimeToLiveRequest);
+      
+      TimeToLiveDescription ttlDesc = ttlDescResult.getTimeToLiveDescription();
+      
+      if("ENABLED".equals(ttlDesc.getTimeToLiveStatus()))
+      {
+        log_.info("Table \"" + objectTableName_ + "\" already has TTL enabled.");
+      }
+      else
+      {
+        if(dryRun)
+        {
+          log_.info("Table \"" + objectTableName_ + "\" does not have TTL set and it would be set for column " + ColumnNameTTL);
+        }
+        else
+        {
+          //table created now enabling TTL
+          UpdateTimeToLiveRequest req = new UpdateTimeToLiveRequest();
+          req.setTableName(objectTableName_);
+           
+          TimeToLiveSpecification ttlSpec = new TimeToLiveSpecification();
+          ttlSpec.setAttributeName(ColumnNameTTL);
+          ttlSpec.setEnabled(true);
+           
+          req.withTimeToLiveSpecification(ttlSpec);
+           
+          UpdateTimeToLiveResult result2 = amazonDynamoDB_.updateTimeToLive(req);
+          log_.info("Table \"" + objectTableName_ + "\" TTL updated " + result2);
+        }
+      }
+    }
+    catch (RuntimeException e)
+    {
+      log_.info("Failed to update TTL for table \"" + objectTableName_ + "\"", e);
+      throw new ProgramFault(e);
+    }
+    
+    try
+    {
+      amazonDynamoDB_.tagResource(new TagResourceRequest()
+          .withResourceArn(tableArn)
+          .withTags(tags)
+          );
+      log_.info("Table \"" + objectTableName_ + "\" tagged");
+    }
+    catch (RuntimeException e)
+    {
+      log_.error("Failed to add tags", e);
+      throw new ProgramFault(e);
+    }
+    
+    try
+    {
+      objectTable_.waitForActive();
+    }
+    catch (InterruptedException e)
+    {
+      throw new ProgramFault(e);
+    }
+  }
+
+//  private void configureAutoScale()
+//  {
+//    boolean updateTable = false;
+//    UpdateTableRequest  updateRequest = new UpdateTableRequest()
+//        .withTableName(objectTableName_);
+//    
+//    TableDescription tableInfo = amazonDynamoDB_.describeTable(objectTableName_).getTable();
+//    
+//    if(tableInfo.getBillingModeSummary() != null && BillingMode.PAY_PER_REQUEST.toString().equals(tableInfo.getBillingModeSummary().getBillingMode()))
+//    {
+//      log_.info("Table is set to on-demand - no change made.");
+//    }
+//    else
+//    {
+//      log_.info("Updating table to on-demand mode");
+//      updateRequest.withBillingMode(BillingMode.PAY_PER_REQUEST);
+//      updateTable=true;
+//    }
+//    
+//    if(updateTable)
+//    {
+//      try
+//      {
+//        amazonDynamoDB_.updateTable(updateRequest);
+//      }
+//      catch(AmazonDynamoDBException e)
+//      {
+//        log_.error("Unable to update table throughput.", e);
+//      }
+//    }
+//  }
+  
+  @Override
+  public void deleteTable(boolean dryRun)
+  {
+    try
+    {
+      TableDescription tableInfo = amazonDynamoDB_.describeTable(objectTableName_).getTable();
+
+      String tableArn = tableInfo.getTableArn();
+      
+      if(dryRun)
+      {
+        log_.info("Table \"" + objectTableName_ + "\" with arn " + tableArn + " would be deleted (dry run).");
+      }
+      else
+      {
+        log_.info("Deleting table \"" + objectTableName_ + "\" with arn " + tableArn + "...");
+
+        amazonDynamoDB_.deleteTable(new DeleteTableRequest()
+            .withTableName(objectTableName_));
+      }
+    }
+    catch (ResourceNotFoundException e)
+    {
+      log_.info("Table \"" + objectTableName_ + "\" Does not exist.");
+    }
   }
 
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AbstractDynamoDbKvTable<B>> extends AbstractKvTable.AbstractBuilder<T,B>
@@ -459,7 +694,8 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     protected final AmazonDynamoDBClientBuilder amazonDynamoDBClientBuilder_;
 
     protected String                            region_;
-    protected int                               payloadLimit_ = MAX_RECORD_SIZE;
+    protected int                               payloadLimit_  = MAX_RECORD_SIZE;
+    protected boolean                           validate_ = true;
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -474,6 +710,13 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
       super.validate(faultAccumulator);
       
       faultAccumulator.checkNotNull(region_,      "region");
+    }
+
+    public T withValidate(boolean validate)
+    {
+      validate_ = validate;
+      
+      return self();
     }
 
     public T withRegion(String region)

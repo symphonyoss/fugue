@@ -27,9 +27,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.fugue.Fugue;
+import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKey;
@@ -178,6 +182,28 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
       return super.withCredentials(credentials);
     }
   }
+  
+  @Override
+  public void createTable(boolean dryRun)
+  {
+    super.createTable(dryRun);
+    
+    Map<String, String> tags = new HashMap<>(nameFactory_.getTags());
+    
+    tags.put(Fugue.TAG_FUGUE_SERVICE, serviceId_);
+    tags.put(Fugue.TAG_FUGUE_ITEM, objectBucketName_);
+    
+    S3Helper.createBucketIfNecessary(s3Client_, objectBucketName_, tags, dryRun);
+  }
+
+  @Override
+  public void deleteTable(boolean dryRun)
+  {
+    S3Helper.deleteBucket(s3Client_, objectBucketName_, dryRun);
+    
+    super.deleteTable(dryRun);
+  }
+
   /**
    * Builder for S3DynamoDbKvTable.
    * 
