@@ -33,6 +33,9 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.fugue.aws.lambda.AwsLambdaManager;
+import org.symphonyoss.s2.fugue.lambda.ILambdaManager;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
@@ -80,6 +83,8 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
 
   private final AmazonSQS                    sqsClient_;
   private final AmazonSNS                    snsClient_;
+  private final ILambdaManager               lambdaManager_;
+  private final INameFactory                 nameFactory_;
   
   private SqsSubscriberAdmin(Builder builder)
   {
@@ -92,6 +97,9 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     sqsClient_ = builder.sqsBuilder_.build();
     snsClient_ = builder.snsBuilder_.build();
     
+    lambdaManager_  = builder.lambdaManagerBuilder_.build();
+    nameFactory_ = builder.nameFactory_;
+    
     log_.info("Starting SQSSubscriberAdmin in " + region_ + "...");
   }
   
@@ -103,12 +111,15 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
    */
   public static class Builder extends AbstractSubscriberAdmin.Builder<Builder, SqsSubscriberAdmin>
   {
-    private final AmazonSQSClientBuilder sqsBuilder_;
-    private final AmazonSNSClientBuilder snsBuilder_;
+    private final AmazonSQSClientBuilder   sqsBuilder_;
+    private final AmazonSNSClientBuilder   snsBuilder_;
+    private final AwsLambdaManager.Builder lambdaManagerBuilder_;
+
+    private String                         region_;
+    private String                         accountId_;
+    private Map<String, String>            tags_ = new HashMap<>();
+    private INameFactory                   nameFactory_;
     
-    private  String                 region_;
-    private  String                 accountId_;
-    private  Map<String, String>    tags_ = new HashMap<>();
 
     /**
      * Constructor.
@@ -119,6 +130,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       
       sqsBuilder_ = AmazonSQSClientBuilder.standard();
       snsBuilder_ = AmazonSNSClientBuilder.standard();
+      lambdaManagerBuilder_ = new AwsLambdaManager.Builder();
     }
     
     /**
@@ -153,6 +165,20 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     }
     
     /**
+     * Set the Name Factory.
+     * 
+     * @param nameFactory The name factory to use.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withNameFactory(INameFactory nameFactory)
+    {
+      nameFactory_  = nameFactory;
+      
+      return self();
+    }
+    
+    /**
      * Set the AWS credentials provider.
      * 
      * @param credentialsProvider An AWS credentials provider.
@@ -163,6 +189,7 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     {
       sqsBuilder_.withCredentials(credentialsProvider);
       snsBuilder_.withCredentials(credentialsProvider);
+      lambdaManagerBuilder_.withCredentials(credentialsProvider);
       
       return self();
     }
@@ -189,6 +216,12 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
       
       faultAccumulator.checkNotNull(region_,    "region");
       faultAccumulator.checkNotNull(accountId_, "accountId");
+      faultAccumulator.checkNotNull(nameFactory_, "nameFactory");
+
+      lambdaManagerBuilder_
+          .withRegion(region_)
+          .withAccountId(accountId_)
+          .withTags(tags_);
     }
 
     @Override
@@ -227,12 +260,11 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
     createFilterPolicy(attributes, subscription);
     attributes.put(RawMessageDelivery, "true");
     
+    String queueArn = getQueueARN(subscriptionName);
     
     try
     {
       queueUrl = sqsClient_.getQueueUrl(subscriptionName.toString()).getQueueUrl();
-      
-      String queueArn = getQueueARN(subscriptionName);
       
       ListSubscriptionsByTopicResult subscriptionList = snsClient_.listSubscriptionsByTopic(getTopicARN(subscriptionName.getTopicName()));
             
@@ -314,6 +346,13 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
         .withQueueUrl(queueUrl)
         .withTags(tags_)
         );
+    
+    if(subscription.getLambdaConsumer() != null)
+    {
+      String lambdaName = nameFactory_.getLogicalServiceItemName(subscription.getLambdaConsumer()).toString();
+      
+      lambdaManager_.subscribe(lambdaName, queueArn);
+    }
   }
   
   /*

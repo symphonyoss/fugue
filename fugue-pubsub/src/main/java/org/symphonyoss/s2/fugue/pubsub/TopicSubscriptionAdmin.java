@@ -46,6 +46,7 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
   private final String                         filterPropertyName_;
   private final boolean                        filterExclude_;
   private final ImmutableSet<String>           filterPropertyValues_;
+  private final String                         lambdaConsumer_;
 
   protected TopicSubscriptionAdmin(AbstractBuilder<?,?> builder)
   {
@@ -53,6 +54,7 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
     filterPropertyName_   = builder.filterPropertyName_;
     filterExclude_        = builder.filterExclude_;
     filterPropertyValues_ = ImmutableSet.copyOf(builder.filterPropertyValues_);
+    lambdaConsumer_       = builder.lambdaConsumer_;
   }
   
   @Override
@@ -79,6 +81,12 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
     return filterPropertyValues_;
   }
 
+  @Override
+  public String getLambdaConsumer()
+  {
+    return lambdaConsumer_;
+  }
+
   /**
    * AbstractBuilder.
    * 
@@ -97,6 +105,7 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
     private boolean                        filterExclude_;
     private Set<String>                    filterPropertyValues_ = new HashSet<>();
     private ImmutableSet<SubscriptionName> subscriptionNames_;
+    private String                         lambdaConsumer_;
 
     protected AbstractBuilder(Class<T> type)
     {
@@ -197,6 +206,20 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
         for(String topicId : value)
           filterPropertyValues_.add(topicId);
       }
+      
+      return self();
+    }
+
+    /**
+     * Set the name of a lambda function to be triggered to process messages on this subscription.
+     * 
+     * @param lambdaConsumer The name of a lambda function to be triggered to process messages on this subscription.
+     * 
+     * @return this (fluent method).
+     */
+    public T withLambdaConsumer(String lambdaConsumer)
+    {
+      lambdaConsumer_ = lambdaConsumer;
       
       return self();
     }

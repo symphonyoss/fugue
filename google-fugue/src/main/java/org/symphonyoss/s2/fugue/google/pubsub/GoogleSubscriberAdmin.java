@@ -114,6 +114,9 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
     if(subscription.getFilterPropertyName() != null)
       throw new IllegalArgumentException("Google pubsub does not support filtering.");
     
+    if(subscription.getLambdaConsumer() != null)
+      throw new IllegalArgumentException("Google pubsub does not support lambda triggers.");
+    
     TopicName topicName = subscriptionName.getTopicName();
     try
     {

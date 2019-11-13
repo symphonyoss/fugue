@@ -65,4 +65,11 @@ public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
    */
   ImmutableSet<String> getFilterPropertyValues();
 
+  /**
+   * Return the name of a lambda function to be triggered to process messages on this subscription.
+   * 
+   * @return The name of a lambda function to be triggered to process messages on this subscription.
+   */
+  String getLambdaConsumer();
+
 }
