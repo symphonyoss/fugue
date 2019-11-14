@@ -2787,7 +2787,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void getApiGateway(boolean createIfNecessary)
     {
-      String name = getNameFactory().getLogicalServiceName().toString();
+      String name = getNameFactory().getEnvironmentName(null).toString();
+          //.getLogicalServiceName().toString();
           //getEnvironmentPrefix() + getNameFactory().getServiceImageName();
       
       try

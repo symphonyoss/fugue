@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.aws.config;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -165,9 +167,30 @@ public class S3Configuration extends Configuration
           .withRegion(region)
           .build();
     
+      
+      
+      ByteArrayOutputStream bout = new ByteArrayOutputStream();
+      
+      log_.info("About to read from S3");
+      
       S3Object s3object = s3Client.getObject(new GetObjectRequest(bucket, key));
       
       try(S3ObjectInputStream in = s3object.getObjectContent())
+      {
+        byte buf[] = new byte[1024];
+        int nbytes;
+        
+        while((nbytes = in.read(buf))>0)
+        {
+          bout.write(buf, 0, nbytes);
+        }
+      }
+      catch (IOException e)
+      {
+        log_.warn("Failed to close config input", e);
+      }
+      log_.info("Loaded " + bout.size() + " bytes from S3");
+      try(InputStream in = new ByteArrayInputStream(bout.toByteArray()))
       {
         loadConfig(in);
       }
@@ -175,6 +198,7 @@ public class S3Configuration extends Configuration
       {
         log_.warn("Failed to close config input", e);
       }
+      log_.info("Loaded " + tree_.size() + " top level config items");
     }
   
   

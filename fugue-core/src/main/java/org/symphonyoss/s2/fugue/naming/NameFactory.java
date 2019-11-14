@@ -365,6 +365,12 @@ public class NameFactory implements INameFactory
   {
     return createName(getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, name);
   }
+  
+  @Override
+  public Name getEnvironmentName(String name)
+  {
+    return createName(getGlobalNamePrefix(), environmentType_, environmentId_, name);
+  }
 
   @Override
   public CredentialName getFugueCredentialName(String owner)

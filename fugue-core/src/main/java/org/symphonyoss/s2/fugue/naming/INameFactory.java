@@ -211,4 +211,7 @@ public interface INameFactory
 
 
   ServiceName getServiceImageName();
+
+
+  Name getEnvironmentName(String name);
 }

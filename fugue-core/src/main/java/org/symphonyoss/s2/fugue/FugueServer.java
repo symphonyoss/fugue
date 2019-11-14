@@ -187,6 +187,7 @@ public class FugueServer extends AbstractComponentContainer<IFugueServer> implem
   @Override
   public FugueServer start()
   {
+    log_.info("Start FugueServer");
     super.start();
     
     startFugueServer();
