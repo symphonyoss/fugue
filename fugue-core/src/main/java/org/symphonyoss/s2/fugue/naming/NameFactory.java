@@ -29,6 +29,7 @@ import java.util.Collection;
 import javax.annotation.Nonnull;
 
 import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
 
 import com.google.common.collect.ImmutableMap;
@@ -127,11 +128,10 @@ public class NameFactory implements INameFactory
   {
     Builder<String, String> builder = new ImmutableMap.Builder<String, String>();
     
-    putIfNotNull(builder, "FUGUE_ENVIRONMENT_TYPE", environmentType_);
-    putIfNotNull(builder, "FUGUE_ENVIRONMENT",      environmentId_);
-    putIfNotNull(builder, "FUGUE_REGION",           regionId_);
-    putIfNotNull(builder, "FUGUE_POD_NAME",         podName_);
-    putIfNotNull(builder, "FUGUE_POD_ID",           podId_);
+    putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT_TYPE, environmentType_);
+    putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT,      environmentId_);
+    putIfNotNull(builder, Fugue.TAG_FUGUE_REGION,           regionId_);
+    putIfNotNull(builder, Fugue.TAG_FUGUE_POD,              podId_);
     
     return builder.build();
   }

@@ -71,6 +71,7 @@ public class Fugue
   private static final Logger log_ = LoggerFactory.getLogger(Fugue.class);
 
   private static final String ALERT = "==========================================================================================================================================";
+
   
   static
   {
