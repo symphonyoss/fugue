@@ -199,6 +199,7 @@ import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
+import com.amazonaws.services.lambda.model.GetFunctionResult;
 import com.amazonaws.services.lambda.model.RemovePermissionRequest;
 import com.amazonaws.services.lambda.model.RemovePermissionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
@@ -1611,7 +1612,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         try
         {
-          lambdaClient_.getFunction(new GetFunctionRequest()
+          GetFunctionResult function = lambdaClient_.getFunction(new GetFunctionRequest()
               .withFunctionName(functionName)
               );
           
@@ -1631,6 +1632,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   .withVariables(variables))
               .withRole(getRoleArn(roleName))
               .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
+              );
+          
+          lambdaClient_.tagResource(new com.amazonaws.services.lambda.model.TagResourceRequest()
+              .withResource(function.getConfiguration().getFunctionArn())
+              .withTags(getTags())
               );
         }
         catch(ResourceNotFoundException e)

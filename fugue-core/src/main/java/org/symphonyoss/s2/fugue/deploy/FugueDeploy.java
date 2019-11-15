@@ -342,6 +342,11 @@ public abstract class FugueDeploy extends CommandLineHandler
     tagIfNotNull(Fugue.TAG_FUGUE_ENVIRONMENT,       environment_);
     tagIfNotNull(Fugue.TAG_FUGUE_REGION,            region_);
     tagIfNotNull(Fugue.TAG_FUGUE_SERVICE,           service_);
+    
+    tagIfNotNull("Owner:portfolio", "objectStore");
+    tagIfNotNull("Org", "engineering");
+    tagIfNotNull("Customer", "symphony");
+    tagIfNotNull("CreatedBy", "fugue");
   }
   
   protected void tagIfNotNull(String name, String value)

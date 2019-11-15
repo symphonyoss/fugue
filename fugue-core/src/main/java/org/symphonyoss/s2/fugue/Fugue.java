@@ -53,17 +53,17 @@ public class Fugue
   public static final String TRACE_TOPIC        = "trace";
 
   /** The name of the tag for the environment type ID */
-  public static final String TAG_FUGUE_ENVIRONMENT_TYPE = "FUGUE_ENVIRONMENT_TYPE";
+  public static final String TAG_FUGUE_ENVIRONMENT_TYPE = "Environment";
   /** The name of the tag for the environment ID */
   public static final String TAG_FUGUE_ENVIRONMENT      = "FUGUE_ENVIRONMENT";
   /** The name of the tag for the region ID */
-  public static final String TAG_FUGUE_REGION           = "FUGUE_REGION";
+  public static final String TAG_FUGUE_REGION           = "Environment:region";
   /** The name of the tag for the service ID */
-  public static final String TAG_FUGUE_SERVICE          = "FUGUE_SERVICE";
+  public static final String TAG_FUGUE_SERVICE          = "Service";
   /** The name of the tag for the item ID */
-  public static final String TAG_FUGUE_ITEM             = "FUGUE_ITEM";
+  public static final String TAG_FUGUE_ITEM             = "Name";
   /** The name of the tag for the pod ID */
-  public static final String TAG_FUGUE_POD             = "FUGUE_POD";
+  public static final String TAG_FUGUE_POD             = "Customer:podId";
 
   private static final boolean isDebugSingleThread_;
   private static final boolean isDeveloperMode_;
