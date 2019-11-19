@@ -58,6 +58,7 @@ import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
 import org.symphonyoss.s2.fugue.deploy.FugueDeployAction;
+import org.symphonyoss.s2.fugue.deploy.Subscription;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
@@ -194,15 +195,22 @@ import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.AddPermissionRequest;
 import com.amazonaws.services.lambda.model.AddPermissionResult;
+import com.amazonaws.services.lambda.model.CreateEventSourceMappingRequest;
+import com.amazonaws.services.lambda.model.CreateEventSourceMappingResult;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
 import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
+import com.amazonaws.services.lambda.model.EventSourceMappingConfiguration;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
 import com.amazonaws.services.lambda.model.GetFunctionResult;
+import com.amazonaws.services.lambda.model.ListEventSourceMappingsRequest;
+import com.amazonaws.services.lambda.model.ListEventSourceMappingsResult;
 import com.amazonaws.services.lambda.model.RemovePermissionRequest;
 import com.amazonaws.services.lambda.model.RemovePermissionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
+import com.amazonaws.services.lambda.model.UpdateEventSourceMappingRequest;
+import com.amazonaws.services.lambda.model.UpdateEventSourceMappingResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 import com.amazonaws.services.logs.AWSLogs;
@@ -385,6 +393,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     return String.format("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/arn:aws:lambda:%s:%s:function:%s/invocations",
         awsRegion_,
+        awsRegion_,
+        awsAccountId_,
+        name);
+  }
+  
+  private String getQueueArn(String name)
+  {
+    return String.format("arn:aws:sqs:%s:%s:%s",
         awsRegion_,
         awsAccountId_,
         name);
@@ -1120,6 +1136,24 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
+    protected void putFugueConfig(Map<String, String> environment)
+    {
+      String storedConfig = "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
+          "-" + getAwsRegion() + "-config/config/" +
+          getNameFactory().getPhysicalServiceName() + ".json";
+      
+      if(configValue_.length() < 3000)
+      {
+        environment.put(FUGUE_CONFIG, configValue_);
+        environment.put(FUGUE_STORED_CONFIG, storedConfig);
+      }
+      else
+      {
+        environment.put(FUGUE_CONFIG, storedConfig);
+      }
+    }
+
+    @Override
     protected void createEnvironment()
     {
       List<String>  keys      = new LinkedList<>();
@@ -1585,7 +1619,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
-    protected void postDeployLambdaContainer(String name, Collection<String> paths)
+    protected void postDeployLambdaContainer(String name, Collection<String> paths, Collection<Subscription> subscriptions)
     {
       String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
 
@@ -1595,6 +1629,51 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         if(!paths.isEmpty())
           createApiGatewayPaths(getFunctionInvocationArn(functionName), paths);
+        
+        if(!subscriptions.isEmpty())
+          createLambdaSubscriptions(functionName, subscriptions);
+      }
+    }
+
+    private void createLambdaSubscriptions(String functionName, Collection<Subscription> subscriptions)
+    {
+      for(Subscription subscription : subscriptions)
+      {
+        String queueName = subscription.getQueueName(getNameFactory());
+        String queueArn = getQueueArn(queueName);
+        
+        ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
+            .withFunctionName(functionName)
+            .withEventSourceArn(queueArn)
+            );
+        
+        for(EventSourceMappingConfiguration mapping : mappingResult.getEventSourceMappings())
+        {
+          if("Enabled".equals(mapping.getState()))
+          {
+            log_.info("Mapping exists.");
+            return;
+          }
+          
+          log_.info("Mapping exists but is " + mapping.getState());
+          
+          UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
+              .withUUID(mapping.getUUID())
+              .withEnabled(true)
+              );
+          
+          log_.info("Mapping updated to state " + updateResult.getState());
+          
+          return;
+        }
+        CreateEventSourceMappingResult result = lambdaClient_.createEventSourceMapping(new CreateEventSourceMappingRequest()
+            .withEnabled(true)
+            .withBatchSize(subscription.getBatchSize())
+            .withFunctionName(functionName)
+            .withEventSourceArn(queueArn)
+            );
+        
+        log_.info("CreateEventSourceMappingResult=" + result);
       }
     }
 
@@ -2103,15 +2182,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         log_.info("Obsolete lambda function " + obsoleteFunctionName + " does not exist.");
       }
-    }
-
-    @Override
-    protected String getFugueConfig()
-    {
-      return "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
-          "-" + getAwsRegion() + "-config/config/" +
-          
-          getNameFactory().getPhysicalServiceName() + ".json";
     }
 
     private String getClusterArn()

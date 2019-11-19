@@ -94,67 +94,77 @@ public class S3Configuration extends Configuration
     private S3Config()
     {
       String fugueConfig = Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG);
-     
-      try
+      
+      if(fugueConfig.trim().startsWith("{"))
       {
-        URL configUrl = new URL(fugueConfig);
+        log_.info("Loading direct config " + fugueConfig);
         
-        log_.info("Loading config from {}", configUrl);
-        
-        String host = configUrl.getHost();
-        
-        if(host.endsWith(AWS_COM))
-        {
-          String region = host.substring(0, host.length() - AWS_COM.length());
-          
-          if(region.equals("s3"))
-          {
-            region = System.getenv("AWS_REGION");
-          }
-          else if(region.startsWith("s3"))
-          {
-            region = region.substring(3);
-          }
-          
-          String path = configUrl.getPath();
-          int i = path.indexOf('/', 1);
-          
-          String bucket = path.substring(0, i);
-          String key = path.substring(i+1);
-          
-          loadConfig(region, bucket, key);
-          name_ = configUrl + "#";
-        }
-        else
-        {
-          throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + configUrl + " a " + AWS_COM + " hostname is expected.");
-        }
+        loadConfig(fugueConfig);
+        name_ = "Direct Config";
       }
-      catch (MalformedURLException e)
+      else
       {
-        File file = new File(fugueConfig);
-        
-        if(file.exists())
+        try
         {
-          try(InputStream in = new FileInputStream(file))
+          URL configUrl = new URL(fugueConfig);
+          
+          log_.info("Loading config from {}", configUrl);
+          
+          String host = configUrl.getHost();
+          
+          if(host.endsWith(AWS_COM))
           {
-            log_.info("Loading config from file " + file.getAbsolutePath());
+            String region = host.substring(0, host.length() - AWS_COM.length());
             
-            loadConfig(in);
-            name_ = file.getAbsolutePath() + " ";
+            if(region.equals("s3"))
+            {
+              region = System.getenv("AWS_REGION");
+            }
+            else if(region.startsWith("s3"))
+            {
+              region = region.substring(3);
+            }
+            
+            String path = configUrl.getPath();
+            int i = path.indexOf('/', 1);
+            
+            String bucket = path.substring(0, i);
+            String key = path.substring(i+1);
+            
+            loadConfig(region, bucket, key);
+            name_ = configUrl + "#";
           }
-          catch (FileNotFoundException e1)
+          else
           {
-            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.", e1);
-          }
-          catch (IOException e1)
-          {
-            log_.warn("Failed to close config input", e1);
+            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + configUrl + " a " + AWS_COM + " hostname is expected.");
           }
         }
-        else
+        catch (MalformedURLException e)
         {
-          throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.");
+          File file = new File(fugueConfig);
+          
+          if(file.exists())
+          {
+            try(InputStream in = new FileInputStream(file))
+            {
+              log_.info("Loading config from file " + file.getAbsolutePath());
+              
+              loadConfig(in);
+              name_ = file.getAbsolutePath() + " ";
+            }
+            catch (FileNotFoundException e1)
+            {
+              throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.", e1);
+            }
+            catch (IOException e1)
+            {
+              log_.warn("Failed to close config input", e1);
+            }
+          }
+          else
+          {
+            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.");
+          }
         }
       }
     }
@@ -209,6 +219,22 @@ public class S3Configuration extends Configuration
       try
       {
         JsonNode configSpec = mapper.readTree(in);
+        
+        tree_ = configSpec;
+      }
+      catch (IOException e1)
+      {
+        throw new ProgramFault("Cannot parse config.", e1);
+      }
+    }
+    
+    private void loadConfig(String directConfig)
+    {
+      ObjectMapper mapper = new ObjectMapper();
+      
+      try
+      {
+        JsonNode configSpec = mapper.readTree(directConfig);
         
         tree_ = configSpec;
       }

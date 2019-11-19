@@ -31,10 +31,12 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -44,7 +46,9 @@ import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
+import org.symphonyoss.s2.common.dom.DomSerializer;
 import org.symphonyoss.s2.common.dom.TypeAdaptor;
+import org.symphonyoss.s2.common.dom.json.IImmutableJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
@@ -140,6 +144,7 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   private static final String     DNS_SUFFIX          = "dnsSuffix";
   private static final String     PUBLIC_DNS_SUFFIX   = "publicDnsSuffix";
+  private static final String     CONFIG_FILTER       = "configFilter";
 
   private final String            cloudServiceProvider_;
   private final ConfigProvider    provider_;
@@ -177,7 +182,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   protected abstract DeploymentContext  createContext(String podName, INameFactory nameFactory);
   
   protected abstract void validateAccount(IJsonObject<?> config);
-  
+  protected DomSerializer domDerializer_ = DomSerializer.newBuilder().withCompactMode(true).build();
   
   /**
    * Constructor.
@@ -382,11 +387,29 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     populateTags(tags_);
     
+
+    ImmutableJsonObject serviceJson;
+    String dir = SERVICE_DIR + "/" + getService();
+    
+    try
+    {
+      serviceJson = provider_.fetchConfig(dir, SERVICE + ".json").immutify();
+      
+      log_.info("Service=" + serviceJson);
+    }
+    catch(IOException e)
+    {
+      throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
+    }
+    
+    Set<String> configFilter = new HashSet<>(serviceJson.getListOf(String.class, CONFIG_FILTER));
+
+    
     // All actions need multi-tenant config
     ImmutableJsonObject multiTenantIdConfig   = createIdConfig(null);
     ImmutableJsonObject environmentConfig     = fetchEnvironmentConfig();
-    ImmutableJsonObject multiTenantDefaults   = fetchMultiTenantDefaults(multiTenantIdConfig);
-    ImmutableJsonObject multiTenantOverrides  = fetchMultiTenantOverrides(multiTenantIdConfig);
+    ImmutableJsonObject multiTenantDefaults   = fetchMultiTenantDefaults(multiTenantIdConfig, configFilter);
+    ImmutableJsonObject multiTenantOverrides  = fetchMultiTenantOverrides(multiTenantIdConfig, configFilter);
     ImmutableJsonObject multiTenantConfig     = overlay(
         multiTenantDefaults,
         environmentConfig,
@@ -423,11 +446,13 @@ public abstract class FugueDeploy extends CommandLineHandler
       case Undeploy:
       case UndeployAll:
         multiTenantContext_ = createContext(null, createNameFactory(environmentType_, environment_, region_, null, null, service_));
-        multiTenantContext_.setConfig(multiTenantConfig);
+        multiTenantContext_.setConfig(filterConfig(multiTenantConfig, configFilter));
         
         deploy( multiTenantDefaults,
             environmentConfig,
-            multiTenantOverrides);
+            multiTenantOverrides,
+            serviceJson,
+            configFilter);
         break;
         
       default:
@@ -435,25 +460,80 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
   
-  private void deploy(ImmutableJsonObject multiTenantDefaults, ImmutableJsonObject environmentConfig,
-      ImmutableJsonObject multiTenantOverrides)
+  protected ImmutableJsonObject filterConfig(ImmutableJsonObject config, Set<String> serviceFilter)
   {
-    ImmutableJsonObject serviceJson;
-    String dir = SERVICE_DIR + "/" + getService();
+    MutableJsonObject json = new MutableJsonObject();
+    Set<String> filter = new HashSet<>(serviceFilter);
     
-    try
+    filter.add("/id");
+    
+    filterConfig(config, filter, json, "");
+    
+    return json.immutify();
+  }
+
+  private void filterConfig(ImmutableJsonObject config, Set<String> filter, MutableJsonObject json, String path)
+  {
+    Iterator<String> it = config.getNameIterator();
+    
+    while(it.hasNext())
     {
-      serviceJson = provider_.fetchConfig(dir, SERVICE + ".json").immutify();
+      String name = it.next();
+      IImmutableJsonDomNode child = config.get(name);
+      String pathName = path + "/" + name;
+      boolean processChildren = false;
       
-      log_.info("Service=" + serviceJson);
+      for(String f : filter)
+      {
+        if(pathName.startsWith(f))
+        {
+          String[] parts = pathName.split("/");
+          MutableJsonObject o = json;
+          
+          for(int i=1 ; i<parts.length - 1; i++)
+          {
+            IJsonDomNode co = o.get(parts[i]);
+            
+            if(co == null)
+            {
+              MutableJsonObject c = new MutableJsonObject();
+              
+              o.add(parts[i], c);
+              
+              o = c;
+            }
+            else if(co instanceof MutableJsonObject)
+            {
+              o = (MutableJsonObject) co;
+            }
+            else
+            {
+              throw new IllegalStateException("Config path " + pathName + " is not an object");
+            }
+          }
+          
+          o.add(name, child);
+          processChildren = false;
+          break;
+        }
+        else if(pathName.length() < f.length())
+        {
+          processChildren = true;
+        }
+      }
+      
+      if(processChildren && child instanceof ImmutableJsonObject)
+        filterConfig((ImmutableJsonObject)child, filter, json, pathName);
     }
-    catch(IOException e)
-    {
-      throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
-    }
-    
-    IJsonObject<?>                  containerJson           = (IJsonObject<?>)serviceJson.get(CONTAINERS);
-    
+  }
+
+  private void deploy(ImmutableJsonObject multiTenantDefaults, ImmutableJsonObject environmentConfig,
+      ImmutableJsonObject multiTenantOverrides, ImmutableJsonObject serviceJson, Set<String> configFilter)
+  {
+
+    String          dir           = SERVICE_DIR + "/" + getService();
+    IJsonObject<?>  containerJson = (IJsonObject<?>)serviceJson.get(CONTAINERS);
+        
     Map<ContainerType, Map<String, JsonObject<?>>>  singleTenantContainerMap     = new HashMap<>();
     Map<ContainerType, Map<String, JsonObject<?>>>  multiTenantContainerMap      = new HashMap<>();
 
@@ -562,8 +642,8 @@ public abstract class FugueDeploy extends CommandLineHandler
                 tenantConfig,
                 multiTenantOverrides,
                 tenantIdConfig);
-            ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, podName);
-            ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, podName);
+            ImmutableJsonObject singleTenantDefaults   = fetchSingleTenantDefaults(singleTenantIdConfig, podName, configFilter);
+            ImmutableJsonObject singleTenantOverrides  = fetchSingleTenantOverrides(singleTenantDefaults, podName, configFilter);
             
             /*
              * At this point the defaults and environment config have all been merged in, we now just need to overlay the 
@@ -579,7 +659,7 @@ public abstract class FugueDeploy extends CommandLineHandler
                 multiTenantOverrides,
                 tenantIdConfig);
             
-            context.setConfig(singleTenantConfig);
+            context.setConfig(filterConfig(singleTenantConfig, configFilter));
             context.processConfigAndPolicies();
             
           }
@@ -718,26 +798,26 @@ public abstract class FugueDeploy extends CommandLineHandler
     return config.immutify();
   }
 
-  private ImmutableJsonObject fetchMultiTenantDefaults(IJsonObject<?> idConfig)
+  private ImmutableJsonObject fetchMultiTenantDefaults(IJsonObject<?> idConfig, Set<String> pathFilter)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayDefaults(config);
+    provider_.overlayDefaults(config, pathFilter);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayDefaults(config);
+      helper.overlayDefaults(config, pathFilter);
     
     return config.immutify();
   }
   
-  private ImmutableJsonObject fetchMultiTenantOverrides(IJsonObject<?> idConfig)
+  private ImmutableJsonObject fetchMultiTenantOverrides(IJsonObject<?> idConfig, Set<String> pathFilter)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayOverrides(config);
+    provider_.overlayOverrides(config, pathFilter);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayOverrides(config);
+      helper.overlayOverrides(config, pathFilter);
     
     return config.immutify();
   }
@@ -782,26 +862,26 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
   }
 
-  private ImmutableJsonObject fetchSingleTenantDefaults(IJsonObject<?> idConfig, String podName)
+  private ImmutableJsonObject fetchSingleTenantDefaults(IJsonObject<?> idConfig, String podName, Set<String> pathFilter)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayDefaults(podName, config);
+    provider_.overlayDefaults(podName, config, pathFilter);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayDefaults(podName, config);
+      helper.overlayDefaults(podName, config, pathFilter);
     
     return config.immutify();
   }
   
-  private ImmutableJsonObject fetchSingleTenantOverrides(IJsonObject<?> idConfig, String podName)
+  private ImmutableJsonObject fetchSingleTenantOverrides(IJsonObject<?> idConfig, String podName, Set<String> pathFilter)
   {
     MutableJsonObject config = idConfig.newMutableCopy();
     
-    provider_.overlayOverrides(podName, config);
+    provider_.overlayOverrides(podName, config, pathFilter);
     
     for(ConfigHelper helper : helpers_)
-      helper.overlayOverrides(podName, config);
+      helper.overlayOverrides(podName, config, pathFilter);
     
     return config.immutify();
   }
@@ -950,7 +1030,8 @@ public abstract class FugueDeploy extends CommandLineHandler
 
   protected abstract class DeploymentContext
   {
-    private static final String FUGUE_CONFIG = "FUGUE_CONFIG";
+    protected static final String FUGUE_CONFIG = "FUGUE_CONFIG";
+    protected static final String FUGUE_STORED_CONFIG = "FUGUE_STORED_CONFIG";
 
     private final String                                   podName_;
 
@@ -964,6 +1045,8 @@ public abstract class FugueDeploy extends CommandLineHandler
     private int                                            pathCnt_;
 
     private Map<ContainerType, Map<String, JsonObject<?>>> containerMap_;
+
+    protected String configValue_;
 
     protected DeploymentContext(String podName, INameFactory nameFactory)
     {
@@ -994,13 +1077,13 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted);
 
     protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths);
-    protected abstract void postDeployLambdaContainer(String name, Collection<String> paths);
+    protected abstract void postDeployLambdaContainer(String name, Collection<String> paths, Collection<Subscription> subscriptions);
     protected abstract void postDeployContainers();
     
     protected abstract void deployService();
     protected abstract void undeployService();
 
-    protected abstract String getFugueConfig();
+    protected abstract void putFugueConfig(Map<String, String> environment);
     
     protected INameFactory getNameFactory()
     {
@@ -1070,7 +1153,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       configDom_           = new MutableJsonDom().add(config_).immutify();
       templateVariables_   = createTemplateVariables(config);
       sub_                 = new StringSubstitutor(templateVariables_);
-      
+      configValue_         = domDerializer_.serialize(config_);
       
       String podName = templateVariables_.get("podName");
       String podIdString = templateVariables_.get("podId");
@@ -1387,7 +1470,8 @@ public abstract class FugueDeploy extends CommandLineHandler
             
             if(!environment.containsKey(FUGUE_CONFIG))
             {
-              environment.put(FUGUE_CONFIG, getFugueConfig());
+              putFugueConfig(environment);
+              
             }
             
             Collection<String> paths = container.getListOf(String.class, PATHS);
@@ -1426,9 +1510,11 @@ public abstract class FugueDeploy extends CommandLineHandler
           JsonObject<?> container = map.get(name);
 
           Collection<String> paths = container.getListOf(String.class, PATHS);
+          Collection<Subscription> subscriptions = Subscription.getSubscriptions(container);
           
           postDeployLambdaContainer(name,
-              paths
+              paths,
+              subscriptions
               );
         }
       }
