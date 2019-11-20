@@ -239,6 +239,9 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   @Override
   public void store(Collection<IKvItem> kvItems, ITraceContext trace)
   {
+    if(kvItems.isEmpty())
+      return;
+    
     List<Item>          items           = new ArrayList<>(kvItems.size());
    
     for(IKvItem kvItem : kvItems)

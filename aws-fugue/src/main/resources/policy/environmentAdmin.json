@@ -166,6 +166,7 @@
                 "lambda:GetPolicy",
                 "lambda:AddPermission",
                 "lambda:RemovePermission",
+                "lambda:TagResource",
                 "s3:GetObject"
             ],
             "Resource": [
