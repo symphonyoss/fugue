@@ -24,16 +24,34 @@
 package org.symphonyoss.s2.fugue.kv;
 
 /**
- * The partition and sort keys for a KvItem.
+ * A trivial implementation of IKvSortKey.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IKvPartitionSortKey extends IKvPartitionKey
+public class KvSortKey implements IKvSortKey
 {
+  private final String asString_;
+
   /**
+   * Constructor.
    * 
-   * @return The sort key.
+   * @param asString The String value of the key.
    */
-  String getSortKey();
+  public KvSortKey(String asString)
+  {
+    asString_ = asString;
+  }
+
+  @Override
+  public String asString()
+  {
+    return asString_;
+  }
+
+  @Override
+  public String toString()
+  {
+    return asString_;
+  }
 }

@@ -36,7 +36,7 @@ import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKey;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
@@ -71,7 +71,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   }
 
   @Override
-  protected String fetchFromSecondaryStorage(IKvPartitionSortKey partitionSortKey, ITraceContext trace)
+  protected String fetchFromSecondaryStorage(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace)
       throws NoSuchObjectException
   {
     try
@@ -115,7 +115,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
     trace.trace("WRITTEN-S3");
   }
   
-  protected String s3Key(IKvPartitionSortKey partitionSortKey)
+  protected String s3Key(IKvPartitionSortKeyProvider partitionSortKey)
   {
     // Return the S3 key used to store an object, we break the partition key into several directories to prevent a single directory
     // from getting too large.
@@ -130,13 +130,15 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
         ;
     }
     
-    return s.append(partitionSortKey.getPartitionKey().substring(0, 4))
+    String partitionKey = partitionSortKey.getPartitionKey().asString();
+    
+    return s.append(partitionKey.substring(0, 4))
         .append(SEPARATOR)
-        .append(partitionSortKey.getPartitionKey().substring(4, 8))
+        .append(partitionKey.substring(4, 8))
         .append(SEPARATOR)
-        .append(partitionSortKey.getPartitionKey().substring(8))
+        .append(partitionKey.substring(8))
         .append(SEPARATOR)
-        .append(partitionSortKey.getSortKey())
+        .append(partitionSortKey.getSortKey().asString())
         .toString();
   }
 

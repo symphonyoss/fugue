@@ -23,51 +23,35 @@
 
 package org.symphonyoss.s2.fugue.kv;
 
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
-
 /**
- * Implementation of IKvPartitionKey for use in fetch operations.
+ * A trivial implementation of IKvPartitionKey.
  * 
  * @author Bruce Skingle
  *
  */
 public class KvPartitionKey implements IKvPartitionKey
 {
-  private final String      partitionKey_;
-  private final IFuguePodId podId_;
+  private final String asString_;
 
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
-   * @param partitionKey  The application level partition key.
+   * @param asString The String value of the key.
    */
-  public KvPartitionKey(IFuguePodId podId, String partitionKey)
+  public KvPartitionKey(String asString)
   {
-    podId_ = podId;
-    partitionKey_ = partitionKey;
-  }
-
-  /**
-   * Copy constructor.
-   * 
-   * @param partitionKey Key to be copied.
-   */
-  public KvPartitionKey(IKvPartitionKey partitionKey)
-  {
-    podId_ = partitionKey.getPodId();
-    partitionKey_ = partitionKey.getPartitionKey();
+    asString_ = asString;
   }
 
   @Override
-  public String getPartitionKey()
+  public String asString()
   {
-    return partitionKey_;
+    return asString_;
   }
 
   @Override
-  public IFuguePodId getPodId()
+  public String toString()
   {
-    return podId_;
+    return asString_;
   }
 }

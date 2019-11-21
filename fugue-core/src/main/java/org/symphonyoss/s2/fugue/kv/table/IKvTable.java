@@ -29,8 +29,8 @@ import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionKey;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKey;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 
 /**
  * Low level storage of KV Items.
@@ -66,7 +66,7 @@ public interface IKvTable extends IFugueComponent
    * 
    * @throws NoSuchObjectException  If there is no object with the given baseHash.
    */
-  String fetch(IKvPartitionSortKey partitionSortKey, ITraceContext trace) throws NoSuchObjectException;
+  String fetch(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace) throws NoSuchObjectException;
   
   /**
    * Fetch the first object with the given partition key.
@@ -78,7 +78,7 @@ public interface IKvTable extends IFugueComponent
    * 
    * @throws NoSuchObjectException  If there is no object with the given partition key.
    */
-  String fetchFirst(IKvPartitionKey partitionKey, ITraceContext trace) throws NoSuchObjectException;
+  String fetchFirst(IKvPartitionKeyProvider partitionKey, ITraceContext trace) throws NoSuchObjectException;
 
   /**
    * Fetch the last object with the given partition key.
@@ -90,7 +90,7 @@ public interface IKvTable extends IFugueComponent
    * 
    * @throws NoSuchObjectException  If there is no object with the given partition key.
    */
-  String fetchLast(IKvPartitionKey partitionKey, ITraceContext trace) throws NoSuchObjectException;
+  String fetchLast(IKvPartitionKeyProvider partitionKey, ITraceContext trace) throws NoSuchObjectException;
 
   /**
    * Create the table.

@@ -23,12 +23,8 @@
 
 package org.symphonyoss.s2.fugue.kv;
 
-import javax.annotation.Nullable;
-
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
-
 /**
- * The partition key for a KvItem.
+ * A partition key for a KvItem.
  * 
  * @author Bruce Skingle
  *
@@ -37,13 +33,7 @@ public interface IKvPartitionKey
 {
   /**
    * 
-   * @return The partition key as defined by the model.
+   * @return The String representation of the key.
    */
-  String getPartitionKey();
-  
-  /**
-   * 
-   * @return The pod which owns this object, if any.
-   */
-  @Nullable IFuguePodId getPodId();
+  String asString();
 }

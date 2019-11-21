@@ -44,9 +44,9 @@ import org.symphonyoss.s2.fugue.aws.AwsTags;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionKey;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKey;
-import org.symphonyoss.s2.fugue.kv.KvPartitionSortKey;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.kv.KvPartitionSortKeyProvider;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
 
 import com.amazonaws.AmazonServiceException;
@@ -159,13 +159,16 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   }
 
   @Override
-  public String fetch(IKvPartitionSortKey partitionSortKey, ITraceContext trace) throws NoSuchObjectException
+  public String fetch(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace) throws NoSuchObjectException
   {
     return doDynamoReadTask(() ->
     {
-      GetItemSpec spec = new GetItemSpec().withPrimaryKey(ColumnNamePartitionKey, getPartitionKey(partitionSortKey), ColumnNameSortKey, partitionSortKey.getSortKey());
+      GetItemSpec spec = new GetItemSpec().withPrimaryKey(ColumnNamePartitionKey, getPartitionKey(partitionSortKey), ColumnNameSortKey, partitionSortKey.getSortKey().toString());
 
       Item item = objectTable_.getItem(spec);
+      
+      if(item == null)
+        throw new NoSuchObjectException("Item (" + getPartitionKey(partitionSortKey) + ", " + partitionSortKey.getSortKey() + ") not found.");
       
       String payloadString = item.getJSON(ColumnNameDocument);
       
@@ -179,18 +182,18 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   }
 
   @Override
-  public String fetchFirst(IKvPartitionKey partitionKey, ITraceContext trace) throws NoSuchObjectException
+  public String fetchFirst(IKvPartitionKeyProvider partitionKey, ITraceContext trace) throws NoSuchObjectException
   {
     return fetchOne(partitionKey, true, trace);
   }
 
   @Override
-  public String fetchLast(IKvPartitionKey partitionKey, ITraceContext trace) throws NoSuchObjectException
+  public String fetchLast(IKvPartitionKeyProvider partitionKey, ITraceContext trace) throws NoSuchObjectException
   {
     return fetchOne(partitionKey, false, trace);
   }
 
-  private String fetchOne(IKvPartitionKey partitionKey, boolean scanForwards, ITraceContext trace) throws NoSuchObjectException
+  private String fetchOne(IKvPartitionKeyProvider partitionKey, boolean scanForwards, ITraceContext trace) throws NoSuchObjectException
   {
     return doDynamoReadTask(() ->
     {
@@ -215,7 +218,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
             
         if(payloadString == null)
         {
-          payloadString = fetchFromSecondaryStorage(new KvPartitionSortKey(partitionKey, item.getString(ColumnNameSortKey)), trace);
+          payloadString = fetchFromSecondaryStorage(new KvPartitionSortKeyProvider(partitionKey, item.getString(ColumnNameSortKey)), trace);
         }
         
         trace.trace("DONE_FETCH_ONE");
@@ -247,7 +250,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     for(IKvItem kvItem : kvItems)
     {
       String partitionKey = getPartitionKey(kvItem);
-      String sortKey = kvItem.getSortKey();
+      String sortKey = kvItem.getSortKey().asString();
       
       boolean saveToS3 = createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
       
@@ -264,7 +267,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     List<Item>          items           = new ArrayList<>(1);
 
     String partitionKey = getPartitionKey(kvItem);
-    String sortKey = kvItem.getSortKey();
+    String sortKey = kvItem.getSortKey().asString();
     
     boolean saveToS3 = createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
     
@@ -284,7 +287,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
    * 
    * @throws NoSuchObjectException If the required object does not exist.
    */
-  protected @Nonnull String fetchFromSecondaryStorage(IKvPartitionSortKey partitionSortKey, ITraceContext trace) throws NoSuchObjectException
+  protected @Nonnull String fetchFromSecondaryStorage(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace) throws NoSuchObjectException
   {
     throw new NoSuchObjectException("This table does not support large objects.");
   }
@@ -458,7 +461,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     }
   }
 
-  private String getPartitionKey(IKvPartitionKey kvItem)
+  private String getPartitionKey(IKvPartitionKeyProvider kvItem)
   {
     if(podPrivate_)
       return serviceId_ + Separator + kvItem.getPodId() + Separator + kvItem.getPartitionKey();

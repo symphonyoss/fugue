@@ -201,6 +201,8 @@ public interface INameFactory
 
   CredentialName getFugueCredentialName(String owner);
 
+  CredentialName getMultiTenantCredentialName(String owner);
+  
   CredentialName getCredentialName(Integer podId, String owner);
 
   CredentialName getCredentialName(String owner);

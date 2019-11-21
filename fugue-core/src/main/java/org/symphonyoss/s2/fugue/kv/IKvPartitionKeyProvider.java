@@ -23,33 +23,27 @@
 
 package org.symphonyoss.s2.fugue.kv;
 
-import java.time.Instant;
-
 import javax.annotation.Nullable;
 
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
+
 /**
- * An item to be stored in a KvStore or KvTable.
+ * The partition key for a KvItem.
  * 
  * @author Bruce Skingle
  *
  */
-public interface IKvItem extends IKvPartitionSortKeyProvider
+public interface IKvPartitionKeyProvider
 {
   /**
    * 
-   * @return The serialized form of this item.
+   * @return The partition key as defined by the model.
    */
-  String getJson();
-
+  IKvPartitionKey getPartitionKey();
+  
   /**
    * 
-   * @return The type id of the payload in this object, if any.
+   * @return The pod which owns this object, if any.
    */
-  @Nullable String getType();
-
-  /**
-   * 
-   * @return The purge date for this object, if any.
-   */
-  @Nullable Instant getPurgeDate();
+  @Nullable IFuguePodId getPodId();
 }

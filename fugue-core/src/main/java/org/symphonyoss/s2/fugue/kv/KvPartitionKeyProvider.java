@@ -25,45 +25,61 @@ package org.symphonyoss.s2.fugue.kv;
 
 import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
-
 /**
- * Implementation of IKvPartitionSortKey for use in fetch operations.
+ * Implementation of IKvPartitionKey for use in fetch operations.
  * 
  * @author Bruce Skingle
  *
  */
-public class KvPartitionSortKey extends KvPartitionKey implements IKvPartitionSortKey
+public class KvPartitionKeyProvider implements IKvPartitionKeyProvider
 {
-  private final String      sortKey_;
-  
+  private final IKvPartitionKey partitionKey_;
+  private final IFuguePodId     podId_;
+
   /**
    * Constructor.
    * 
    * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
-   * @param sortKey       The application level sort key.
    */
-  public KvPartitionSortKey(IFuguePodId podId, String partitionKey, String sortKey)
+  public KvPartitionKeyProvider(IFuguePodId podId, IKvPartitionKey partitionKey)
   {
-    super(podId, partitionKey);
-    sortKey_ = sortKey;
+    podId_ = podId;
+    partitionKey_ = partitionKey;
   }
-  
+
   /**
-   * Constructor from a partition key.
+   * Constructor.
    * 
-   * @param partitionKey  An existing partition key.
-   * @param sortKey       The application level sort key.
+   * @param podId         ID of the pod which owns the item.
+   * @param partitionKey  The application level partition key.
    */
-  public KvPartitionSortKey(IKvPartitionKey partitionKey, String sortKey)
+  public KvPartitionKeyProvider(IFuguePodId podId, String partitionKey)
   {
-    super(partitionKey);
-    sortKey_ = sortKey;
+    podId_ = podId;
+    partitionKey_ = new KvPartitionKey(partitionKey);
+  }
+
+  /**
+   * Copy constructor.
+   * 
+   * @param partitionKey Key to be copied.
+   */
+  public KvPartitionKeyProvider(IKvPartitionKeyProvider partitionKey)
+  {
+    podId_ = partitionKey.getPodId();
+    partitionKey_ = partitionKey.getPartitionKey();
   }
 
   @Override
-  public String getSortKey()
+  public IKvPartitionKey getPartitionKey()
   {
-    return sortKey_;
+    return partitionKey_;
+  }
+
+  @Override
+  public IFuguePodId getPodId()
+  {
+    return podId_;
   }
 }
