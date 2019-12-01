@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
 
@@ -39,6 +40,7 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.common.fault.TransactionFault;
 import org.symphonyoss.s2.common.fault.TransientTransactionFault;
+import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.AwsTags;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
@@ -46,7 +48,6 @@ import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
-import org.symphonyoss.s2.fugue.kv.KvPartitionSortKeyProvider;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
 
 import com.amazonaws.AmazonServiceException;
@@ -57,6 +58,8 @@ import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
+import com.amazonaws.services.dynamodbv2.document.KeyAttribute;
+import com.amazonaws.services.dynamodbv2.document.Page;
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey;
 import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
@@ -65,6 +68,7 @@ import com.amazonaws.services.dynamodbv2.document.spec.GetItemSpec;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
 import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.BillingMode;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
 import com.amazonaws.services.dynamodbv2.model.CreateTableResult;
@@ -92,7 +96,7 @@ import com.amazonaws.services.dynamodbv2.model.WriteRequest;
  *
  * @param <T> Concrete type for fluent methods.
  */
-public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> extends AbstractKvTable<T>
+public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> extends AbstractKvTable<T>
 {
   private static final Logger   log_                   = LoggerFactory.getLogger(AbstractDynamoDbKvTable.class);
 
@@ -103,6 +107,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   protected static final String ColumnNamePayloadType  = "pt";
   protected static final String ColumnNameTTL          = "t";
   protected static final String ColumnNameCreatedDate  = "c";
+  protected static final String ColumnNameAbsoluteHash = "h";
 
   protected static final int    MAX_RECORD_SIZE        = 400 * 1024;
 
@@ -115,6 +120,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
   protected final String        objectTableName_;
   protected final int           payloadLimit_;
   protected final boolean       validate_;
+  protected final boolean       enableSecondaryStorage_;
   
   protected AbstractDynamoDbKvTable(AbstractBuilder<?,?> builder)
   {
@@ -123,6 +129,7 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     region_ = builder.region_;
     payloadLimit_ = builder.payloadLimit_;
     validate_ = builder.validate_;
+    enableSecondaryStorage_ = builder.enableSecondaryStorage_;
   
     log_.info("Starting storage...");
     
@@ -174,7 +181,9 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
       
       if(payloadString == null)
       {
-        payloadString = fetchFromSecondaryStorage(partitionSortKey, trace);
+        Hash absoluteHash = Hash.ofBase64String(item.getString(ColumnNameAbsoluteHash));
+        
+        payloadString = fetchFromSecondaryStorage(absoluteHash, trace);
       }
       
       return payloadString;
@@ -218,7 +227,9 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
             
         if(payloadString == null)
         {
-          payloadString = fetchFromSecondaryStorage(new KvPartitionSortKeyProvider(partitionKey, item.getString(ColumnNameSortKey)), trace);
+          Hash absoluteHash = Hash.ofBase64String(item.getString(ColumnNameAbsoluteHash));
+          
+          payloadString = fetchFromSecondaryStorage(absoluteHash, trace);
         }
         
         trace.trace("DONE_FETCH_ONE");
@@ -227,6 +238,19 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
       
       throw new NoSuchObjectException(partitionKey + " not found");
     });
+  }
+  
+  protected <CT> CT doDynamoQueryTask(Callable<CT> task)
+  {
+    try
+    {
+      return doDynamoReadTask(task);
+    }
+    catch (NoSuchObjectException e)
+    {
+      // This "can't happen"
+      throw new TransactionFault(e);
+    }
   }
 
   protected <CT> CT doDynamoReadTask(Callable<CT> task) throws NoSuchObjectException
@@ -252,10 +276,11 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
       String partitionKey = getPartitionKey(kvItem);
       String sortKey = kvItem.getSortKey().asString();
       
-      boolean saveToS3 = createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
+      boolean payloadNotStored = 
+          createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
       
-      if(saveToS3)
-        storeToSecondaryStorage(kvItem, trace);
+      if(kvItem.isSaveToSecondaryStorage())
+        storeToSecondaryStorage(kvItem, payloadNotStored, trace);
     }
     
     write(items, trace);
@@ -269,10 +294,11 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     String partitionKey = getPartitionKey(kvItem);
     String sortKey = kvItem.getSortKey().asString();
     
-    boolean saveToS3 = createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
+    boolean payloadNotStored = 
+        createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
     
-    if(saveToS3)
-      storeToSecondaryStorage(kvItem, trace);
+    if(kvItem.isSaveToSecondaryStorage())
+      storeToSecondaryStorage(kvItem, payloadNotStored, trace);
     
     write(items, trace);
   }
@@ -287,21 +313,16 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
    * 
    * @throws NoSuchObjectException If the required object does not exist.
    */
-  protected @Nonnull String fetchFromSecondaryStorage(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace) throws NoSuchObjectException
-  {
-    throw new NoSuchObjectException("This table does not support large objects.");
-  }
+  protected abstract @Nonnull String fetchFromSecondaryStorage(Hash absoluteHash, ITraceContext trace) throws NoSuchObjectException;
   
   /**
    * Store the given item to secondary storage.
    * 
-   * @param kvItem  An item to be stored.
-   * @param trace   A trace context.
+   * @param kvItem            An item to be stored.
+   * @param payloadNotStored  The payload is too large to store in primary storage.
+   * @param trace             A trace context.
    */
-  protected void storeToSecondaryStorage(IKvItem kvItem, ITraceContext trace)
-  {
-    throw new IllegalArgumentException("Object is too large.");
-  }
+  protected abstract void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace);
 
   protected void write(List<Item> items, ITraceContext trace)
   {
@@ -423,13 +444,22 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     int baseLength = ColumnNamePartitionKey.length() + partitionKey.length() + 
         ColumnNameSortKey.length() + sortKey.length();
     
+    if(kvItem.getAbsoluteHash() != null)
+    {
+      String ah = kvItem.getAbsoluteHash().toStringBase64();
+      
+      baseLength += ColumnNameAbsoluteHash.length() + ah.length();
+      
+      item.withString(ColumnNameAbsoluteHash, ah);
+    }
+    
     if(kvItem.getPodId() != null)
     {
       baseLength += ColumnNamePodId.length() + kvItem.getPodId().toString().length();
       
       item.withInt(ColumnNamePodId, kvItem.getPodId().getValue());
     }
-    
+
     if(kvItem.getType() != null)
     {
       baseLength += ColumnNamePayloadType.length() + kvItem.getType().length();
@@ -695,13 +725,90 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     }
   }
 
+  @Override
+  public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+      Consumer<String> consumer, ITraceContext trace)
+  {
+    return doDynamoQueryTask(() ->
+    {
+      QuerySpec spec = new QuerySpec()
+          .withKeyConditionExpression(ColumnNamePartitionKey + " = :v_partition")
+          .withValueMap(new ValueMap()
+              .withString(":v_partition", getPartitionKey(partitionKey)))
+          .withScanIndexForward(scanForwards)
+          ;
+      
+      if(limit != null)
+      {
+        spec.withMaxResultSize(limit);
+      }
+      
+      if(after != null)
+      {
+        spec.withExclusiveStartKey(
+            new KeyAttribute(ColumnNamePartitionKey, getPartitionKey(partitionKey)),
+            new KeyAttribute(ColumnNameSortKey,  after)
+            );
+      }
+    
+      Map<String, AttributeValue> lastEvaluatedKey = null;
+      ItemCollection<QueryOutcome> items = objectTable_.query(spec);
+      
+      for(Page<Item, QueryOutcome> page : items.pages())
+      {
+        Iterator<Item> it = page.iterator();
+        
+        while(it.hasNext())
+        {
+          Item item = it.next();
+          
+          consume(item, consumer, trace);
+        }
+      }
+      
+      lastEvaluatedKey = items.getLastLowLevelResult().getQueryResult().getLastEvaluatedKey();
+      
+      if(lastEvaluatedKey != null)
+      {
+        AttributeValue sequenceKeyAttr = lastEvaluatedKey.get(ColumnNameSortKey);
+        
+        return sequenceKeyAttr.getS();
+      }
+      
+      return null;
+    });
+  }
+
+  private void consume(Item item, Consumer<String> consumer, ITraceContext trace)
+  {
+    String payloadString = item.getJSON(ColumnNameDocument);
+    
+    if(payloadString == null)
+    {
+      String hashString = item.getString(ColumnNameAbsoluteHash);
+      Hash absoluteHash = Hash.newInstance(hashString);
+      
+      try
+      {
+        payloadString = fetchFromSecondaryStorage(absoluteHash, trace);
+      }
+      catch (NoSuchObjectException e)
+      {
+        throw new IllegalStateException("Unable to read known object from S3", e);
+      }
+    }
+    
+    consumer.accept(payloadString);
+  }
+
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AbstractDynamoDbKvTable<B>> extends AbstractKvTable.AbstractBuilder<T,B>
   {
     protected final AmazonDynamoDBClientBuilder amazonDynamoDBClientBuilder_;
 
     protected String                            region_;
-    protected int                               payloadLimit_  = MAX_RECORD_SIZE;
-    protected boolean                           validate_ = true;
+    protected int                               payloadLimit_           = MAX_RECORD_SIZE;
+    protected boolean                           validate_               = true;
+    protected boolean                           enableSecondaryStorage_ = false;
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -721,6 +828,13 @@ public class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> exten
     public T withValidate(boolean validate)
     {
       validate_ = validate;
+      
+      return self();
+    }
+
+    public T withEnableSecondaryStorage(boolean enableSecondaryStorage)
+    {
+      enableSecondaryStorage_ = enableSecondaryStorage;
       
       return self();
     }

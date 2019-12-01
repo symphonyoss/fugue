@@ -23,6 +23,14 @@
 
 package org.symphonyoss.s2.fugue.aws.kv.table;
 
+import javax.annotation.Nonnull;
+
+import org.symphonyoss.s2.common.exception.NoSuchObjectException;
+import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
+import org.symphonyoss.s2.fugue.kv.IKvItem;
+import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+
 /**
  * DynamoDB implementation of IKvTable.
  * 
@@ -34,6 +42,19 @@ public class DynamoDbKvTable extends AbstractDynamoDbKvTable<DynamoDbKvTable>
   protected DynamoDbKvTable(AbstractDynamoDbKvTable.AbstractBuilder<?,?> builder)
   {
     super(builder);
+  }
+  
+  @Override
+  protected @Nonnull String fetchFromSecondaryStorage(Hash absoluteHash, ITraceContext trace) throws NoSuchObjectException
+  {
+    throw new NoSuchObjectException("This table does not support secondary storage.");
+  }
+  
+  @Override
+  protected void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
+  {
+    if(payloadNotStored)
+      throw new IllegalArgumentException("This table does not support secondary storage and the payload is too large to store in primary storage.");
   }
   
   /**
@@ -56,6 +77,12 @@ public class DynamoDbKvTable extends AbstractDynamoDbKvTable<DynamoDbKvTable>
     protected DynamoDbKvTable construct()
     {
       return new DynamoDbKvTable(this);
+    }
+
+    @Override
+    public Builder withEnableSecondaryStorage(boolean enableSecondaryStorage)
+    {
+      throw new IllegalArgumentException("Secondary storage is not supported by this implementation. Try S3DynamoDbKvTable");
     }
   }
 }

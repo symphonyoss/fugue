@@ -27,6 +27,8 @@ import java.time.Instant;
 
 import javax.annotation.Nullable;
 
+import org.symphonyoss.s2.common.hash.Hash;
+
 /**
  * An item to be stored in a KvStore or KvTable.
  * 
@@ -52,4 +54,16 @@ public interface IKvItem extends IKvPartitionSortKeyProvider
    * @return The purge date for this object, if any.
    */
   @Nullable Instant getPurgeDate();
+  
+  /**
+   * 
+   * @return true if this item should be stored to secondary storage.
+   */
+  boolean isSaveToSecondaryStorage();
+  
+  /**
+   * 
+   * @return The absolute hash for this object.
+   */
+  Hash getAbsoluteHash();
 }

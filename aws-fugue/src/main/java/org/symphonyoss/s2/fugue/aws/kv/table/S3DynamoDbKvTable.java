@@ -23,6 +23,7 @@
 
 package org.symphonyoss.s2.fugue.aws.kv.table;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -31,7 +32,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
+import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
+import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
@@ -43,6 +46,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 
@@ -71,12 +75,12 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   }
 
   @Override
-  protected String fetchFromSecondaryStorage(IKvPartitionSortKeyProvider partitionSortKey, ITraceContext trace)
+  protected String fetchFromSecondaryStorage(Hash absoluteHash, ITraceContext trace)
       throws NoSuchObjectException
   {
     try
     {
-      S3Object object = s3Client_.getObject(new GetObjectRequest(objectBucketName_, s3Key(partitionSortKey)));
+      S3Object object = s3Client_.getObject(new GetObjectRequest(objectBucketName_, s3Key(absoluteHash)));
       
       if(object.getObjectMetadata().getContentLength() > Integer.MAX_VALUE)
         throw new IllegalStateException("Blob is too big");
@@ -108,37 +112,49 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   }
   
   @Override
-  protected void storeToSecondaryStorage(IKvItem kvItem, ITraceContext trace)
+  protected void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
   {
-    s3Client_.putObject(new PutObjectRequest(objectBucketName_, s3Key(kvItem), kvItem.getJson()));
+    byte[] bytes = kvItem.getJson().getBytes(StandardCharsets.UTF_8);
+    
+    try(InputStream in = new ByteArrayInputStream(bytes))
+    {
+      s3Client_.putObject(new PutObjectRequest(objectBucketName_, s3Key(kvItem.getAbsoluteHash()), in, getS3MetaData(kvItem.getAbsoluteHash(), bytes.length)));
+    }
+    catch (IOException e)
+    {
+      throw new CodingFault("In memory I/O - can't happen", e);
+    }
     
     trace.trace("WRITTEN-S3");
   }
   
-  protected String s3Key(IKvPartitionSortKeyProvider partitionSortKey)
+  private ObjectMetadata getS3MetaData(
+      Hash absoluteHash, 
+      long contentLength)
+  {
+    ObjectMetadata metaData = new ObjectMetadata();
+        
+    metaData.setContentLength(contentLength);
+    metaData.setContentDisposition("attachment; filename=" + absoluteHash.toStringUrlSafeBase64() + ".json");
+    metaData.setContentType("application/json");
+    
+    return metaData;
+  }
+  
+  protected String s3Key(Hash absoluteHash)
   {
     // Return the S3 key used to store an object, we break the partition key into several directories to prevent a single directory
     // from getting too large.
     
     StringBuilder s = new StringBuilder();
     
-    if(podPrivate_)
-    {
-      s
-        .append(partitionSortKey.getPodId())
-        .append(SEPARATOR)
-        ;
-    }
-    
-    String partitionKey = partitionSortKey.getPartitionKey().asString();
+    String partitionKey = absoluteHash.toStringUrlSafeBase64();
     
     return s.append(partitionKey.substring(0, 4))
         .append(SEPARATOR)
         .append(partitionKey.substring(4, 8))
         .append(SEPARATOR)
         .append(partitionKey.substring(8))
-        .append(SEPARATOR)
-        .append(partitionSortKey.getSortKey().asString())
         .toString();
   }
 

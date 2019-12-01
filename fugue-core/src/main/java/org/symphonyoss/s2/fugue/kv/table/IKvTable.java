@@ -24,8 +24,10 @@
 package org.symphonyoss.s2.fugue.kv.table;
 
 import java.util.Collection;
+import java.util.function.Consumer;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
+import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
@@ -105,4 +107,19 @@ public interface IKvTable extends IFugueComponent
    * @param dryRun If true then no changes are made but log messages show what would happen.
    */
   void deleteTable(boolean dryRun);
+
+  /**
+   * Return objects from the given partition.
+   * 
+   * @param partitionKey  The ID of the partition.
+   * @param scanForwards  If true then scan objects in the order of their sort keys, else in reverse order.
+   * @param limit         An optional limit to the number of objects retrieved.
+   * @param after         An optional page cursor to continue a previous query.
+   * @param consumer      A consumer to receive the retrieved objects.
+   * @param trace         Trace context.
+   * 
+   * @return              A new after token to allow a continuation query to be made.
+   */
+  String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+      Consumer<String> consumer, ITraceContext trace);
 }
