@@ -27,9 +27,9 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.fugue.IFugeComponentContainer;
 import org.symphonyoss.s2.fugue.IFugueAssembly;
-import org.symphonyoss.s2.fugue.config.FileConfiguration;
 import org.symphonyoss.s2.fugue.config.GlobalConfiguration;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
+import org.symphonyoss.s2.fugue.inmemory.InMemoryConfiguration;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.NameFactory;
 
@@ -102,7 +102,7 @@ public class InMemoryFugueAssembly implements IFugueAssembly
       faultAccumulator.checkNotNull(container_, "container");
       
       if(config_ == null)
-        config_ = new GlobalConfiguration(FileConfiguration.FACTORY.newInstance());
+        config_ = new GlobalConfiguration(InMemoryConfiguration.FACTORY.newInstance());
       
       if(nameFactory_ == null)
         nameFactory_ = new NameFactory(config_);
