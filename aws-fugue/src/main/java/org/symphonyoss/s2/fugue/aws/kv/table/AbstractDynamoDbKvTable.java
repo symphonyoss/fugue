@@ -25,9 +25,11 @@ package org.symphonyoss.s2.fugue.aws.kv.table;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
@@ -58,6 +60,7 @@ import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
+import com.amazonaws.services.dynamodbv2.document.ItemUtils;
 import com.amazonaws.services.dynamodbv2.document.KeyAttribute;
 import com.amazonaws.services.dynamodbv2.document.Page;
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey;
@@ -70,14 +73,17 @@ import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
 import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.BillingMode;
+import com.amazonaws.services.dynamodbv2.model.CancellationReason;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
 import com.amazonaws.services.dynamodbv2.model.CreateTableResult;
+import com.amazonaws.services.dynamodbv2.model.Delete;
 import com.amazonaws.services.dynamodbv2.model.DeleteTableRequest;
 import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveRequest;
 import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveResult;
 import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
 import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputExceededException;
+import com.amazonaws.services.dynamodbv2.model.Put;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
@@ -85,6 +91,10 @@ import com.amazonaws.services.dynamodbv2.model.Tag;
 import com.amazonaws.services.dynamodbv2.model.TagResourceRequest;
 import com.amazonaws.services.dynamodbv2.model.TimeToLiveDescription;
 import com.amazonaws.services.dynamodbv2.model.TimeToLiveSpecification;
+import com.amazonaws.services.dynamodbv2.model.TransactWriteItem;
+import com.amazonaws.services.dynamodbv2.model.TransactWriteItemsRequest;
+import com.amazonaws.services.dynamodbv2.model.TransactionCanceledException;
+import com.amazonaws.services.dynamodbv2.model.Update;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveRequest;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveResult;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
@@ -110,7 +120,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   protected static final String ColumnNameAbsoluteHash = "h";
 
   protected static final int    MAX_RECORD_SIZE        = 400 * 1024;
-
+  
   protected final String        region_;
 
   protected AmazonDynamoDB      amazonDynamoDB_;
@@ -177,7 +187,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       if(item == null)
         throw new NoSuchObjectException("Item (" + getPartitionKey(partitionSortKey) + ", " + partitionSortKey.getSortKey() + ") not found.");
       
-      String payloadString = item.getJSON(ColumnNameDocument);
+      String payloadString = item.getString(ColumnNameDocument);
       
       if(payloadString == null)
       {
@@ -223,7 +233,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       {
         Item item = it.next();
         
-        String payloadString = item.getJSON(ColumnNameDocument);
+        String payloadString = item.getString(ColumnNameDocument);
             
         if(payloadString == null)
         {
@@ -268,39 +278,293 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   {
     if(kvItems.isEmpty())
       return;
+
+    Hash        absoluteHash = null;
+    List<TransactWriteItem> actions = new ArrayList<>(kvItems.size());
     
-    List<Item>          items           = new ArrayList<>(kvItems.size());
-   
     for(IKvItem kvItem : kvItems)
     {
       String partitionKey = getPartitionKey(kvItem);
       String sortKey = kvItem.getSortKey().asString();
       
-      boolean payloadNotStored = 
-          createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
+      UpdateOrPut updateOrPut = new UpdateOrPut(kvItem, partitionKey, sortKey, payloadLimit_);
+      
+      absoluteHash = kvItem.getAbsoluteHash();
       
       if(kvItem.isSaveToSecondaryStorage())
-        storeToSecondaryStorage(kvItem, payloadNotStored, trace);
+        storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
+      
+      actions.add(new TransactWriteItem().withPut(updateOrPut.createPut()));
     }
     
-    write(items, trace);
+    try
+    {
+      write(actions, absoluteHash, trace);
+    }
+    catch (NoSuchObjectException e)
+    {
+      throw new TransactionFault(e);
+    }
   }
-
-  @Override
-  public void store(IKvItem kvItem, ITraceContext trace)
+  
+  class Condition
   {
-    List<Item>          items           = new ArrayList<>(1);
+    String                      expression_;
+    Map<String, AttributeValue> attributeValues_ = new HashMap<>();
+    
+    Condition(String expression)
+    {
+      expression_ = expression;
+    }
+    
+    Condition withString(String name, String value)
+    {
+      attributeValues_.put(name, new AttributeValue().withS(value));
+      
+      return this;
+    }
+  }
+  
+  class DeleteConsumer extends AbstractItemConsumer
+  {
+    List<PrimaryKey>            primaryKeysToDelete_ = new ArrayList<>(24);
+    IKvPartitionSortKeyProvider absoluteHashPrefix_;
+    
+    public DeleteConsumer(IKvPartitionSortKeyProvider absoluteHashPrefix)
+    {
+      absoluteHashPrefix_ = absoluteHashPrefix;
+    }
 
-    String partitionKey = getPartitionKey(kvItem);
-    String sortKey = kvItem.getSortKey().asString();
+    @Override
+    void consume(Item item, ITraceContext trace)
+    {
+      primaryKeysToDelete_.add(new PrimaryKey(
+          new KeyAttribute(ColumnNamePartitionKey,  item.getString(ColumnNamePartitionKey)),
+          new KeyAttribute(ColumnNameSortKey,       item.getString(ColumnNameSortKey))
+          )
+        );
+      
+      Hash absoluteHash = Hash.newInstance(item.getString(ColumnNameAbsoluteHash));
+      
+      primaryKeysToDelete_.add(new PrimaryKey(
+          new KeyAttribute(ColumnNamePartitionKey,  getPartitionKey(absoluteHashPrefix_) + absoluteHash),
+          new KeyAttribute(ColumnNameSortKey,       absoluteHashPrefix_.getSortKey().asString())
+          )
+        );
+      
+      deleteFromSecondaryStorage(absoluteHash, trace);
+    }
     
-    boolean payloadNotStored = 
-        createPutItem(items, kvItem, partitionKey, sortKey, payloadLimit_);
+    void dynamoBatchWrite()
+    {
+      if(primaryKeysToDelete_.isEmpty())
+        return;
+      
+      TableWriteItems tableWriteItems = new TableWriteItems(objectTable_.getTableName())
+          .withPrimaryKeysToDelete(primaryKeysToDelete_.toArray(new PrimaryKey[primaryKeysToDelete_.size()]));
+      
+      BatchWriteItemOutcome outcome = dynamoDB_.batchWriteItem(tableWriteItems);
+      int totalRequestItems = primaryKeysToDelete_.size();
+      long  delay = 4;
+      do
+      {
+          Map<String, List<WriteRequest>> unprocessedItems = outcome.getUnprocessedItems();
+
+          if (outcome.getUnprocessedItems().size() > 0)
+          {
+            int requestItems = 0;
+            
+            for(List<WriteRequest> ui : unprocessedItems.values())
+            {
+              requestItems += ui.size();
+            }
+      
+            log_.info("Retry " + requestItems + " of " + totalRequestItems + " items after " + delay + "ms.");
+            
+            totalRequestItems = requestItems;
+            
+            try
+            {
+              Thread.sleep(delay);
+              
+              if(delay < 1000)
+                delay *= 1.2;
+            }
+            catch (InterruptedException e)
+            {
+              log_.warn("Sleep interrupted", e);
+            }
+            
+            outcome = dynamoDB_.batchWriteItemUnprocessed(unprocessedItems);
+          }
+      } while (outcome.getUnprocessedItems().size() > 0);
+    }
+  }
+  
+  @Override
+  public void delete(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash,
+      IKvPartitionKeyProvider versionPartitionKey, IKvPartitionSortKeyProvider absoluteHashPrefix, ITraceContext trace) throws NoSuchObjectException
+  {
+    List<TransactWriteItem> actions = new ArrayList<>(2);
     
-    if(kvItem.isSaveToSecondaryStorage())
-      storeToSecondaryStorage(kvItem, payloadNotStored, trace);
+    String    existingPartitionKey = getPartitionKey(partitionSortKeyProvider);
+    String    existingSortKey = partitionSortKeyProvider.getSortKey().asString();
+    Condition condition = new Condition(ColumnNameAbsoluteHash + " = :ah").withString(":ah", absoluteHash.toStringBase64());
     
-    write(items, trace);
+    deleteFromSecondaryStorage(absoluteHash, trace);
+    
+    String after = null;
+    do
+    {
+      DeleteConsumer deleteConsumer = new DeleteConsumer(absoluteHashPrefix);
+      
+      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, deleteConsumer, trace);
+      
+      deleteConsumer.dynamoBatchWrite();
+    } while (after != null);
+    
+    final Map<String, AttributeValue> itemKey = new HashMap<>();
+    
+    itemKey.put(ColumnNamePartitionKey, new AttributeValue(existingPartitionKey));
+    itemKey.put(ColumnNameSortKey, new AttributeValue(existingSortKey));
+   
+    Delete delete = new Delete()
+        .withTableName(objectTable_.getTableName())
+        .withConditionExpression(condition.expression_)
+        .withExpressionAttributeValues(condition.attributeValues_)
+        .withKey(itemKey)
+        ;
+    
+    actions.add(new TransactWriteItem().withDelete(delete));
+    
+    write(actions, absoluteHash, trace);
+  }
+  
+  @Override
+  public void update(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash, Set<IKvItem> kvItems,
+      ITraceContext trace) throws NoSuchObjectException
+  {
+    List<TransactWriteItem> actions = new ArrayList<>(kvItems.size() + 2);
+    
+    String    existingPartitionKey = getPartitionKey(partitionSortKeyProvider);
+    String    existingSortKey = partitionSortKeyProvider.getSortKey().asString();
+    Condition condition = new Condition(ColumnNameAbsoluteHash + " = :ah").withString(":ah", absoluteHash.toStringBase64());
+    
+    for(IKvItem kvItem : kvItems)
+    {
+      String partitionKey = getPartitionKey(kvItem);
+      String sortKey = kvItem.getSortKey().asString();
+      
+      UpdateOrPut updateOrPut = new UpdateOrPut(kvItem, partitionKey, sortKey, payloadLimit_);
+      
+      if(existingPartitionKey.equals(partitionKey) && existingSortKey.equals(sortKey))
+      {
+        actions.add(new TransactWriteItem()
+            .withUpdate(
+                updateOrPut.createUpdate(condition)
+                )
+            );
+        
+        condition = null;
+      }
+      else
+      {
+        actions.add(new TransactWriteItem()
+            .withPut(updateOrPut.createPut()
+                )
+            );
+                
+      }
+      
+      if(kvItem.isSaveToSecondaryStorage())
+        storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
+    }
+    
+    if(condition != null)
+    {
+      // The prev version has a different sort key
+
+      final Map<String, AttributeValue> itemKey = new HashMap<>();
+      
+      itemKey.put(ColumnNamePartitionKey, new AttributeValue(existingPartitionKey));
+      itemKey.put(ColumnNameSortKey, new AttributeValue(existingSortKey));
+     
+      Delete delete = new Delete()
+          .withTableName(objectTable_.getTableName())
+          .withConditionExpression(condition.expression_)
+          .withExpressionAttributeValues(condition.attributeValues_)
+          .withKey(itemKey)
+          ;
+      
+      actions.add(new TransactWriteItem().withDelete(delete));
+    }
+    
+    write(actions, absoluteHash, trace);
+  }
+  
+  protected void write(Collection<TransactWriteItem> actions, Hash absoluteHash, ITraceContext trace) throws NoSuchObjectException
+  {
+    TransactWriteItemsRequest request = new TransactWriteItemsRequest()
+        .withTransactItems(actions);
+     
+    doDynamoConditionalWriteTask(() -> 
+    {
+      int                           retryCnt = 0;
+      long                          delay = 4;
+      TransactionCanceledException  lastException = null;
+      
+      while(retryCnt++ < 11)
+      {
+        try
+        {
+  //        long start = System.currentTimeMillis();
+          amazonDynamoDB_.transactWriteItems(request);
+  //        long end = System.currentTimeMillis();
+  //        
+  //        System.err.println("T " + (end - start));
+          return null;
+        }
+        catch (TransactionCanceledException tce)
+        {
+          lastException = tce;
+          
+          for(CancellationReason reason : tce.getCancellationReasons())
+          {
+            switch(reason.getCode())
+            {
+              case "ConditionalCheckFailed":
+                throw new NoSuchObjectException("Object " + absoluteHash + " has changed.");
+                
+              case "None":
+                // there is an entry for each item in the transaction, this means nothing and should be ignored.
+                break;
+                
+              case "TransactionConflict":
+                log_.info("Retry transaction after " + delay + "ms.");
+                try
+                {
+                  Thread.sleep(delay);
+                  
+                  if(delay < 1000)
+                    delay *= 1.2;
+                }
+                catch (InterruptedException e)
+                {
+                  log_.warn("Sleep interrupted", e);
+                }
+                break;
+                
+              default:
+                throw new TransientTransactionFault("Transient failure to update object " + absoluteHash, tce);
+            }
+          }
+        }
+      }
+      
+      throw new TransientTransactionFault("Transient failure to update (after " + retryCnt + " retries) object " + absoluteHash, lastException);
+    }
+    , trace);  
+    
   }
 
   /**
@@ -324,17 +588,25 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
    */
   protected abstract void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace);
 
-  protected void write(List<Item> items, ITraceContext trace)
-  {
-    doDynamoWriteTask(() -> 
-    {
-      dynamoBatchWrite(items, null);
-      trace.trace("WRITTEN-DYNAMODB");
-      
-      return null;
-     }
-    , trace);
-  }
+  /**
+   * Delete the given object from secondary storage.
+   * 
+   * @param absoluteHash  Hash of the item to be deleted.
+   * @param trace         A trace context.
+   */
+  protected abstract void deleteFromSecondaryStorage(Hash absoluteHash, ITraceContext trace);
+  
+//  protected void write(List<Put> items, ITraceContext trace)
+//  {
+//    doDynamoWriteTask(() -> 
+//    {
+//      dynamoBatchWrite(items);
+//      trace.trace("WRITTEN-DYNAMODB");
+//      
+//      return null;
+//     }
+//    , trace);
+//  }
 
   protected <TT> TT doDynamoTask(Callable<TT> task, String accessMode, ITraceContext trace) throws NoSuchObjectException
   {
@@ -390,106 +662,401 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       throw new TransactionFault("Failed to write object", e);
     }
   }
-
-  protected void dynamoBatchWrite(Collection<Item> itemsToPut, Collection<PrimaryKey> primaryKeysToDelete)
+  
+  protected void doDynamoConditionalWriteTask(Callable<Void> task, ITraceContext trace) throws NoSuchObjectException
   {
-    TableWriteItems tableWriteItems = new TableWriteItems(objectTable_.getTableName())
-        .withItemsToPut(itemsToPut)
-        ;
-    
-    if(primaryKeysToDelete != null)
-      tableWriteItems = tableWriteItems.withPrimaryKeysToDelete(primaryKeysToDelete.toArray(new PrimaryKey[primaryKeysToDelete.size()]));
-    
-    BatchWriteItemOutcome outcome = dynamoDB_.batchWriteItem(tableWriteItems);
-    int requestItems = itemsToPut.size();
-    long  delay = 4;
-    do
+    try
     {
-        Map<String, List<WriteRequest>> unprocessedItems = outcome.getUnprocessedItems();
-
-        if (outcome.getUnprocessedItems().size() > 0)
-        {
-          requestItems = 0;
-          
-          for(List<WriteRequest> ui : unprocessedItems.values())
-          {
-            requestItems += ui.size();
-          }
-    
-          log_.info("Retry " + requestItems + " of " + requestItems + " items after " + delay + "ms.");
-          try
-          {
-            Thread.sleep(delay);
-            
-            if(delay < 1000)
-              delay *= 1.2;
-          }
-          catch (InterruptedException e)
-          {
-            log_.warn("Sleep interrupted", e);
-          }
-          
-          outcome = dynamoDB_.batchWriteItemUnprocessed(unprocessedItems);
-        }
-    } while (outcome.getUnprocessedItems().size() > 0);
+      doDynamoTask(task, "write", trace);
+    }
+    catch (NoSuchObjectException e)
+    {
+      throw e;
+    }
   }
 
-  protected boolean createPutItem(List<Item> items, IKvItem kvItem, String partitionKey, String sortKey, int payloadLimit)
+//  protected void dynamoBatchWrite(Collection<Put> itemsToPut)
+//  {
+//    TableWriteItems tableWriteItems = new TableWriteItems(objectTable_.getTableName())
+//        .withItemsToPut(itemsToPut)
+//        ;
+//    
+//    if(primaryKeysToDelete != null)
+//      tableWriteItems = tableWriteItems.withPrimaryKeysToDelete(primaryKeysToDelete.toArray(new PrimaryKey[primaryKeysToDelete.size()]));
+//    
+//    Map<String, List<WriteRequest>> requestItems = new HashMap<>();
+//    
+//    new WriteRequest().withPutRequest(new PutRequest()
+//    
+//    List<WriteRequest> value;
+//    requestItems.put(objectTable_.getTableName(), value);
+//    BatchWriteItemRequest batchWriteItemRequest = new BatchWriteItemRequest().withRequestItems(requestItems);
+//    BatchWriteItemResult outcome = amazonDynamoDB_.batchWriteItem(batchWriteItemRequest);
+//    
+//    
+//    int requestItems = itemsToPut.size();
+//    long  delay = 4;
+//    do
+//    {
+//        Map<String, List<WriteRequest>> unprocessedItems = outcome.getUnprocessedItems();
+//
+//        if (outcome.getUnprocessedItems().size() > 0)
+//        {
+//          requestItems = 0;
+//          
+//          for(List<WriteRequest> ui : unprocessedItems.values())
+//          {
+//            requestItems += ui.size();
+//          }
+//    
+//          log_.info("Retry " + requestItems + " of " + requestItems + " items after " + delay + "ms.");
+//          try
+//          {
+//            Thread.sleep(delay);
+//            
+//            if(delay < 1000)
+//              delay *= 1.2;
+//          }
+//          catch (InterruptedException e)
+//          {
+//            log_.warn("Sleep interrupted", e);
+//          }
+//          
+//          outcome = dynamoDB_.batchWriteItemUnprocessed(unprocessedItems);
+//        }
+//    } while (outcome.getUnprocessedItems().size() > 0);
+//  }
+  
+  class UpdateOrPut
   {
-    Item item = new Item()
-        .withPrimaryKey(ColumnNamePartitionKey, 
-            partitionKey, 
-            ColumnNameSortKey, sortKey);
+    Map<String, AttributeValue> key_              = new HashMap<>();
+    ValueMap                    putItem_          = new ValueMap();
+    Map<String, AttributeValue> updateItem_       = new HashMap<>();
+    StringBuilder               updateExpression_ = new StringBuilder("SET ");
+    int                         baseLength_;
+    boolean                     payloadNotStored_;
+    boolean                     first_            = true;
     
-    int baseLength = ColumnNamePartitionKey.length() + partitionKey.length() + 
-        ColumnNameSortKey.length() + sortKey.length();
-    
-    if(kvItem.getAbsoluteHash() != null)
+    UpdateOrPut(IKvItem kvItem, String partitionKey, String sortKey, int payloadLimit)
     {
-      String ah = kvItem.getAbsoluteHash().toStringBase64();
+      putItem_.withString(ColumnNamePartitionKey,  partitionKey);
+      putItem_.withString(ColumnNameSortKey,       sortKey);
       
-      baseLength += ColumnNameAbsoluteHash.length() + ah.length();
+      key_.put(ColumnNamePartitionKey,  new AttributeValue(partitionKey));
+      key_.put(ColumnNameSortKey,       new AttributeValue(sortKey));
       
-      item.withString(ColumnNameAbsoluteHash, ah);
+      baseLength_ = ColumnNamePartitionKey.length() + partitionKey.length() + 
+          ColumnNameSortKey.length() + sortKey.length();
+      
+      withHash(   ColumnNameAbsoluteHash, kvItem.getAbsoluteHash());
+      withNumber( ColumnNamePodId,        kvItem.getPodId().getValue());
+      withString( ColumnNamePayloadType,  kvItem.getType());
+      
+      if(kvItem.getPurgeDate() != null)
+      {
+        Long ttl = kvItem.getPurgeDate().toEpochMilli() / 1000;
+        
+        withNumber( ColumnNameTTL,          ttl);
+      }
+      
+      int length = baseLength_ + ColumnNameDocument.length() + kvItem.getJson().length();
+      
+      if(length < payloadLimit)
+      {
+        payloadNotStored_ = false;
+        withString(ColumnNameDocument, kvItem.getJson());
+      }
+      else
+      {
+        payloadNotStored_ = true;
+      }
     }
     
-    if(kvItem.getPodId() != null)
+    Put createPut()
     {
-      baseLength += ColumnNamePodId.length() + kvItem.getPodId().toString().length();
+      return new Put()
+        .withTableName(objectTable_.getTableName())
+        .withItem(ItemUtils.fromSimpleMap(putItem_));
+    }
+    
+    Update createUpdate(Condition condition)
+    {
+      updateItem_.putAll(condition.attributeValues_);
       
-      item.withInt(ColumnNamePodId, kvItem.getPodId().getValue());
+      return new Update()
+        .withTableName(objectTable_.getTableName())
+        .withConditionExpression(condition.expression_)
+        .withExpressionAttributeValues(updateItem_)
+        .withKey(key_)
+        .withUpdateExpression(updateExpression_.toString())
+      ;
     }
 
-    if(kvItem.getType() != null)
+    private void withNumber(String name, Number value)
     {
-      baseLength += ColumnNamePayloadType.length() + kvItem.getType().length();
+      separator();
+      updateExpression_.append(name + " = :" + name);
       
-      item.withString(ColumnNamePayloadType, kvItem.getType());
+      if(value == null)
+      {
+        putItem_.withNull(name);
+        updateItem_.put(":" + name, new AttributeValue().withNULL(true));
+        baseLength_ += name.length();
+      }
+      else
+      {
+        putItem_.withNumber(name, value);
+        updateItem_.put(":" + name, new AttributeValue().withN(value.toString()));
+        baseLength_ += name.length() + value.toString().length();
+      }
     }
-    
-    if(kvItem.getPurgeDate() != null)
+
+    private void separator()
     {
-      long ttl = kvItem.getPurgeDate().toEpochMilli() / 1000;
+      if(first_)
+        first_ = false;
+      else
+        updateExpression_.append(", ");
       
-      baseLength += ColumnNameTTL.length() + String.valueOf(ttl).length();
-      
-      item.withLong(ColumnNameTTL,       ttl);
     }
-    
-    items.add(item);
-    
-    int length = baseLength + ColumnNameDocument.length() + kvItem.getJson().length();
-    
-    if(length < payloadLimit)
+
+    private void withHash(String name, Hash value)
     {
-      item.withJSON(ColumnNameDocument, kvItem.getJson());
-      return false;
+      withString(name, value == null ? null : value.toStringBase64());
     }
-    else
+
+    private void withString(String name, String value)
     {
-      return true;
+      separator();
+      updateExpression_.append(name + " = :" + name);
+    
+      if(value == null)
+      {
+        baseLength_ += name.length();
+        putItem_.withNull(name);
+        updateItem_.put(":" + name, new AttributeValue().withNULL(true));
+      }
+      else
+      {
+        baseLength_ += name.length() + value.length();
+        putItem_.withString(name, value);
+        updateItem_.put(":" + name, new AttributeValue().withS(value));
+      }
     }
+
+//    private void withJSON(String name, String value)
+//    {
+//      updateExpression_.append(name + " = :" + name);
+//      
+//      if(value == null)
+//      {
+//        baseLength_ += name.length();
+//        putItem_.withNull(name);
+//        updateItem_.put(":" + name, new AttributeValue().withNULL(true));
+//      }
+//      else
+//      {
+//        baseLength_ += name.length() + value.length();
+//        putItem_.withJSON(name, value);
+//        updateItem_.put(":" + name, new AttributeValue().with(value));
+//        updateItem_.withJSON(":" + name, value);
+//      }
+//    }
   }
+  
+//  protected boolean createPut(IKvItem kvItem, String partitionKey, String sortKey, int payloadLimit, List<Put> items, Condition condition)
+//  {
+//    ValueMap putItem = new ValueMap();
+//    ValueMap updateItem = new ValueMap();
+//    StringBuilder updateExpression = new StringBuilder();
+//    
+//    putItem.withString(ColumnNamePartitionKey,  partitionKey);
+//    putItem.withString(ColumnNameSortKey,       sortKey);
+//    
+//    int baseLength = ColumnNamePartitionKey.length() + partitionKey.length() + 
+//        ColumnNameSortKey.length() + sortKey.length();
+//    
+//    if(kvItem.getAbsoluteHash() == null)
+//    {
+//      updateExpression.append(ColumnNameAbsoluteHash + " = null");
+//    }
+//    else
+//    {
+//      String ah = kvItem.getAbsoluteHash().toStringBase64();
+//      
+//      baseLength += ColumnNameAbsoluteHash.length() + ah.length();
+//      putItem.withString(ColumnNameAbsoluteHash, ah);
+//    }
+//    
+//    if(kvItem.getPodId() != null)
+//    {
+//      baseLength += ColumnNamePodId.length() + kvItem.getPodId().toString().length();
+//      
+//      putItem.withNumber(ColumnNamePodId, kvItem.getPodId().getValue());
+//    }
+//
+//    if(kvItem.getType() != null)
+//    {
+//      baseLength += ColumnNamePayloadType.length() + kvItem.getType().length();
+//      
+//      putItem.withString(ColumnNamePayloadType, kvItem.getType());
+//    }
+//    
+//    if(kvItem.getPurgeDate() != null)
+//    {
+//      long ttl = kvItem.getPurgeDate().toEpochMilli() / 1000;
+//      
+//      baseLength += ColumnNameTTL.length() + String.valueOf(ttl).length();
+//      
+//      putItem.withNumber(ColumnNameTTL, ttl);
+//    }
+//    
+//    int length = baseLength + ColumnNameDocument.length() + kvItem.getJson().length();
+//    
+//    if(length < payloadLimit)
+//    {
+//      putItem.withJSON(ColumnNameDocument, kvItem.getJson());
+//    }
+//    
+//    
+//    
+//    if(condition == null)
+//    {
+//      
+//      Put put = new Put()
+//          .withTableName(objectTable_.getTableName())
+//          .withItem(ItemUtils.fromSimpleMap(putItem));
+//    }
+//    else
+//    {
+//      Update update = new Update()
+//          .withTableName(objectTable_.getTableName())
+//          .with
+//          ;
+//      put
+//        .withConditionExpression(condition.expression_)
+//        .withExpressionAttributeValues(condition.attributeValues_)
+//        ;
+//    }
+//    
+//    items.add(put);
+//    
+//    return length >= payloadLimit;
+//  }
+  
+
+//  protected Put createPut2(IKvItem kvItem, String partitionKey, String sortKey, int payloadLimit)
+//  {
+//    HashMap<String, AttributeValue> item = new HashMap<>();
+//    
+//    item.put(ColumnNamePartitionKey,  new AttributeValue(partitionKey));
+//    item.put(ColumnNameSortKey,       new AttributeValue(sortKey));
+//    
+//    int baseLength = ColumnNamePartitionKey.length() + partitionKey.length() + 
+//        ColumnNameSortKey.length() + sortKey.length();
+//    
+//    if(kvItem.getAbsoluteHash() != null)
+//    {
+//      String ah = kvItem.getAbsoluteHash().toStringBase64();
+//      
+//      baseLength += ColumnNameAbsoluteHash.length() + ah.length();
+//      item.put(ColumnNameAbsoluteHash, new AttributeValue(ah));
+//    }
+//    
+//    if(kvItem.getPodId() != null)
+//    {
+//      baseLength += ColumnNamePodId.length() + kvItem.getPodId().toString().length();
+//      
+//      item.put(ColumnNamePodId, new AttributeValue().withN(kvItem.getPodId().getValue()));
+//    }
+//
+//    if(kvItem.getType() != null)
+//    {
+//      baseLength += ColumnNamePayloadType.length() + kvItem.getType().length();
+//      
+//      item.put(ColumnNamePayloadType, new AttributeValue(kvItem.getType()));
+//    }
+//    
+//    if(kvItem.getPurgeDate() != null)
+//    {
+//      String ttl = String.valueOf(kvItem.getPurgeDate().toEpochMilli() / 1000);
+//      
+//      baseLength += ColumnNameTTL.length() + ttl.length();
+//      
+//      item.put(ColumnNameTTL, new AttributeValue().withN(ttl));
+//    }
+//    
+//    int length = baseLength + ColumnNameDocument.length() + kvItem.getJson().length();
+//    
+//    if(length < payloadLimit)
+//    {
+//      
+//      item.put(ColumnNameDocument, new AttributeValue().withM(
+//          valueConformer.transform(Jackson.fromJsonString(kvItem.getJson(), Object.class))));
+//      return false;
+//    }
+//    else
+//    {
+//      return true;
+//    }
+//  }
+
+//  protected boolean createPutItem(List<Item> items, IKvItem kvItem, String partitionKey, String sortKey, int payloadLimit)
+//  {
+//    Item item = new Item()
+//        .withPrimaryKey(ColumnNamePartitionKey, 
+//            partitionKey, 
+//            ColumnNameSortKey, sortKey);
+//    
+//    int baseLength = ColumnNamePartitionKey.length() + partitionKey.length() + 
+//        ColumnNameSortKey.length() + sortKey.length();
+//    
+//    if(kvItem.getAbsoluteHash() != null)
+//    {
+//      String ah = kvItem.getAbsoluteHash().toStringBase64();
+//      
+//      baseLength += ColumnNameAbsoluteHash.length() + ah.length();
+//      
+//      item.withString(ColumnNameAbsoluteHash, ah);
+//    }
+//    
+//    if(kvItem.getPodId() != null)
+//    {
+//      baseLength += ColumnNamePodId.length() + kvItem.getPodId().toString().length();
+//      
+//      item.withInt(ColumnNamePodId, kvItem.getPodId().getValue());
+//    }
+//
+//    if(kvItem.getType() != null)
+//    {
+//      baseLength += ColumnNamePayloadType.length() + kvItem.getType().length();
+//      
+//      item.withString(ColumnNamePayloadType, kvItem.getType());
+//    }
+//    
+//    if(kvItem.getPurgeDate() != null)
+//    {
+//      long ttl = kvItem.getPurgeDate().toEpochMilli() / 1000;
+//      
+//      baseLength += ColumnNameTTL.length() + String.valueOf(ttl).length();
+//      
+//      item.withLong(ColumnNameTTL,       ttl);
+//    }
+//    
+//    items.add(item);
+//    
+//    int length = baseLength + ColumnNameDocument.length() + kvItem.getJson().length();
+//    
+//    if(length < payloadLimit)
+//    {
+//      item.withJSON(ColumnNameDocument, kvItem.getJson());
+//      return false;
+//    }
+//    else
+//    {
+//      return true;
+//    }
+//  }
 
   private String getPartitionKey(IKvPartitionKeyProvider kvItem)
   {
@@ -729,6 +1296,12 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
       Consumer<String> consumer, ITraceContext trace)
   {
+    return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, new PartitionConsumer(consumer), trace);
+  }
+
+  private String doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+      AbstractItemConsumer consumer, ITraceContext trace)
+  {
     return doDynamoQueryTask(() ->
     {
       QuerySpec spec = new QuerySpec()
@@ -762,7 +1335,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
         {
           Item item = it.next();
           
-          consume(item, consumer, trace);
+          consumer.consume(item, trace);
         }
       }
       
@@ -779,26 +1352,42 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     });
   }
 
-  private void consume(Item item, Consumer<String> consumer, ITraceContext trace)
+  abstract class AbstractItemConsumer
   {
-    String payloadString = item.getJSON(ColumnNameDocument);
+    abstract void consume(Item item, ITraceContext trace);
+  }
+  
+  class PartitionConsumer extends AbstractItemConsumer
+  {
+    Consumer<String> consumer_;
     
-    if(payloadString == null)
+    PartitionConsumer(Consumer<String> consumer)
     {
-      String hashString = item.getString(ColumnNameAbsoluteHash);
-      Hash absoluteHash = Hash.newInstance(hashString);
-      
-      try
-      {
-        payloadString = fetchFromSecondaryStorage(absoluteHash, trace);
-      }
-      catch (NoSuchObjectException e)
-      {
-        throw new IllegalStateException("Unable to read known object from S3", e);
-      }
+      consumer_ = consumer;
     }
-    
-    consumer.accept(payloadString);
+
+    @Override
+    void consume(Item item, ITraceContext trace)
+    {
+      String payloadString = item.getString(ColumnNameDocument);
+      
+      if(payloadString == null)
+      {
+        String hashString = item.getString(ColumnNameAbsoluteHash);
+        Hash absoluteHash = Hash.newInstance(hashString);
+        
+        try
+        {
+          payloadString = fetchFromSecondaryStorage(absoluteHash, trace);
+        }
+        catch (NoSuchObjectException e)
+        {
+          throw new IllegalStateException("Unable to read known object from S3", e);
+        }
+      }
+      
+      consumer_.accept(payloadString);
+    }
   }
 
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AbstractDynamoDbKvTable<B>> extends AbstractKvTable.AbstractBuilder<T,B>

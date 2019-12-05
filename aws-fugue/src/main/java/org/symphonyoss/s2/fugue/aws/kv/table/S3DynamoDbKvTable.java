@@ -128,6 +128,14 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
     trace.trace("WRITTEN-S3");
   }
   
+  @Override
+  protected void deleteFromSecondaryStorage(Hash absoluteHash, ITraceContext trace)
+  {
+    s3Client_.deleteObject(objectBucketName_, s3Key(absoluteHash));
+    
+    trace.trace("DELETED-S3");
+  }
+  
   private ObjectMetadata getS3MetaData(
       Hash absoluteHash, 
       long contentLength)

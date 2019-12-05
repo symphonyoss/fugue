@@ -24,6 +24,7 @@
 package org.symphonyoss.s2.fugue.kv.table;
 
 import java.util.Collection;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
@@ -43,21 +44,41 @@ import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 public interface IKvTable extends IFugueComponent
 {
   /**
-   * Store the given item.
-   * 
-   * @param kvItem  Item to be stored.
-   * @param trace   Trace context.
-   */
-  void store(IKvItem kvItem, ITraceContext trace);
-  
-  /**
    * Store the given collection of items.
    * 
    * @param kvItems Items to be stored.
    * @param trace   Trace context.
    */
   void store(Collection<IKvItem> kvItems, ITraceContext trace);
+  
 
+  /**
+   * Update an existing object.
+   * 
+   * @param partitionSortKeyProvider  The partition and sort key of the existing item.
+   * @param absoluteHash    The absolute hash of the existing item.
+   * @param kvItems         A set of items to be put.
+   * @param trace           Trace context.
+   * 
+   * @throws NoSuchObjectException If the object to be updated has changed. 
+   */
+  void update(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash, Set<IKvItem> kvItems,
+      ITraceContext trace) throws NoSuchObjectException;
+  
+  /**
+   * Delete the given object.
+   * 
+   * @param partitionSortKeyProvider  The partition and sort key of the existing item.
+   * @param absoluteHash              The absolute hash of the existing item.
+   * @param versionPartitionKey       Partition key for the versions partition.
+   * @param absoluteHashPrefix        Prefix for Absolute records to delete
+   * @param trace                     Trace context.
+   * 
+   * @throws NoSuchObjectException If the object to be deleted has changed. 
+   */
+  void delete(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash, IKvPartitionKeyProvider versionPartitionKey,
+      IKvPartitionSortKeyProvider absoluteHashPrefix, ITraceContext trace) throws NoSuchObjectException;
+  
   /**
    * Fetch the object with the given partition key and sort key.
    * 
@@ -122,4 +143,6 @@ public interface IKvTable extends IFugueComponent
    */
   String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
       Consumer<String> consumer, ITraceContext trace);
+
+
 }

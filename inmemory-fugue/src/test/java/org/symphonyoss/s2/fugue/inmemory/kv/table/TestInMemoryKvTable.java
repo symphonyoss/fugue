@@ -9,6 +9,10 @@ package org.symphonyoss.s2.fugue.inmemory.kv.table;
 import static org.junit.Assert.assertEquals;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.junit.Test;
@@ -160,12 +164,53 @@ public class TestInMemoryKvTable
     assertEquals(0, consumer.index_);
   }
   
+  @Test
+  public void testUpdate() throws NoSuchObjectException
+  {
+    InMemoryKvTable table = createTable();
+    
+    String object = table.fetch(ITEMS[1], trace);
+    
+    assertEquals(ITEMS[1].getJson(), object);
+    
+    Set<IKvItem> items = new HashSet<>();
+    
+    items.add(new KvItem(PART1, "2", "Updated Two"));
+    
+    table.update(ITEMS[1], ITEMS[1].getAbsoluteHash(), 
+        items, trace);
+  }
+  
+  @Test(expected = NoSuchObjectException.class)
+  public void testUpdate2() throws NoSuchObjectException
+  {
+    InMemoryKvTable table = createTable();
+    
+    String object = table.fetch(ITEMS[1], trace);
+    
+    assertEquals(ITEMS[1].getJson(), object);
+    
+    Set<IKvItem> items = new HashSet<>();
+    
+    items.add(new KvItem(PART1, "2", "Updated Two"));
+    
+    table.update(ITEMS[1], ITEMS[1].getAbsoluteHash(), 
+        items, trace);
+    
+    table.update(ITEMS[1], ITEMS[1].getAbsoluteHash(), 
+        items, trace);
+  }
+  
   private InMemoryKvTable createTable()
   {
     InMemoryKvTable table = new InMemoryKvTable.Builder().withPodPrivate(false).withServiceId("test").build();
     
+    List<IKvItem> items = new ArrayList<>(ITEMS.length);
+    
     for(IKvItem item : ITEMS)
-      table.store(item, trace);
+      items.add(item);
+    
+    table.store(items, trace);
     
     return table;
   }

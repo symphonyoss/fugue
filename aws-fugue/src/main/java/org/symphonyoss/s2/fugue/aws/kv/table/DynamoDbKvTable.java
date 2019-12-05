@@ -57,6 +57,11 @@ public class DynamoDbKvTable extends AbstractDynamoDbKvTable<DynamoDbKvTable>
       throw new IllegalArgumentException("This table does not support secondary storage and the payload is too large to store in primary storage.");
   }
   
+  @Override
+  protected void deleteFromSecondaryStorage(Hash absoluteHash, ITraceContext trace)
+  {
+  }
+
   /**
    * Builder for DynamoDbKvTable.
    * 

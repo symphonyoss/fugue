@@ -28,20 +28,19 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
-import org.symphonyoss.s2.fugue.config.IConfiguration;
+import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 import org.symphonyoss.s2.fugue.kv.table.IKvTable;
-import org.symphonyoss.s2.fugue.naming.INameFactory;
-import org.symphonyoss.s2.fugue.pubsub.AbstractSubscription.AbstractBuilder;
 
 /**
  * Base implementation of IKvTable.
@@ -58,7 +57,7 @@ public class InMemoryKvTable implements IKvTable
   /** If true then data in this table is segregated by podId (i.e. podId forms part of the hash key for all values) */
   protected final boolean        podPrivate_;
 
-  private final Map<String, TreeMap<String, String>>  partitionMap_ = new HashMap<>();
+  private final Map<String, TreeMap<String, IKvItem>>  partitionMap_ = new HashMap<>();
   
   protected InMemoryKvTable(AbstractBuilder<?,?> builder)
   {
@@ -77,19 +76,92 @@ public class InMemoryKvTable implements IKvTable
   }
 
   @Override
-  public void store(IKvItem kvItem, ITraceContext trace)
+  public void delete(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash,
+      IKvPartitionKeyProvider versionPartitionKey, IKvPartitionSortKeyProvider absoluteHashPrefix, ITraceContext trace)
+      throws NoSuchObjectException
+  {
+    String partitionKey = getPartitionKey(partitionSortKeyProvider);
+    String sortKey = partitionSortKeyProvider.getSortKey().asString();
+    
+    Map<String, IKvItem> partition = getPartition(partitionKey);
+    
+    synchronized (partition)
+    {
+      IKvItem existing = partition.get(sortKey);
+      
+      if(existing == null)
+        throw new NoSuchObjectException("Object does not exist");
+      
+      if(!absoluteHash.equals(existing.getAbsoluteHash()))
+        throw new NoSuchObjectException("Object has changed");
+      
+      partition.remove(sortKey);
+    }
+    
+    partition = getPartition(getPartitionKey(versionPartitionKey));
+    
+    synchronized (partition)
+    {
+      for(IKvItem item : partition.values())
+      {
+        Hash ah = item.getAbsoluteHash();
+        String pk = getPartitionKey(absoluteHashPrefix) + ah;
+        String sk = absoluteHashPrefix.getSortKey().asString();
+        
+        TreeMap<String, IKvItem> p2 = getPartition(pk);
+        
+        IKvItem d = p2.remove(sk);
+      }
+      
+      partition.clear();
+    }
+  }
+
+  @Override
+  public void update(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash, Set<IKvItem> kvItems,
+      ITraceContext trace) throws NoSuchObjectException
+  {
+    String partitionKey = getPartitionKey(partitionSortKeyProvider);
+    String sortKey = partitionSortKeyProvider.getSortKey().asString();
+    
+    Map<String, IKvItem> partition = getPartition(partitionKey);
+    
+    synchronized (partition)
+    {
+      IKvItem existing = partition.get(sortKey);
+      
+      if(existing == null)
+        throw new NoSuchObjectException("Object does not exist");
+      
+      if(!absoluteHash.equals(existing.getAbsoluteHash()))
+        throw new NoSuchObjectException("Object has changed");
+      
+      partition.remove(sortKey);
+      
+      for(IKvItem kvItem : kvItems)
+      {
+        String updatePartitionKey = getPartitionKey(kvItem);
+        
+        Map<String, IKvItem> updatePartition = getPartition(updatePartitionKey);
+        
+        updatePartition.put(kvItem.getSortKey().asString(), kvItem);
+      }
+    }
+  }
+
+  private void store(IKvItem kvItem, ITraceContext trace)
   {
     String partitionKey = getPartitionKey(kvItem);
     String sortKey = kvItem.getSortKey().asString();
     
-    Map<String, String> partition = getPartition(partitionKey);
+    Map<String, IKvItem> partition = getPartition(partitionKey);
     
-    partition.put(sortKey, kvItem.getJson());
+    partition.put(sortKey, kvItem);
   }
 
-  private synchronized TreeMap<String, String> getPartition(String partitionKey)
+  private synchronized TreeMap<String, IKvItem> getPartition(String partitionKey)
   {
-    TreeMap<String, String> partition = partitionMap_.get(partitionKey);
+    TreeMap<String, IKvItem> partition = partitionMap_.get(partitionKey);
     
     if(partition == null)
     {
@@ -121,9 +193,14 @@ public class InMemoryKvTable implements IKvTable
     String partitionKey = getPartitionKey(partitionSortKey);
     String sortKey = partitionSortKey.getSortKey().asString();
     
-    TreeMap<String, String> partition = getPartition(partitionKey);
+    TreeMap<String, IKvItem> partition = getPartition(partitionKey);
     
-    return partition.get(sortKey);
+    IKvItem item = partition.get(sortKey);
+    
+    if(item == null)
+      throw new NoSuchObjectException();
+    
+    return item.getJson();
   }
 
   @Override
@@ -131,9 +208,14 @@ public class InMemoryKvTable implements IKvTable
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
     
-    TreeMap<String, String> partition = getPartition(partitionKey);
+    TreeMap<String, IKvItem> partition = getPartition(partitionKey);
     
-    return partition.firstEntry().getValue();
+    IKvItem item = partition.isEmpty() ? null : partition.firstEntry().getValue();
+    
+    if(item == null)
+      throw new NoSuchObjectException();
+    
+    return item.getJson();
   }
 
   @Override
@@ -141,9 +223,14 @@ public class InMemoryKvTable implements IKvTable
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
     
-    TreeMap<String, String> partition = getPartition(partitionKey);
+    TreeMap<String, IKvItem> partition = getPartition(partitionKey);
     
-    return partition.lastEntry().getValue();
+    IKvItem item = partition.isEmpty() ? null : partition.lastEntry().getValue();
+    
+    if(item == null)
+      throw new NoSuchObjectException();
+    
+    return item.getJson();
   }
 
   @Override
@@ -162,9 +249,9 @@ public class InMemoryKvTable implements IKvTable
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
     
-    TreeMap<String, String> partition = getPartition(partitionKey);
+    TreeMap<String, IKvItem> partition = getPartition(partitionKey);
 
-    NavigableMap<String, String> map; 
+    NavigableMap<String, IKvItem> map; 
     
     if(after == null)
     {
@@ -181,9 +268,9 @@ public class InMemoryKvTable implements IKvTable
     if(limit == null)
       limit = 100;
     
-    for(Entry<String, String> entry : map.entrySet())
+    for(Entry<String, IKvItem> entry : map.entrySet())
     {
-      consumer.accept(entry.getValue());
+      consumer.accept(entry.getValue().getJson());
       
       if(--limit <= 0)
         return entry.getKey();
