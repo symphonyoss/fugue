@@ -570,7 +570,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   /**
    * Fetch the given item from secondary storage.
    * 
-   * @param partitionSortKey  Partition and sort key of the required object.
+   * @param absoluteHash      Absolute hash of the required object.
    * @param trace             Trace context.
    * 
    * @return The required object.
