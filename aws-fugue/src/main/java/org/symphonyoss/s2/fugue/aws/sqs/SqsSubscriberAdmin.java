@@ -347,12 +347,13 @@ public class SqsSubscriberAdmin extends AbstractSubscriberAdmin<SqsSubscriberAdm
         .withTags(tags_)
         );
     
-    if(subscription.getLambdaConsumer() != null)
-    {
-      String lambdaName = nameFactory_.getLogicalServiceItemName(subscription.getLambdaConsumer()).toString();
-      
-      lambdaManager_.subscribe(lambdaName, queueArn);
-    }
+// On first deploy the lambda has not been created yet. AwsFugueDeploy now does this at the end of the deployment
+//    if(subscription.getLambdaConsumer() != null)
+//    {
+//      String lambdaName = nameFactory_.getLogicalServiceItemName(subscription.getLambdaConsumer()).toString();
+//      
+//      lambdaManager_.subscribe(lambdaName, queueArn);
+//    }
   }
   
   /*
