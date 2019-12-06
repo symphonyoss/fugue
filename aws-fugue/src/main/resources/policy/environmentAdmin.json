@@ -167,6 +167,9 @@
                 "lambda:AddPermission",
                 "lambda:RemovePermission",
                 "lambda:TagResource",
+                "lambda:ListEventSourceMappings",
+                "lambda:UpdateEventSourceMapping",
+                "lambda:CreateEventSourceMapping",
                 "s3:GetObject"
             ],
             "Resource": [
