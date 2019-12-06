@@ -100,7 +100,9 @@
                 "apigateway:DELETE",
                 "apigateway:PUT",
                 "apigateway:POST",
-                "apigateway:PATCH"
+                "apigateway:PATCH",
+                "lambda:ListEventSourceMappings",
+                "lambda:CreateEventSourceMapping"
             ],
             "Resource": [
                 "*"
@@ -167,14 +169,13 @@
                 "lambda:AddPermission",
                 "lambda:RemovePermission",
                 "lambda:TagResource",
-                "lambda:ListEventSourceMappings",
                 "lambda:UpdateEventSourceMapping",
-                "lambda:CreateEventSourceMapping",
                 "s3:GetObject"
             ],
             "Resource": [
               "arn:aws:lambda:*:${awsAccountId}:function:sym-s2-${environmentType}-${environmentId}-*",
-              "arn:aws:s3:::sym-s2-fugue-${environmentType}-*-config/lambda/*"
+              "arn:aws:s3:::sym-s2-fugue-${environmentType}-*-config/lambda/*",
+              "arn:aws:lambda:*:*:event-source-mapping:*"
             ]
         }
     ]
