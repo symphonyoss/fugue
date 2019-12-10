@@ -114,14 +114,14 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
 {
   private static final Logger         log_                   = LoggerFactory.getLogger(AbstractDynamoDbKvTable.class);
 
-  protected static final String       ColumnNamePartitionKey = "pk";
-  protected static final String       ColumnNameSortKey      = "sk";
-  protected static final String       ColumnNameDocument     = "d";
-  protected static final String       ColumnNamePodId        = "p";
-  protected static final String       ColumnNamePayloadType  = "pt";
-  protected static final String       ColumnNameTTL          = "t";
-  protected static final String       ColumnNameCreatedDate  = "c";
-  protected static final String       ColumnNameAbsoluteHash = "h";
+  public static final String       ColumnNamePartitionKey = "pk";
+  public static final String       ColumnNameSortKey      = "sk";
+  public static final String       ColumnNameDocument     = "d";
+  public static final String       ColumnNamePodId        = "p";
+  public static final String       ColumnNamePayloadType  = "pt";
+  public static final String       ColumnNameTTL          = "t";
+  public static final String       ColumnNameCreatedDate  = "c";
+  public static final String       ColumnNameAbsoluteHash = "h";
 
   protected static final int          MAX_RECORD_SIZE        = 400 * 1024;
 
