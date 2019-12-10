@@ -86,6 +86,8 @@ import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputExceededExce
 import com.amazonaws.services.dynamodbv2.model.Put;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
+import com.amazonaws.services.dynamodbv2.model.StreamSpecification;
+import com.amazonaws.services.dynamodbv2.model.StreamViewType;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 import com.amazonaws.services.dynamodbv2.model.Tag;
 import com.amazonaws.services.dynamodbv2.model.TagResourceRequest;
@@ -95,6 +97,8 @@ import com.amazonaws.services.dynamodbv2.model.TransactWriteItem;
 import com.amazonaws.services.dynamodbv2.model.TransactWriteItemsRequest;
 import com.amazonaws.services.dynamodbv2.model.TransactionCanceledException;
 import com.amazonaws.services.dynamodbv2.model.Update;
+import com.amazonaws.services.dynamodbv2.model.UpdateTableRequest;
+import com.amazonaws.services.dynamodbv2.model.UpdateTableResult;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveRequest;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveResult;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
@@ -108,29 +112,30 @@ import com.amazonaws.services.dynamodbv2.model.WriteRequest;
  */
 public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<T>> extends AbstractKvTable<T>
 {
-  private static final Logger   log_                   = LoggerFactory.getLogger(AbstractDynamoDbKvTable.class);
+  private static final Logger         log_                   = LoggerFactory.getLogger(AbstractDynamoDbKvTable.class);
 
-  protected static final String ColumnNamePartitionKey = "pk";
-  protected static final String ColumnNameSortKey      = "sk";
-  protected static final String ColumnNameDocument     = "d";
-  protected static final String ColumnNamePodId        = "p";
-  protected static final String ColumnNamePayloadType  = "pt";
-  protected static final String ColumnNameTTL          = "t";
-  protected static final String ColumnNameCreatedDate  = "c";
-  protected static final String ColumnNameAbsoluteHash = "h";
+  protected static final String       ColumnNamePartitionKey = "pk";
+  protected static final String       ColumnNameSortKey      = "sk";
+  protected static final String       ColumnNameDocument     = "d";
+  protected static final String       ColumnNamePodId        = "p";
+  protected static final String       ColumnNamePayloadType  = "pt";
+  protected static final String       ColumnNameTTL          = "t";
+  protected static final String       ColumnNameCreatedDate  = "c";
+  protected static final String       ColumnNameAbsoluteHash = "h";
 
-  protected static final int    MAX_RECORD_SIZE        = 400 * 1024;
-  
-  protected final String        region_;
+  protected static final int          MAX_RECORD_SIZE        = 400 * 1024;
 
-  protected AmazonDynamoDB      amazonDynamoDB_;
-  protected DynamoDB            dynamoDB_;
-  protected Table               objectTable_;
+  protected final String              region_;
 
-  protected final String        objectTableName_;
-  protected final int           payloadLimit_;
-  protected final boolean       validate_;
-  protected final boolean       enableSecondaryStorage_;
+  protected AmazonDynamoDB            amazonDynamoDB_;
+  protected DynamoDB                  dynamoDB_;
+  protected Table                     objectTable_;
+
+  protected final String              objectTableName_;
+  protected final int                 payloadLimit_;
+  protected final boolean             validate_;
+  protected final boolean             enableSecondaryStorage_;
+  protected final StreamSpecification streamSpecification_;
   
   protected AbstractDynamoDbKvTable(AbstractBuilder<?,?> builder)
   {
@@ -140,6 +145,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     payloadLimit_ = builder.payloadLimit_;
     validate_ = builder.validate_;
     enableSecondaryStorage_ = builder.enableSecondaryStorage_;
+    streamSpecification_ = builder.streamSpecification_;
   
     log_.info("Starting storage...");
     
@@ -1117,6 +1123,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       tableArn = tableInfo.getTableArn();
 
       log_.info("Table \"" + objectTableName_ + "\" already exists as " + tableArn);
+      
+      configureStream(streamSpecification_, tableInfo);
     }
     catch (ResourceNotFoundException e)
     {
@@ -1142,6 +1150,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
                   )
               .withKeySchema(new KeySchemaElement(ColumnNamePartitionKey, KeyType.HASH), new KeySchemaElement(ColumnNameSortKey, KeyType.RANGE))
               .withBillingMode(BillingMode.PAY_PER_REQUEST)
+              .withStreamSpecification(streamSpecification_)
               ;
           
           result = amazonDynamoDB_.createTable(request);
@@ -1165,6 +1174,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
         }
       }
     }
+    
     
 //    configureAutoScale();
     
@@ -1265,6 +1275,47 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
 //    }
 //  }
   
+  private void configureStream(StreamSpecification streamSpecification, TableDescription tableInfo)
+  {
+    String streamArn = tableInfo.getLatestStreamArn();
+    
+    if(streamSpecification == null || !streamSpecification.isStreamEnabled())
+    {
+      if(streamArn != null || tableInfo.getStreamSpecification().isStreamEnabled())
+      {
+        log_.info("Table has streams enabled, disabling....");
+        streamSpecification = new StreamSpecification().withStreamEnabled(false);
+      }
+      else
+      {
+        log_.info("Table does not have streams enabled, nothing to do here.");
+        return;
+      }
+    }
+    else
+    {
+      if(streamArn == null || !tableInfo.getStreamSpecification().isStreamEnabled())
+      {
+        log_.info("Enabling streams for table....");
+      }
+      else
+      {
+        log_.info("Table has streams enabled, nothing to do here.");
+        return;
+      }
+    }
+    
+    
+    UpdateTableRequest  updateTableRequest = new UpdateTableRequest()
+        .withTableName(objectTable_.getTableName())
+        .withStreamSpecification(streamSpecification)
+        ;
+    
+    amazonDynamoDB_.updateTable(updateTableRequest);
+    
+    log_.info("Stream settings updated.");
+  }
+
   @Override
   public void deleteTable(boolean dryRun)
   {
@@ -1394,10 +1445,12 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   {
     protected final AmazonDynamoDBClientBuilder amazonDynamoDBClientBuilder_;
 
-    protected String                            region_;
-    protected int                               payloadLimit_           = MAX_RECORD_SIZE;
-    protected boolean                           validate_               = true;
-    protected boolean                           enableSecondaryStorage_ = false;
+    protected String              region_;
+    protected int                 payloadLimit_           = MAX_RECORD_SIZE;
+    protected boolean             validate_               = true;
+    protected boolean             enableSecondaryStorage_ = false;
+
+    protected StreamSpecification streamSpecification_    = new StreamSpecification().withStreamEnabled(false);
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -1417,6 +1470,13 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     public T withValidate(boolean validate)
     {
       validate_ = validate;
+      
+      return self();
+    }
+    
+    public T withStreamSpecification(StreamSpecification streamSpecification)
+    {
+      streamSpecification_ = streamSpecification;
       
       return self();
     }
