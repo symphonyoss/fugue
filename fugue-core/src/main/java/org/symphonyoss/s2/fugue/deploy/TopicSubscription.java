@@ -24,20 +24,34 @@
 package org.symphonyoss.s2.fugue.deploy;
 
 import org.symphonyoss.s2.common.dom.json.JsonObject;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
+import org.symphonyoss.s2.fugue.naming.TopicName;
 
-public abstract class Subscription
+public abstract class TopicSubscription extends Subscription
 {
-  private final int    batchSize_;
+  private final INameFactory nameFactory_;
+  private final String       serviceId_;
+  private final String       topicId_;
+  private final String       subscriptionId_;
+  private final String       queueName_;
   
-  public Subscription(JsonObject<?> json, int defaultBatchSize)
+  public TopicSubscription(JsonObject<?> json, INameFactory nameFactory)
   {
-    batchSize_ = json.getInteger("batchSize", defaultBatchSize);
+    super(json, 10);
+    
+    nameFactory_ = nameFactory;
+    
+    serviceId_ = json.getString("serviceId", null);
+    topicId_ = json.getRequiredString("topicId");
+    subscriptionId_ = json.getString("subscriptionId", null);
+    
+    TopicName topicName = serviceId_ == null ? nameFactory_.getTopicName(topicId_) : nameFactory_.getTopicName(serviceId_, topicId_);
+    
+    queueName_ = nameFactory_.getSubscriptionName(topicName, subscriptionId_).toString();
   }
 
-  public int getBatchSize()
+  public String getQueueName()
   {
-    return batchSize_;
+    return queueName_;
   }
-
-  public abstract void create(String functionName);
 }

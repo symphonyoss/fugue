@@ -47,6 +47,7 @@ import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
+import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
@@ -120,6 +121,11 @@ import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
 import com.amazonaws.services.cloudwatchevents.model.RemoveTargetsRequest;
 import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreams;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreamsClientBuilder;
+import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
 import com.amazonaws.services.ecs.model.AmazonECSException;
@@ -195,22 +201,15 @@ import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.AddPermissionRequest;
 import com.amazonaws.services.lambda.model.AddPermissionResult;
-import com.amazonaws.services.lambda.model.CreateEventSourceMappingRequest;
-import com.amazonaws.services.lambda.model.CreateEventSourceMappingResult;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
 import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
 import com.amazonaws.services.lambda.model.Environment;
-import com.amazonaws.services.lambda.model.EventSourceMappingConfiguration;
 import com.amazonaws.services.lambda.model.FunctionCode;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
 import com.amazonaws.services.lambda.model.GetFunctionResult;
-import com.amazonaws.services.lambda.model.ListEventSourceMappingsRequest;
-import com.amazonaws.services.lambda.model.ListEventSourceMappingsResult;
 import com.amazonaws.services.lambda.model.RemovePermissionRequest;
 import com.amazonaws.services.lambda.model.RemovePermissionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
-import com.amazonaws.services.lambda.model.UpdateEventSourceMappingRequest;
-import com.amazonaws.services.lambda.model.UpdateEventSourceMappingResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 import com.amazonaws.services.logs.AWSLogs;
@@ -350,6 +349,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private AmazonECS                      ecsClient_;
   private AWSLogs                        logsClient_;
   private AmazonApiGateway               apiClient_;
+  private AmazonDynamoDBStreams          dynamoStreamsClient_;
+
+  private AmazonDynamoDB amazonDynamoDB_;
+
+  private DynamoDB dynamoDB_;
 
 
 
@@ -620,6 +624,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           AmazonApiGatewayClientBuilder.standard()
           .withRegion(awsClientRegion_)
           .build();
+      
+      amazonDynamoDB_ = AmazonDynamoDBClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      dynamoDB_               = new DynamoDB(amazonDynamoDB_);
+      
+      dynamoStreamsClient_ = AmazonDynamoDBStreamsClientBuilder.standard()
+        .withRegion(awsClientRegion_)
+        .build();
     }
     else
     {
@@ -628,8 +642,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       throw new IllegalStateException("The top level configuration object called \"" + AMAZON + "\" must be an object not a " + node.getClass().getSimpleName());
     }
+    
+    
+    
   }
-  
+
   private void getStringArray(IJsonObject<?> amazon, String nodeName, List<String> list)
   {
     IJsonDomNode sgNode = amazon.get(nodeName);
@@ -1136,6 +1153,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
+    protected Subscription newQueueSubscription(JsonObject<?> sn)
+    {
+      return new AwsTopicSubscription(sn, getNameFactory(), lambdaClient_,
+          String.format("arn:aws:sqs:%s:%s:",
+              awsRegion_,
+              awsAccountId_)
+          );
+    }
+
+    @Override
+    protected Subscription newDbSubscription(JsonObject<?> sn)
+    {
+      return new AwsDbSubscription(sn, getNameFactory(), lambdaClient_, dynamoStreamsClient_, amazonDynamoDB_);
+    }
+
+    @Override
     protected void putFugueConfig(Map<String, String> environment)
     {
       String storedConfig = "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
@@ -1639,41 +1672,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       for(Subscription subscription : subscriptions)
       {
-        String queueName = subscription.getQueueName(getNameFactory());
-        String queueArn = getQueueArn(queueName);
-        
-        ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
-            .withFunctionName(functionName)
-            .withEventSourceArn(queueArn)
-            );
-        
-        for(EventSourceMappingConfiguration mapping : mappingResult.getEventSourceMappings())
-        {
-          if("Enabled".equals(mapping.getState()))
-          {
-            log_.info("Mapping exists.");
-            return;
-          }
-          
-          log_.info("Mapping exists but is " + mapping.getState());
-          
-          UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
-              .withUUID(mapping.getUUID())
-              .withEnabled(true)
-              );
-          
-          log_.info("Mapping updated to state " + updateResult.getState());
-          
-          return;
-        }
-        CreateEventSourceMappingResult result = lambdaClient_.createEventSourceMapping(new CreateEventSourceMappingRequest()
-            .withEnabled(true)
-            .withBatchSize(subscription.getBatchSize())
-            .withFunctionName(functionName)
-            .withEventSourceArn(queueArn)
-            );
-        
-        log_.info("CreateEventSourceMappingResult=" + result);
+        subscription.create(functionName);
       }
     }
 

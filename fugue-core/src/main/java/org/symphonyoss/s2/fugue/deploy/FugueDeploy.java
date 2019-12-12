@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1032,6 +1033,7 @@ public abstract class FugueDeploy extends CommandLineHandler
   {
     protected static final String FUGUE_CONFIG = "FUGUE_CONFIG";
     protected static final String FUGUE_STORED_CONFIG = "FUGUE_STORED_CONFIG";
+    protected static final String MUST_BE_ARRAY_OF_OBJECTS = "\"subscriptions\" must be an array of objects.";
 
     private final String                                   podName_;
 
@@ -1084,6 +1086,9 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void undeployService();
 
     protected abstract void putFugueConfig(Map<String, String> environment);
+    
+    protected abstract Subscription newQueueSubscription(JsonObject<?> sn);
+    protected abstract Subscription newDbSubscription(JsonObject<?> sn);
     
     protected INameFactory getNameFactory()
     {
@@ -1510,7 +1515,7 @@ public abstract class FugueDeploy extends CommandLineHandler
           JsonObject<?> container = map.get(name);
 
           Collection<String> paths = container.getListOf(String.class, PATHS);
-          Collection<Subscription> subscriptions = Subscription.getSubscriptions(container);
+          Collection<Subscription> subscriptions = getSubscriptions(container);
           
           postDeployLambdaContainer(name,
               paths,
@@ -1518,6 +1523,59 @@ public abstract class FugueDeploy extends CommandLineHandler
               );
         }
       }
+    }
+
+    private Collection<Subscription> getSubscriptions(JsonObject<?> json)
+    {
+      List<Subscription> result = new LinkedList<>();
+      
+      IJsonDomNode node = json.get("topicSubscriptions");
+      
+      if(node instanceof IJsonArray)
+      {
+        IJsonArray<?> subscriptions = (IJsonArray<?>)node;
+        
+        for(IJsonDomNode sn : subscriptions)
+        {
+          if(sn instanceof JsonObject)
+          {
+            result.add(newQueueSubscription((JsonObject<?>) sn));
+          }
+          else
+          {
+            throw new IllegalStateException(MUST_BE_ARRAY_OF_OBJECTS);
+          }
+        }
+      }
+      else if(node != null)
+      {
+        throw new IllegalStateException(MUST_BE_ARRAY_OF_OBJECTS);
+      }
+      
+      node = json.get("dbSubscriptions");
+      
+      if(node instanceof IJsonArray)
+      {
+        IJsonArray<?> subscriptions = (IJsonArray<?>)node;
+        
+        for(IJsonDomNode sn : subscriptions)
+        {
+          if(sn instanceof JsonObject)
+          {
+            result.add(newDbSubscription((JsonObject<?>) sn));
+          }
+          else
+          {
+            throw new IllegalStateException(MUST_BE_ARRAY_OF_OBJECTS);
+          }
+        }
+      }
+      else if(node != null)
+      {
+        throw new IllegalStateException(MUST_BE_ARRAY_OF_OBJECTS);
+      }
+      
+      return result;
     }
 
     private void deployDockerContainers(IBatch<Runnable> batch, ContainerType containerType, boolean scheduled)
@@ -1570,7 +1628,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     
     return s;
   }
-  
+
   public static String stripBefore(String s, char c)
   {
     int i = s.lastIndexOf(c);

@@ -24,20 +24,21 @@
 package org.symphonyoss.s2.fugue.deploy;
 
 import org.symphonyoss.s2.common.dom.json.JsonObject;
+import org.symphonyoss.s2.fugue.naming.INameFactory;
 
-public abstract class Subscription
+public abstract class DbSubscription extends Subscription
 {
-  private final int    batchSize_;
+  private final String tableName_;
   
-  public Subscription(JsonObject<?> json, int defaultBatchSize)
+  public DbSubscription(JsonObject<?> json, INameFactory nameFactory)
   {
-    batchSize_ = json.getInteger("batchSize", defaultBatchSize);
+    super(json, 1000);
+    
+    tableName_ = nameFactory.getTableName(json.getRequiredString("tableName")).toString();;
   }
 
-  public int getBatchSize()
+  public String getTableName()
   {
-    return batchSize_;
+    return tableName_;
   }
-
-  public abstract void create(String functionName);
 }
