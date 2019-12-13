@@ -1495,7 +1495,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       return self();
     }
 
-    public T withRegion(int payloadLimit)
+    public T withPayloadLimit(int payloadLimit)
     {
       payloadLimit_ = Math.min(payloadLimit, MAX_RECORD_SIZE);
       
