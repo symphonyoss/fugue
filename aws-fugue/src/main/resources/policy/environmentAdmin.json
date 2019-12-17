@@ -177,6 +177,16 @@
               "arn:aws:s3:::sym-s2-fugue-${environmentType}-*-config/lambda/*",
               "arn:aws:lambda:*:*:event-source-mapping:*"
             ]
+        },
+        {
+          "Sid": "DynamoTables",
+          "Effect": "Allow",
+          "Action": [
+            "dynamodb:ListStreams",
+            "dynamodb:UpdateTable",
+            "dynamodb:DescribeStream"
+          ],
+          "Resource": "arn:aws:dynamodb:*:*:table/sym-s2-${environmentType}-${environmentId}-*"
         }
     ]
 }
