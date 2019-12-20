@@ -1281,7 +1281,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     
     if(streamSpecification == null || !streamSpecification.isStreamEnabled())
     {
-      if(streamArn != null || tableInfo.getStreamSpecification().isStreamEnabled())
+      if(streamArn != null || (tableInfo.getStreamSpecification() != null && tableInfo.getStreamSpecification().isStreamEnabled()))
       {
         log_.info("Table has streams enabled, disabling....");
         streamSpecification = new StreamSpecification().withStreamEnabled(false);
