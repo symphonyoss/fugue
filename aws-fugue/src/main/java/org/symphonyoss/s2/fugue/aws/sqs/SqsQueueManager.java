@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.common.exception.NotFoundException;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
@@ -47,6 +48,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 
 /**
  * AWS SQS implementation of QueueManager.
@@ -114,7 +116,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public synchronized IQueueReceiver getReceiver(String queueName)
+  public synchronized IQueueReceiver getReceiver(String queueName) throws NotFoundException
   {
     try
     {
@@ -123,6 +125,16 @@ public class SqsQueueManager implements IQueueManager
     catch (ExecutionException e)
     {
       throw new CodingFault("Can't Happen", e);
+    }
+    catch(UncheckedExecutionException e)
+    {
+      if(e.getCause() instanceof QueueDoesNotExistException)
+        throw new NotFoundException("Queue does not exist", e);
+      
+      if(e.getCause() instanceof RuntimeException)
+        throw (RuntimeException)e.getCause();
+      
+      throw e;
     }
   }
 
