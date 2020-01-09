@@ -34,6 +34,7 @@ import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -424,7 +425,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     {
       DeleteConsumer deleteConsumer = new DeleteConsumer(absoluteHashPrefix);
       
-      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, deleteConsumer, trace);
+      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, null, deleteConsumer, trace);
       
       deleteConsumer.dynamoBatchWrite();
     } while (after != null);
@@ -1344,21 +1345,36 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   }
 
   @Override
-  public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+  public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+      @Nullable String after,
+      @Nullable String sortKeyPrefix,
       Consumer<String> consumer, ITraceContext trace)
   {
-    return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, new PartitionConsumer(consumer), trace);
+    return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, sortKeyPrefix, new PartitionConsumer(consumer), trace);
   }
 
-  private String doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+  private String doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+      @Nullable String after,
+      @Nullable String sortKeyPrefix,
       AbstractItemConsumer consumer, ITraceContext trace)
   {
     return doDynamoQueryTask(() ->
     {
+      ValueMap valueMap = new ValueMap()
+          .withString(":v_partition", getPartitionKey(partitionKey))
+          ;
+      
+      String keyConditionExpression = ColumnNamePartitionKey + " = :v_partition";
+      
+      if(sortKeyPrefix != null)
+      {
+        keyConditionExpression += " and begins_with(" + ColumnNameSortKey + ", :v_sortKeyPrefix)";
+        valueMap.put(":v_sortKeyPrefix", sortKeyPrefix);
+      }
+      
       QuerySpec spec = new QuerySpec()
-          .withKeyConditionExpression(ColumnNamePartitionKey + " = :v_partition")
-          .withValueMap(new ValueMap()
-              .withString(":v_partition", getPartitionKey(partitionKey)))
+          .withKeyConditionExpression(keyConditionExpression)
+          .withValueMap(valueMap)
           .withScanIndexForward(scanForwards)
           ;
       

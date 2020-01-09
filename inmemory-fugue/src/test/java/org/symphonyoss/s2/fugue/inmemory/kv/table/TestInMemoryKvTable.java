@@ -105,7 +105,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, null, null, consumer, trace);
+    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, null, null, null, consumer, trace);
    
     assertEquals(null, after);
     assertEquals(ITEMS.length, consumer.index_);
@@ -118,7 +118,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(5, -1);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, null, null, consumer, trace);
+    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, null, null, null, consumer, trace);
    
     assertEquals(null, after);
     assertEquals(-1, consumer.index_);
@@ -131,7 +131,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, null, consumer, trace);
+    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, null, null, consumer, trace);
    
     assertEquals(ITEMS[1].getSortKey().asString(), after);
     assertEquals(2, consumer.index_);
@@ -144,7 +144,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(2);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), consumer, trace);
+    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), null, consumer, trace);
    
     assertEquals(ITEMS[3].getSortKey().asString(), after);
     assertEquals(4, consumer.index_);
@@ -158,7 +158,7 @@ public class TestInMemoryKvTable
     Checker consumer = new Checker(2, -1);
        
     String after = table.fetchPartitionObjects(
-        new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, 2, ITEMS[3].getSortKey().asString(), consumer, trace);
+        new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, 2, ITEMS[3].getSortKey().asString(), null, consumer, trace);
    
     assertEquals(ITEMS[1].getSortKey().asString(), after);
     assertEquals(0, consumer.index_);

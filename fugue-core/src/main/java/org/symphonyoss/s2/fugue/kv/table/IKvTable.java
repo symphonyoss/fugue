@@ -27,6 +27,8 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
@@ -136,12 +138,15 @@ public interface IKvTable extends IFugueComponent
    * @param scanForwards  If true then scan objects in the order of their sort keys, else in reverse order.
    * @param limit         An optional limit to the number of objects retrieved.
    * @param after         An optional page cursor to continue a previous query.
+   * @param sortKeyPrefix An optional sort key prefix.
    * @param consumer      A consumer to receive the retrieved objects.
    * @param trace         Trace context.
    * 
    * @return              A new after token to allow a continuation query to be made.
    */
-  String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, String after,
+  String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+      @Nullable String after,
+      @Nullable String sortKeyPrefix,
       Consumer<String> consumer, ITraceContext trace);
 
 

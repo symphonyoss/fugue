@@ -245,7 +245,7 @@ public class InMemoryKvTable implements IKvTable
 
   @Override
   public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKeyProvider, boolean scanForwards, Integer limit,
-      String after, Consumer<String> consumer, ITraceContext trace)
+      String after, String sortKeyPrefix, Consumer<String> consumer, ITraceContext trace)
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
     
@@ -270,7 +270,8 @@ public class InMemoryKvTable implements IKvTable
     
     for(Entry<String, IKvItem> entry : map.entrySet())
     {
-      consumer.accept(entry.getValue().getJson());
+      if(sortKeyPrefix == null || entry.getKey().startsWith(sortKeyPrefix))
+        consumer.accept(entry.getValue().getJson());
       
       if(--limit <= 0)
         return entry.getKey();
