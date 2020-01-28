@@ -49,8 +49,10 @@ import org.symphonyoss.s2.fugue.aws.AwsTags;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
+import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
 
 import com.amazonaws.AmazonServiceException;
@@ -88,7 +90,6 @@ import com.amazonaws.services.dynamodbv2.model.Put;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
 import com.amazonaws.services.dynamodbv2.model.StreamSpecification;
-import com.amazonaws.services.dynamodbv2.model.StreamViewType;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 import com.amazonaws.services.dynamodbv2.model.Tag;
 import com.amazonaws.services.dynamodbv2.model.TagResourceRequest;
@@ -99,7 +100,6 @@ import com.amazonaws.services.dynamodbv2.model.TransactWriteItemsRequest;
 import com.amazonaws.services.dynamodbv2.model.TransactionCanceledException;
 import com.amazonaws.services.dynamodbv2.model.Update;
 import com.amazonaws.services.dynamodbv2.model.UpdateTableRequest;
-import com.amazonaws.services.dynamodbv2.model.UpdateTableResult;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveRequest;
 import com.amazonaws.services.dynamodbv2.model.UpdateTimeToLiveResult;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
@@ -425,7 +425,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     {
       DeleteConsumer deleteConsumer = new DeleteConsumer(absoluteHashPrefix);
       
-      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, null, deleteConsumer, trace);
+      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, null, deleteConsumer, trace).getAfter();
       
       deleteConsumer.dynamoBatchWrite();
     } while (after != null);
@@ -1345,7 +1345,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   }
 
   @Override
-  public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+  public IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
       Consumer<String> consumer, ITraceContext trace)
@@ -1353,7 +1353,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, sortKeyPrefix, new PartitionConsumer(consumer), trace);
   }
 
-  private String doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+  private IKvPagination doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
       AbstractItemConsumer consumer, ITraceContext trace)
@@ -1393,7 +1393,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     
       Map<String, AttributeValue> lastEvaluatedKey = null;
       ItemCollection<QueryOutcome> items = objectTable_.query(spec);
-      
+      String before = null;
       for(Page<Item, QueryOutcome> page : items.pages())
       {
         Iterator<Item> it = page.iterator();
@@ -1403,6 +1403,11 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
           Item item = it.next();
           
           consumer.consume(item, trace);
+          
+          if(before == null && after != null)
+          {
+            before = item.getString(ColumnNameSortKey);
+          }
         }
       }
       
@@ -1412,10 +1417,10 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       {
         AttributeValue sequenceKeyAttr = lastEvaluatedKey.get(ColumnNameSortKey);
         
-        return sequenceKeyAttr.getS();
+        return new KvPagination(before, sequenceKeyAttr.getS());
       }
       
-      return null;
+      return new KvPagination(before, null);
     });
   }
 

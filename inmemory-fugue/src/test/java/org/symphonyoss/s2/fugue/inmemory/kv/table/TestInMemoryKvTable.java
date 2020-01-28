@@ -22,6 +22,7 @@ import org.symphonyoss.s2.common.hash.HashProvider;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.NoOpTraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
+import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKey;
 import org.symphonyoss.s2.fugue.kv.IKvSortKey;
 import org.symphonyoss.s2.fugue.kv.KvPartitionKey;
@@ -105,9 +106,10 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, null, null, null, consumer, trace);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, null, null, null, consumer, trace);
    
-    assertEquals(null, after);
+    assertEquals(null, pagination.getBefore());
+    assertEquals(null, pagination.getAfter());
     assertEquals(ITEMS.length, consumer.index_);
   }
   
@@ -118,9 +120,10 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(5, -1);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, null, null, null, consumer, trace);
-   
-    assertEquals(null, after);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, null, null, null, consumer, trace);
+
+    assertEquals(null, pagination.getBefore());
+    assertEquals(null, pagination.getAfter());
     assertEquals(-1, consumer.index_);
   }
   
@@ -131,9 +134,10 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, null, null, consumer, trace);
-   
-    assertEquals(ITEMS[1].getSortKey().asString(), after);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, null, null, consumer, trace);
+
+    assertEquals(null, pagination.getBefore());
+    assertEquals(ITEMS[1].getSortKey().asString(), pagination.getAfter());
     assertEquals(2, consumer.index_);
   }
   
@@ -144,9 +148,10 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(2);
        
-    String after = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), null, consumer, trace);
-   
-    assertEquals(ITEMS[3].getSortKey().asString(), after);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), null, consumer, trace);
+
+    assertEquals(ITEMS[2].getSortKey().asString(), pagination.getBefore());
+    assertEquals(ITEMS[3].getSortKey().asString(), pagination.getAfter());
     assertEquals(4, consumer.index_);
   }
   
@@ -157,10 +162,11 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(2, -1);
        
-    String after = table.fetchPartitionObjects(
+    IKvPagination pagination = table.fetchPartitionObjects(
         new KvPartitionKeyProvider(POD_ID, PARTITION_KEY1), false, 2, ITEMS[3].getSortKey().asString(), null, consumer, trace);
    
-    assertEquals(ITEMS[1].getSortKey().asString(), after);
+    assertEquals(ITEMS[2].getSortKey().asString(), pagination.getBefore());
+    assertEquals(ITEMS[1].getSortKey().asString(), pagination.getAfter());
     assertEquals(0, consumer.index_);
   }
   

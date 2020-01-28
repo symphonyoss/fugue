@@ -38,8 +38,10 @@ import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
+import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.IKvTable;
 
 /**
@@ -244,7 +246,7 @@ public class InMemoryKvTable implements IKvTable
   }
 
   @Override
-  public String fetchPartitionObjects(IKvPartitionKeyProvider partitionKeyProvider, boolean scanForwards, Integer limit,
+  public IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKeyProvider, boolean scanForwards, Integer limit,
       String after, String sortKeyPrefix, Consumer<String> consumer, ITraceContext trace)
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
@@ -252,6 +254,7 @@ public class InMemoryKvTable implements IKvTable
     TreeMap<String, IKvItem> partition = getPartition(partitionKey);
 
     NavigableMap<String, IKvItem> map; 
+    String before = null;
     
     if(after == null)
     {
@@ -261,23 +264,33 @@ public class InMemoryKvTable implements IKvTable
         map = partition.descendingMap();
     }
     else if(scanForwards)
-      map = partition.tailMap(after, false);
+    {
+      map   = partition.tailMap(after, false);
+      before = map.isEmpty() ||  map.firstKey().equals(partition.firstKey()) ? null : map.firstKey();
+    }
     else
-      map = partition.descendingMap().tailMap(after, false);
+    {
+      map   = partition.descendingMap().tailMap(after, false);
+      before = map.isEmpty() ||  map.firstKey().equals(partition.firstKey()) ? null : map.firstKey();
+    }
     
     if(limit == null)
       limit = 100;
+    
+    int available = map.entrySet().size();
     
     for(Entry<String, IKvItem> entry : map.entrySet())
     {
       if(sortKeyPrefix == null || entry.getKey().startsWith(sortKeyPrefix))
         consumer.accept(entry.getValue().getJson());
+    
+      available--;
       
       if(--limit <= 0)
-        return entry.getKey();
+        return new KvPagination(before, available==0 ? null : entry.getKey());
     }
         
-    return null;
+    return new KvPagination(before, null);
   }
   
   /**

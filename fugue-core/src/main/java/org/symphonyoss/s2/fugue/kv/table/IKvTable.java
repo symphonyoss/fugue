@@ -34,6 +34,7 @@ import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
+import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 
@@ -142,9 +143,9 @@ public interface IKvTable extends IFugueComponent
    * @param consumer      A consumer to receive the retrieved objects.
    * @param trace         Trace context.
    * 
-   * @return              A new after token to allow a continuation query to be made.
+   * @return              Pagination tokens to allow a continuation query to be made.
    */
-  String fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
+  IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
       Consumer<String> consumer, ITraceContext trace);
