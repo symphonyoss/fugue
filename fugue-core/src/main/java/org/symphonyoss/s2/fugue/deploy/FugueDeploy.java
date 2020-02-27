@@ -614,10 +614,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     }
     
     // deploy Multi tenant config
-    if(action_.isDeploy_)
-    {
-      multiTenantContext_.processConfigAndPolicies();
-    }
+    multiTenantContext_.processConfigAndPolicies();
     
     // multi tenant init containers
     multiTenantContext_.deployInitContainers();
@@ -631,7 +628,7 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         batch.submit(() ->
         {
-          if(action_.isDeploy_)
+          if(action_.isDeploy_ || action_.isUndeploy_)
           {
             String podName = context.getPodName();
             
@@ -661,9 +658,9 @@ public abstract class FugueDeploy extends CommandLineHandler
                 tenantIdConfig);
             
             context.setConfig(filterConfig(singleTenantConfig, configFilter));
-            context.processConfigAndPolicies();
-            
           }
+          
+          context.processConfigAndPolicies();
           
           if(action_.processContainers_)
           {
@@ -682,8 +679,10 @@ public abstract class FugueDeploy extends CommandLineHandler
       
       IBatch<Runnable> containerBatch = createBatch();
           
-      
-      multiTenantContext_.deployServiceContainers(containerBatch);
+      if(action_.processMultiTenant_)
+      {
+        multiTenantContext_.deployServiceContainers(containerBatch);
+      }
       
       for(DeploymentContext context : tenantContextMap_.values())
       {
@@ -714,10 +713,13 @@ public abstract class FugueDeploy extends CommandLineHandler
         });
       }
       
-      multiTenantContext_.undeployInitContainers();
-      multiTenantContext_.deleteConfigAndPolicies();
-      
       batch.waitForAllTasks();
+      
+      if(action_ == FugueDeployAction.UndeployAll)
+      {
+        multiTenantContext_.undeployInitContainers();
+        multiTenantContext_.deleteConfigAndPolicies();
+      }
     }
   }
   
@@ -1406,12 +1408,31 @@ public abstract class FugueDeploy extends CommandLineHandler
       {
         for(String name : initContainerMap.keySet())
         {
+//          JsonObject<?> container = initContainerMap.get(name);
+//          
+//          IJsonDomNode        portNode = container.get(PORT);
+//          int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
+//          Collection<String>  paths = container.getListOf(String.class, PATHS);
+//          String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+//          
+//          deployInitContainer
+          
+
           JsonObject<?> container = initContainerMap.get(name);
           
           IJsonDomNode        portNode = container.get(PORT);
           int                 port = portNode == null ? 80 : TypeAdaptor.adapt(Integer.class, portNode);
           Collection<String>  paths = container.getListOf(String.class, PATHS);
           String              healthCheckPath = container.getString(HEALTH_CHECK_PATH, "/HealthCheck");
+          String              roleId = container.getRequiredString(ROLE);
+          Name                roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
+          
+          String              imageId       = container.getString(IMAGE, name);
+          String              imageName     = getNameFactory().getServiceImageName() + "/" + imageId + ":" + buildId_;
+          int jvmHeap = container.getInteger("jvmHeap", 512);
+          int memory = container.getInteger("memory", 1024);
+          
+          deployInitContainer(name, port, paths, healthCheckPath, roleName, imageName, jvmHeap, memory);
           
           undeployInitContainer(name, port, paths, healthCheckPath);
         }

@@ -1175,7 +1175,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           "-" + getAwsRegion() + "-config/config/" +
           getNameFactory().getPhysicalServiceName() + ".json";
       
-      if(configValue_.length() < 3000)
+      if(configValue_ == null)
+      {
+        System.err.println("HERE");
+        environment.put(FUGUE_CONFIG, storedConfig);
+      }
+      else if(configValue_.length() < 3000)
       {
         environment.put(FUGUE_CONFIG, configValue_);
         environment.put(FUGUE_STORED_CONFIG, storedConfig);
@@ -2937,9 +2942,9 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       if(apiGatewayArn_ != null)
       {
-        apiClient_.deleteRestApi(new DeleteRestApiRequest()
-            .withRestApiId(apiGatewayId_)
-            );
+//        apiClient_.deleteRestApi(new DeleteRestApiRequest()
+//            .withRestApiId(apiGatewayId_)
+//            );
       }
     }
   }

@@ -33,24 +33,26 @@ package org.symphonyoss.s2.fugue.deploy;
 public enum FugueDeployAction
 {
   
-  CreateEnvironmentType(  true,  false, true,  false),
-  CreateEnvironment(      true,  false, true,  false),
-  CreateRegion(           true,  false, true,  false),
-  DeployConfig(           true,  false, true,  false),
-  Deploy(                 true,  true, true,  false),
-  Undeploy(               false,  true, false,  true),
-  UndeployAll(            false,  true, false,  true);
+  CreateEnvironmentType(  true,  false, true,  false,  false),
+  CreateEnvironment(      true,  false, true,  false,  false),
+  CreateRegion(           true,  false, true,  false,  false),
+  DeployConfig(           true,  false, true,  false,  false),
+  Deploy(                 true,  true, true,  false,  true),
+  Undeploy(               false,  true, false,  true,  false),
+  UndeployAll(            false,  true, false,  true,  true);
   
   public final boolean  processConfig_;
   public final boolean  processContainers_;
+  public final boolean  processMultiTenant_;
   public final boolean  isDeploy_;
   public final boolean  isUndeploy_;
-  private FugueDeployAction(boolean processConfig, boolean processContainers, boolean isDeploy, boolean isUndeploy)
+  private FugueDeployAction(boolean processConfig, boolean processContainers, boolean isDeploy, boolean isUndeploy, boolean processMultiTenant)
   {
     processConfig_ = processConfig;
     processContainers_ = processContainers;
     isDeploy_ = isDeploy;
     isUndeploy_ = isUndeploy;
+    processMultiTenant_ = processMultiTenant;
   }
   
   
