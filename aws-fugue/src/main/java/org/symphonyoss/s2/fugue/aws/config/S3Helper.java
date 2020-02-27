@@ -36,6 +36,7 @@ import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.BucketTaggingConfiguration;
@@ -60,7 +61,7 @@ public class S3Helper
 
   public static void deleteBucket(AmazonS3 s3, String name, boolean dryRun)
   {
-    ExecutorService         executor           = Executors.newFixedThreadPool(20,
+    ExecutorService         executor           = Executors.newFixedThreadPool(5,
         new NamedThreadFactory("Batch", true));
     
     IBatch<Runnable> batch = new ExecutorBatch<Runnable>(executor);
@@ -155,9 +156,18 @@ public class S3Helper
           
           return;
         }
-        catch(MultiObjectDeleteException e)
+        catch(SdkClientException e)
         {
           log_.error("Failed to delete objects, retrying....", e);
+          
+          try
+          {
+            Thread.sleep(900);
+          }
+          catch (InterruptedException e1)
+          {
+            log_.error("Failed to delete objects, retrying....", e1);
+          }
         }
       }
     });
