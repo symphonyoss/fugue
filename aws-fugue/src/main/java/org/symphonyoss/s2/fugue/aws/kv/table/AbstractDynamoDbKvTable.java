@@ -54,6 +54,7 @@ import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -125,6 +126,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   public static final String       ColumnNameAbsoluteHash = "h";
 
   protected static final int          MAX_RECORD_SIZE        = 400 * 1024;
+
+  private static final String KEY_EXISTS = "An object with given partition and sort key already exists.";
 
   protected final String              region_;
 
@@ -283,11 +286,29 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   @Override
   public void store(Collection<IKvItem> kvItems, ITraceContext trace)
   {
+    try
+    {
+      store(null, kvItems, trace);
+    }
+    catch (ObjectExistsException e)
+    {
+      throw new TransactionFault(e);
+    }
+  }
+
+  @Override
+  public void store(@Nullable IKvPartitionSortKeyProvider partitionSortKeyProvider, Collection<IKvItem> kvItems, ITraceContext trace) throws ObjectExistsException
+  {
     if(kvItems.isEmpty())
       return;
 
     Hash        absoluteHash = null;
     List<TransactWriteItem> actions = new ArrayList<>(kvItems.size());
+    String    existingPartitionKey = partitionSortKeyProvider==null ? null : getPartitionKey(partitionSortKeyProvider);
+    String    existingSortKey = partitionSortKeyProvider==null ? null : partitionSortKeyProvider.getSortKey().asString();
+      
+    
+    Hash secondaryStoredHash = null;
     
     for(IKvItem kvItem : kvItems)
     {
@@ -299,18 +320,41 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       absoluteHash = kvItem.getAbsoluteHash();
       
       if(kvItem.isSaveToSecondaryStorage())
+      {
         storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
+        
+        secondaryStoredHash = kvItem.getAbsoluteHash();
+      }
       
-      actions.add(new TransactWriteItem().withPut(updateOrPut.createPut()));
+      Put put = updateOrPut.createPut();
+      
+      // It's not strictly necessary to check both things for null but it stops the compiler complaining...
+      if(existingPartitionKey!=null && existingSortKey!=null && existingPartitionKey.equals(partitionKey) && existingSortKey.equals(sortKey))
+      {
+        put.withConditionExpression("attribute_not_exists(" + ColumnNamePartitionKey + ") and attribute_not_exists(" + ColumnNameSortKey + ")");
+      }
+      
+      actions.add(new TransactWriteItem().withPut(put));
     }
     
     try
     {
-      write(actions, absoluteHash, trace);
+      write(actions, absoluteHash, KEY_EXISTS, trace);
     }
     catch (NoSuchObjectException e)
     {
-      throw new TransactionFault(e);
+      if(secondaryStoredHash != null)
+      {
+        try
+        {
+          deleteFromSecondaryStorage(secondaryStoredHash, trace);
+        }
+        catch(RuntimeException e2)
+        {
+          log_.error("Failed to delete secondary copy of " + secondaryStoredHash, e2);
+        }
+      }
+      throw new ObjectExistsException(KEY_EXISTS, e);
     }
   }
   
@@ -444,7 +488,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     
     actions.add(new TransactWriteItem().withDelete(delete));
     
-    write(actions, absoluteHash, trace);
+    write(actions, absoluteHash, "Object to be deleted (" + absoluteHash + ") has changed.", trace);
   }
   
   @Override
@@ -456,6 +500,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     String    existingPartitionKey = getPartitionKey(partitionSortKeyProvider);
     String    existingSortKey = partitionSortKeyProvider.getSortKey().asString();
     Condition condition = new Condition(ColumnNameAbsoluteHash + " = :ah").withString(":ah", absoluteHash.toStringBase64());
+    
+    Hash secondaryStoredHash = null;
     
     for(IKvItem kvItem : kvItems)
     {
@@ -476,16 +522,28 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       }
       else
       {
+        Put put = updateOrPut.createPut();
+        
+        if(existingPartitionKey.equals(partitionKey))
+        {
+          put.withConditionExpression("attribute_not_exists(" + ColumnNamePartitionKey + ") and attribute_not_exists(" + ColumnNameSortKey + ")");
+        }
+            
         actions.add(new TransactWriteItem()
-            .withPut(updateOrPut.createPut()
-                )
+            .withPut(put)
             );
                 
       }
       
       if(kvItem.isSaveToSecondaryStorage())
+      {
         storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
+        
+        secondaryStoredHash = kvItem.getAbsoluteHash();
+      }
     }
+    
+    String error = "Object to be updated (" + absoluteHash + ") has changed.";
     
     if(condition != null)
     {
@@ -504,12 +562,32 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
           ;
       
       actions.add(new TransactWriteItem().withDelete(delete));
+      
+      error = "Object to be updated (" + absoluteHash + ") has changed or an object already exists with the new sort key.";
     }
     
-    write(actions, absoluteHash, trace);
+    try
+    {
+      write(actions, absoluteHash, error, trace);
+    }
+    catch (NoSuchObjectException e)
+    {
+      if(secondaryStoredHash != null)
+      {
+        try
+        {
+          deleteFromSecondaryStorage(secondaryStoredHash, trace);
+        }
+        catch(RuntimeException e2)
+        {
+          log_.error("Failed to delete secondary copy of " + secondaryStoredHash, e2);
+        }
+      }
+      throw e;
+    }
   }
   
-  protected void write(Collection<TransactWriteItem> actions, Hash absoluteHash, ITraceContext trace) throws NoSuchObjectException
+  protected void write(Collection<TransactWriteItem> actions, Hash absoluteHash, String errorMessage, ITraceContext trace) throws NoSuchObjectException
   {
     TransactWriteItemsRequest request = new TransactWriteItemsRequest()
         .withTransactItems(actions);
@@ -540,7 +618,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
             switch(reason.getCode())
             {
               case "ConditionalCheckFailed":
-                throw new NoSuchObjectException("Object " + absoluteHash + " has changed.");
+                throw new NoSuchObjectException(errorMessage);
                 
               case "None":
                 // there is an entry for each item in the transaction, this means nothing and should be ignored.
@@ -562,7 +640,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
                 break;
                 
               default:
-                throw new TransientTransactionFault("Transient failure to update object " + absoluteHash, tce);
+                throw new TransientTransactionFault("Transient failure to store object " + absoluteHash, tce);
             }
           }
         }

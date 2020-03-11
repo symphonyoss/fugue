@@ -37,6 +37,7 @@ import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 /**
  * Low level storage of KV Items.
@@ -47,12 +48,24 @@ import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 public interface IKvTable extends IFugueComponent
 {
   /**
-   * Store the given collection of items.
+   * Store the given collection of items, overwriting any existing object with the same partition and sort keys.
    * 
    * @param kvItems Items to be stored.
    * @param trace   Trace context.
    */
   void store(Collection<IKvItem> kvItems, ITraceContext trace);
+  
+
+  /**
+   * Store the given collection of items, checking that the given ppartition sort key pair does not already exist.
+   * 
+   * @param partitionSortKeyProvider  The partition and sort key of the item.
+   * @param kvItems Items to be stored.
+   * @param trace   Trace context.
+   * 
+   * @throws ObjectExistsException If an object with the give partition and sort key already exists. 
+   */
+  void store(IKvPartitionSortKeyProvider partitionSortKeyProvider, Collection<IKvItem> kvItems, ITraceContext trace) throws ObjectExistsException;
   
 
   /**

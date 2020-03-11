@@ -43,6 +43,7 @@ import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.IKvTable;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 /**
  * Base implementation of IKvTable.
@@ -138,6 +139,19 @@ public class InMemoryKvTable implements IKvTable
       if(!absoluteHash.equals(existing.getAbsoluteHash()))
         throw new NoSuchObjectException("Object has changed");
       
+      for(IKvItem kvItem : kvItems)
+      {
+        String updatePartitionKey = getPartitionKey(kvItem);
+        
+        Map<String, IKvItem> updatePartition = getPartition(updatePartitionKey);
+        
+        if(partition == updatePartition && !sortKey.equals(kvItem.getSortKey().asString()))
+        {
+          if(updatePartition.containsKey(sortKey))
+            throw new NoSuchObjectException("An object with the new sort key already exists.");
+        }
+      }
+      
       partition.remove(sortKey);
       
       for(IKvItem kvItem : kvItems)
@@ -152,7 +166,7 @@ public class InMemoryKvTable implements IKvTable
   }
 
   private void store(IKvItem kvItem, ITraceContext trace)
-  {
+  { 
     String partitionKey = getPartitionKey(kvItem);
     String sortKey = kvItem.getSortKey().asString();
     
@@ -185,6 +199,25 @@ public class InMemoryKvTable implements IKvTable
   @Override
   public void store(Collection<IKvItem> kvItems, ITraceContext trace)
   {
+    for(IKvItem item : kvItems)
+      store(item, trace);
+  }
+
+  @Override
+  public void store(IKvPartitionSortKeyProvider partitionSortKeyProvider, Collection<IKvItem> kvItems,
+      ITraceContext trace) throws ObjectExistsException
+  {
+    if(partitionSortKeyProvider != null)
+    {
+      String partitionKey = getPartitionKey(partitionSortKeyProvider);
+      String sortKey = partitionSortKeyProvider.getSortKey().asString();
+      
+      Map<String, IKvItem> partition = getPartition(partitionKey);
+      
+      if(partition.containsKey(sortKey))
+          throw new ObjectExistsException("Object with key " + partitionSortKeyProvider + " already exists.");
+    }
+    
     for(IKvItem item : kvItems)
       store(item, trace);
   }
