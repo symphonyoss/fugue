@@ -1377,6 +1377,34 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       {
         log_.info("Enabling streams for table....");
       }
+      else if(!tableInfo.getStreamSpecification().getStreamViewType().equals(streamSpecification.getStreamViewType())
+          && tableInfo.getStreamSpecification().getStreamEnabled()
+          && streamSpecification.getStreamEnabled())
+      {
+        log_.info("Changing stream view type for table, ....");
+        
+        StreamSpecification disabled = new StreamSpecification()
+            //.withStreamViewType(tableInfo.getStreamSpecification().getStreamViewType())
+            .withStreamEnabled(false);
+        
+        UpdateTableRequest  updateTableRequest = new UpdateTableRequest()
+            .withTableName(objectTable_.getTableName())
+            .withStreamSpecification(disabled)
+            ;
+        
+        amazonDynamoDB_.updateTable(updateTableRequest);
+        
+        log_.info("Waiting for table to be active...");
+        try
+        {
+          objectTable_.waitForActive();
+        }
+        catch (InterruptedException e2)
+        {
+          throw new ProgramFault(e2);
+        }
+        log_.info("Waiting for table to be active...DONE");
+      }
       else
       {
         log_.info("Table has streams enabled, nothing to do here.");
