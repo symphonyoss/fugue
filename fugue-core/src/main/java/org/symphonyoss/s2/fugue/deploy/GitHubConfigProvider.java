@@ -27,11 +27,20 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.dom.json.MutableJsonObject;
@@ -56,11 +65,27 @@ public class GitHubConfigProvider extends ConfigProvider
   private static final String TYPE_FILE = "file";
   private static final String TYPE_DIR = "dir";
   
+  public static final String AUTH_HEADER_KEY = "Authorization";
+  public static final String AUTH_HEADER_VALUE_PREFIX = "Bearer "; // with trailing space to separate token
+  
   private String organization_ = "SymphonyOSF";
   private String repo_;
   private String branch_ = "master";
   private String accessToken_;
+
+  private final BasicCookieStore cookieStore_;
+  private final CloseableHttpClient httpClient_;
   
+  
+  public GitHubConfigProvider()
+  {
+    cookieStore_ = new BasicCookieStore();
+    
+    HttpClientBuilder httpBuilder = HttpClients.custom().setDefaultCookieStore(cookieStore_);
+    
+    httpClient_ = httpBuilder.build();
+  }
+
   @Override
   public void init(FugueDeploy deployConfig)
   {
@@ -72,25 +97,14 @@ public class GitHubConfigProvider extends ConfigProvider
       .withFlag('B', "gitHubBranch",       "GITHUB_BRANCH", String.class, false, false, (v) -> branch_ = v)
       .withFlag('T', "gitHubToken",        "GITHUB_TOKEN",  String.class, false, true,  (v) -> accessToken_ = v);
   }
+
   
   private URL getUrl(String folderName, String fileName)
   {
-    return getUrl(folderName, fileName, accessToken_);
-  }
-  
-  private URL getLogUrl(String folderName, String fileName)
-  {
-    return getUrl(folderName, fileName, "XXXXXXXXX");
-  }
-
-  
-  private URL getUrl(String folderName, String fileName, String accessToken)
-  {
     try
     {
-      return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s/%s?access_token=%s&ref=%s", 
+      return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s/%s?ref=%s", 
           organization_, repo_, folderName, fileName,
-          accessToken,
           branch_));
     }
     catch (MalformedURLException e)
@@ -101,21 +115,10 @@ public class GitHubConfigProvider extends ConfigProvider
   
   private URL getDirUrl(String fileName)
   {
-    return getDirUrl(fileName, accessToken_);
-  }
-  
-  private URL getLogDirUrl(String fileName)
-  {
-    return getDirUrl(fileName, "XXXXXXXXX");
-  }
-  
-  private URL getDirUrl(String fileName, String accessToken)
-  {
     try
     {
-      return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s?access_token=%s&ref=%s", 
+      return new URL(String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s", 
           organization_, repo_, fileName,
-          accessToken,
           branch_));
     }
     catch (MalformedURLException e)
@@ -127,36 +130,100 @@ public class GitHubConfigProvider extends ConfigProvider
   @Override
   public MutableJsonObject fetchConfig(String folderName, String fileName) throws IOException
   {
-    URL configUrl = getLogUrl(folderName, fileName);
+    URL configUrl = getUrl(folderName, fileName);
     
     log_.debug("fetch " + configUrl);
+
     
-    try(InputStream in =getUrl(folderName, fileName).openStream())
+    CloseableHttpResponse response = null;
+    
+    try
     {
-      ObjectMapper mapper = new ObjectMapper();
+      RequestBuilder builder = RequestBuilder.get()
+          .setUri(configUrl.toURI())
+          .addHeader(AUTH_HEADER_KEY, AUTH_HEADER_VALUE_PREFIX + accessToken_)
+          ;
       
-      JsonNode tree = mapper.readTree(in);
+      HttpUriRequest request = builder.build();
+
+      response = httpClient_.execute(request);
       
-      JsonNode type = tree.get(TYPE);
+      if(response.getStatusLine().getStatusCode() == 404)
+        throw new FileNotFoundException(response.getStatusLine().toString());
       
-      if(!TYPE_FILE.equals(type.asText()))
-        throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", expected a file but found a " + type);
+//      validateResponse(response);
       
-      JsonNode content = tree.get("content");
+      HttpEntity entity = response.getEntity();
       
-      if(content == null || !content.isTextual())
-        throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", there is no content node in the JSON there");
+      InputStream in = entity.getContent();
       
-      byte[] bytes = Base64.decodeBase64(content.asText());
-      
-      JsonNode config = mapper.readTree(bytes);
-      
-      if(config instanceof ObjectNode)
+      try
       {
-        return JacksonAdaptor.adaptObject((ObjectNode)config);
+        ObjectMapper mapper = new ObjectMapper();
+        
+        JsonNode tree = mapper.readTree(in);
+        
+        JsonNode type = tree.get(TYPE);
+        
+        if(!TYPE_FILE.equals(type.asText()))
+          throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", expected a file but found a " + type);
+        
+        JsonNode content = tree.get("content");
+        
+        if(content == null || !content.isTextual())
+          throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", there is no content node in the JSON there");
+        
+        byte[] bytes = Base64.decodeBase64(content.asText());
+        
+        JsonNode config = mapper.readTree(bytes);
+        
+        if(config instanceof ObjectNode)
+        {
+          return JacksonAdaptor.adaptObject((ObjectNode)config);
+        }
+        throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", this URL does not contain a JSON object");
       }
-      throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", this URL does not contain a JSON object");
+      finally
+      {
+        in.close();
+      }
     }
+    catch (URISyntaxException e)
+    {
+      throw new IOException(e);
+    }
+    finally
+    {
+      if(response != null)
+        response.close();
+    }
+    
+//    try(InputStream in =getUrl(folderName, fileName).openStream())
+//    {
+//      ObjectMapper mapper = new ObjectMapper();
+//      
+//      JsonNode tree = mapper.readTree(in);
+//      
+//      JsonNode type = tree.get(TYPE);
+//      
+//      if(!TYPE_FILE.equals(type.asText()))
+//        throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", expected a file but found a " + type);
+//      
+//      JsonNode content = tree.get("content");
+//      
+//      if(content == null || !content.isTextual())
+//        throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", there is no content node in the JSON there");
+//      
+//      byte[] bytes = Base64.decodeBase64(content.asText());
+//      
+//      JsonNode config = mapper.readTree(bytes);
+//      
+//      if(config instanceof ObjectNode)
+//      {
+//        return JacksonAdaptor.adaptObject((ObjectNode)config);
+//      }
+//      throw new IllegalArgumentException("Unable to fetchConfig from " + configUrl + ", this URL does not contain a JSON object");
+//    }
   }
   
   @Override
@@ -174,30 +241,63 @@ public class GitHubConfigProvider extends ConfigProvider
   private List<String> fetchDirItems(String folderName, String requiredType)
   {
     List<String> result = new ArrayList<>();
-    URL configUrl = getLogDirUrl(folderName);
+    URL configUrl = getDirUrl(folderName);
     
-    try(InputStream in =getDirUrl(folderName).openStream())
+    CloseableHttpResponse response = null;
+    
+    try
     {
-      ObjectMapper mapper = new ObjectMapper();
+      RequestBuilder builder = RequestBuilder.get()
+          .setUri(configUrl.toURI())
+          .addHeader(AUTH_HEADER_KEY, AUTH_HEADER_VALUE_PREFIX + accessToken_)
+          ;
       
-      JsonNode tree = mapper.readTree(in);
+      HttpUriRequest request = builder.build();
+
+      response = httpClient_.execute(request);
       
-      if(tree instanceof ArrayNode)
+      if(response.getStatusLine().getStatusCode() == 404)
       {
-        for(JsonNode node : tree)
-        {
-          JsonNode type = node.get(TYPE);
-          
-          if(requiredType.equals(type.asText()))
-          {
-            result.add(node.get("name").asText());
-          }
-        }
+        log_.warn("No such directory \"" + folderName + "\" returning empty list.");
       }
       else
       {
-        throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", received a non-array response.");
+        HttpEntity entity = response.getEntity();
+        
+        InputStream in = entity.getContent();
+        
+        try
+        {
+          ObjectMapper mapper = new ObjectMapper();
+          
+          JsonNode tree = mapper.readTree(in);
+          
+          if(tree instanceof ArrayNode)
+          {
+            for(JsonNode node : tree)
+            {
+              JsonNode type = node.get(TYPE);
+              
+              if(requiredType.equals(type.asText()))
+              {
+                result.add(node.get("name").asText());
+              }
+            }
+          }
+          else
+          {
+            throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", received a non-array response.");
+          }
+        }
+        finally
+        {
+          in.close();
+        }
       }
+    }
+    catch (URISyntaxException e)
+    {
+      throw new IllegalArgumentException(e);
     }
     catch (FileNotFoundException e)
     {
@@ -207,6 +307,50 @@ public class GitHubConfigProvider extends ConfigProvider
     {
       throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", this URL is not readable", e);
     }
+    finally
+    {
+      try
+      {
+        if(response != null)
+          response.close();
+      }
+      catch (IOException e)
+      {
+        throw new IllegalArgumentException(e);
+    }
+    }
+    
+//    try(InputStream in =getDirUrl(folderName).openStream())
+//    {
+//      ObjectMapper mapper = new ObjectMapper();
+//      
+//      JsonNode tree = mapper.readTree(in);
+//      
+//      if(tree instanceof ArrayNode)
+//      {
+//        for(JsonNode node : tree)
+//        {
+//          JsonNode type = node.get(TYPE);
+//          
+//          if(requiredType.equals(type.asText()))
+//          {
+//            result.add(node.get("name").asText());
+//          }
+//        }
+//      }
+//      else
+//      {
+//        throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", received a non-array response.");
+//      }
+//    }
+//    catch (FileNotFoundException e)
+//    {
+//      log_.warn("No such directory \"" + folderName + "\" returning empty list.");
+//    }
+//    catch (IOException e)
+//    {
+//      throw new IllegalArgumentException("Unable to fetchFiles from " + configUrl + ", this URL is not readable", e);
+//    }
     
     return result;
   }
