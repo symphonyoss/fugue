@@ -44,16 +44,12 @@ public abstract class AbstractKvTable<T extends AbstractKvTable<T>> implements I
   
   /** The serviceId forms part of the partition key for all values in this table. */
   protected final String         serviceId_;
-  
-  /** If true then data in this table is segregated by podId (i.e. podId forms part of the hash key for all values) */
-  protected final boolean        podPrivate_;
 
   protected AbstractKvTable(AbstractBuilder<?,?> builder)
   {
     config_       = builder.config_;
     nameFactory_  = builder.nameFactory_;
     serviceId_    = builder.serviceId_;
-    podPrivate_   = builder.podPrivate_;
   }
 
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AbstractKvTable<B>> extends BaseAbstractBuilder<T,B>
@@ -61,7 +57,6 @@ public abstract class AbstractKvTable<T extends AbstractKvTable<T>> implements I
     protected IConfiguration config_;
     protected INameFactory   nameFactory_;
     protected String         serviceId_;
-    protected boolean        podPrivate_ = true;
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -102,20 +97,6 @@ public abstract class AbstractKvTable<T extends AbstractKvTable<T>> implements I
     public T withServiceId(String serviceId)
     {
       serviceId_ = serviceId;
-      
-      return self();
-    }
-
-    /**
-     * If a table is podPrivate then data in it is segregated by podId (i.e. podId forms part of the hash key for all values).
-     * 
-     * @param podPrivate Set the podPrivate flag for this table.
-     * 
-     * @return This (fluent method).
-     */
-    public T withPodPrivate(boolean podPrivate)
-    {
-      podPrivate_ = podPrivate;
       
       return self();
     }

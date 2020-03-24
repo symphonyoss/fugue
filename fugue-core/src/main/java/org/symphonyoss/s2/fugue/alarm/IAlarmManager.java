@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2019 Symphony Communication Services, LLC.
+ * Copyright 2020 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,19 +21,9 @@
  * under the License.
  */
 
-package org.symphonyoss.s2.fugue.kv;
+package org.symphonyoss.s2.fugue.alarm;
 
-/**
- * The partition key for a KvItem.
- * 
- * @author Bruce Skingle
- *
- */
-public interface IKvPartitionKeyProvider
+public interface IAlarmManager
 {
-  /**
-   * 
-   * @return The partition key as defined by the model.
-   */
-  IKvPartitionKey getPartitionKey();
+
 }

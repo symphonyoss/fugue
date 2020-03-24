@@ -23,8 +23,6 @@
 
 package org.symphonyoss.s2.fugue.kv;
 
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
-
 /**
  * Implementation of IKvPartitionKey for use in fetch operations.
  * 
@@ -34,29 +32,24 @@ import org.symphonyoss.s2.fugue.store.IFuguePodId;
 public class KvPartitionKeyProvider implements IKvPartitionKeyProvider
 {
   private final IKvPartitionKey partitionKey_;
-  private final IFuguePodId     podId_;
 
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
    */
-  public KvPartitionKeyProvider(IFuguePodId podId, IKvPartitionKey partitionKey)
+  public KvPartitionKeyProvider(IKvPartitionKey partitionKey)
   {
-    podId_ = podId;
     partitionKey_ = partitionKey;
   }
 
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
    */
-  public KvPartitionKeyProvider(IFuguePodId podId, String partitionKey)
+  public KvPartitionKeyProvider(String partitionKey)
   {
-    podId_ = podId;
     partitionKey_ = new KvPartitionKey(partitionKey);
   }
 
@@ -67,7 +60,6 @@ public class KvPartitionKeyProvider implements IKvPartitionKeyProvider
    */
   public KvPartitionKeyProvider(IKvPartitionKeyProvider partitionKey)
   {
-    podId_ = partitionKey.getPodId();
     partitionKey_ = partitionKey.getPartitionKey();
   }
 
@@ -75,11 +67,5 @@ public class KvPartitionKeyProvider implements IKvPartitionKeyProvider
   public IKvPartitionKey getPartitionKey()
   {
     return partitionKey_;
-  }
-
-  @Override
-  public IFuguePodId getPodId()
-  {
-    return podId_;
   }
 }

@@ -28,6 +28,7 @@ import java.time.Instant;
 import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
  * An item to be stored in a KvStore or KvTable.
@@ -66,4 +67,10 @@ public interface IKvItem extends IKvPartitionSortKeyProvider
    * @return The absolute hash for this object.
    */
   Hash getAbsoluteHash();
+  
+  /**
+   * 
+   * @return The pod which owns this object, if any.
+   */
+  @Nullable IFuguePodId getPodId();
 }

@@ -1145,10 +1145,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
 
   private String getPartitionKey(IKvPartitionKeyProvider kvItem)
   {
-    if(podPrivate_)
-      return serviceId_ + Separator + kvItem.getPodId() + Separator + kvItem.getPartitionKey();
-    else
-      return serviceId_ + Separator + kvItem.getPartitionKey();
+    return serviceId_ + Separator + kvItem.getPartitionKey();
   }
 
   @Override

@@ -23,9 +23,6 @@
 
 package org.symphonyoss.s2.fugue.kv;
 
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
-
-
 /**
  * Implementation of IKvPartitionSortKey for use in fetch operations.
  * 
@@ -39,26 +36,24 @@ public class KvPartitionSortKeyProvider extends KvPartitionKeyProvider implement
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
    * @param sortKey       The application level sort key.
    */
-  public KvPartitionSortKeyProvider(IFuguePodId podId, IKvPartitionKey partitionKey, IKvSortKey sortKey)
+  public KvPartitionSortKeyProvider(IKvPartitionKey partitionKey, IKvSortKey sortKey)
   {
-    super(podId, partitionKey);
+    super(partitionKey);
     sortKey_ = sortKey;
   }
 
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
    * @param sortKey       The application level sort key.
    */
-  public KvPartitionSortKeyProvider(IFuguePodId podId, IKvPartitionKey partitionKey, String sortKey)
+  public KvPartitionSortKeyProvider(IKvPartitionKey partitionKey, String sortKey)
   {
-    super(podId, partitionKey);
+    super(partitionKey);
     sortKey_ = new KvSortKey(sortKey);
   }
   
@@ -77,13 +72,12 @@ public class KvPartitionSortKeyProvider extends KvPartitionKeyProvider implement
   /**
    * Constructor.
    * 
-   * @param podId         ID of the pod which owns the item.
    * @param partitionKey  The application level partition key.
    * @param sortKey       The application level sort key.
    */
-  public KvPartitionSortKeyProvider(IFuguePodId podId, String partitionKey, String sortKey)
+  public KvPartitionSortKeyProvider(String partitionKey, String sortKey)
   {
-    super(podId, partitionKey);
+    super(partitionKey);
     sortKey_ = new KvSortKey(sortKey);
   }
   

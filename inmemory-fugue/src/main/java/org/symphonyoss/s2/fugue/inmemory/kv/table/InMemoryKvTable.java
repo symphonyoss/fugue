@@ -56,16 +56,12 @@ public class InMemoryKvTable implements IKvTable
   
   /** The serviceId forms part of the partition key for all values in this table. */
   protected final String         serviceId_;
-  
-  /** If true then data in this table is segregated by podId (i.e. podId forms part of the hash key for all values) */
-  protected final boolean        podPrivate_;
 
   private final Map<String, TreeMap<String, IKvItem>>  partitionMap_ = new HashMap<>();
   
   protected InMemoryKvTable(AbstractBuilder<?,?> builder)
   {
     serviceId_    = builder.serviceId_;
-    podPrivate_   = builder.podPrivate_;
   }
 
   @Override
@@ -190,10 +186,7 @@ public class InMemoryKvTable implements IKvTable
 
   private String getPartitionKey(IKvPartitionKeyProvider kvItem)
   {
-    if(podPrivate_)
-      return serviceId_ + Separator + kvItem.getPodId() + Separator + kvItem.getPartitionKey();
-    else
-      return serviceId_ + Separator + kvItem.getPartitionKey();
+    return serviceId_ + Separator + kvItem.getPartitionKey();
   }
 
   @Override
@@ -352,7 +345,6 @@ public class InMemoryKvTable implements IKvTable
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends InMemoryKvTable> extends BaseAbstractBuilder<T,B>
   {
     protected String         serviceId_;
-    protected boolean        podPrivate_ = true;
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -377,20 +369,6 @@ public class InMemoryKvTable implements IKvTable
     public T withServiceId(String serviceId)
     {
       serviceId_ = serviceId;
-      
-      return self();
-    }
-
-    /**
-     * If a table is podPrivate then data in it is segregated by podId (i.e. podId forms part of the hash key for all values).
-     * 
-     * @param podPrivate Set the podPrivate flag for this table.
-     * 
-     * @return This (fluent method).
-     */
-    public T withPodPrivate(boolean podPrivate)
-    {
-      podPrivate_ = podPrivate;
       
       return self();
     }
