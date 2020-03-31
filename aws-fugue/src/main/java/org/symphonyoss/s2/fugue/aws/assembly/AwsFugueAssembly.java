@@ -148,8 +148,6 @@ public class AwsFugueAssembly implements IFugueAssembly
       if(config_ == null)
         config_ = new GlobalConfiguration(S3Configuration.FACTORY.newInstance());
       
-      GlobalConfiguration c2 = new GlobalConfiguration(S3Configuration.FACTORY.newInstance());
-      
       if(nameFactory_ == null)
       {
         nameFactory_ = new NameFactory(config_);

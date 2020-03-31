@@ -38,16 +38,6 @@ public class KvPartitionKeyProvider implements IKvPartitionKeyProvider
    * 
    * @param partitionKey  The application level partition key.
    */
-  public KvPartitionKeyProvider(IKvPartitionKey partitionKey)
-  {
-    partitionKey_ = partitionKey;
-  }
-
-  /**
-   * Constructor.
-   * 
-   * @param partitionKey  The application level partition key.
-   */
   public KvPartitionKeyProvider(String partitionKey)
   {
     partitionKey_ = new KvPartitionKey(partitionKey);

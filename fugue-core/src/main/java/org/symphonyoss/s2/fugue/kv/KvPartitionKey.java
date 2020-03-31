@@ -29,7 +29,7 @@ package org.symphonyoss.s2.fugue.kv;
  * @author Bruce Skingle
  *
  */
-public class KvPartitionKey implements IKvPartitionKey
+public class KvPartitionKey implements IKvPartitionKey, IKvPartitionKeyProvider
 {
   private final String asString_;
 
@@ -53,5 +53,11 @@ public class KvPartitionKey implements IKvPartitionKey
   public String toString()
   {
     return asString_;
+  }
+
+  @Override
+  public IKvPartitionKey getPartitionKey()
+  {
+    return this;
   }
 }

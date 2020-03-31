@@ -43,7 +43,7 @@ public class TestInMemoryKvTable
       };
 
   private static final String PART1 = "PART1";
-  private static final IKvPartitionKey PARTITION_KEY1 = new KvPartitionKey(PART1);
+  private static final KvPartitionKey PARTITION_KEY1 = new KvPartitionKey(PART1);
 
   private static final IKvItem[] ITEMS = new IKvItem[]
   {

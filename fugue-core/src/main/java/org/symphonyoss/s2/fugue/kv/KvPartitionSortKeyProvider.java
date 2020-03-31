@@ -34,30 +34,6 @@ public class KvPartitionSortKeyProvider extends KvPartitionKeyProvider implement
   private final IKvSortKey      sortKey_;
   
   /**
-   * Constructor.
-   * 
-   * @param partitionKey  The application level partition key.
-   * @param sortKey       The application level sort key.
-   */
-  public KvPartitionSortKeyProvider(IKvPartitionKey partitionKey, IKvSortKey sortKey)
-  {
-    super(partitionKey);
-    sortKey_ = sortKey;
-  }
-
-  /**
-   * Constructor.
-   * 
-   * @param partitionKey  The application level partition key.
-   * @param sortKey       The application level sort key.
-   */
-  public KvPartitionSortKeyProvider(IKvPartitionKey partitionKey, String sortKey)
-  {
-    super(partitionKey);
-    sortKey_ = new KvSortKey(sortKey);
-  }
-  
-  /**
    * Constructor from a partition key.
    * 
    * @param partitionKey  An existing partition key.
