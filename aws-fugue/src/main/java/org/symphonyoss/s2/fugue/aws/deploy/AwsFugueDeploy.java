@@ -2047,7 +2047,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         {
           apiGatewayMasterTargetDomain_ = createApiGatewayBasePath(apiGatewayMasterDomainName_, awsPublicCertArn_);
           doCreateR53RecordSet(apiGatewayMasterDomainName_, apiGatewayMasterTargetDomain_, true, false, 
-              apiGatewayMasterDomainName_.length() - getPublicDnsSuffix().length());
+              apiGatewayMasterDomainName_.length() - getPublicDnsSuffix().length(), true);
         }
         
         apiGatewayPrivateTargetDomain_ = createApiGatewayBasePath(apiGatewayPrivateDomainName_, awsLoadBalancerCertArn_);
@@ -2216,10 +2216,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue)
     {
-      doCreateR53RecordSet(source, target, create, multiValue, source.indexOf('.') + 1);
+      doCreateR53RecordSet(source, target, create, multiValue, source.indexOf('.') + 1, false);
     }
     
-    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue, int pos)
+    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue, int pos, boolean doNotDelete)
     {
       String zoneId = createOrGetHostedZone(source.substring(pos), create);
       
@@ -2331,7 +2331,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
-        if(ok)
+        if(ok && !doNotDelete)
         {
           log_.info("Deleting R53 record set for " + source + " to " + target + "...");
           
