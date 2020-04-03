@@ -106,7 +106,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, null, null, null, consumer, trace);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, null, null, null, null, consumer, trace);
    
     assertEquals(null, pagination.getBefore());
     assertEquals(null, pagination.getAfter());
@@ -120,7 +120,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(5, -1);
        
-    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), false, null, null, null, consumer, trace);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), false, null, null, null, null, consumer, trace);
 
     assertEquals(null, pagination.getBefore());
     assertEquals(null, pagination.getAfter());
@@ -134,7 +134,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(0);
        
-    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, 2, null, null, consumer, trace);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, 2, null, null, null, consumer, trace);
 
     assertEquals(null, pagination.getBefore());
     assertEquals(ITEMS[1].getSortKey().asString(), pagination.getAfter());
@@ -148,7 +148,7 @@ public class TestInMemoryKvTable
     
     Checker consumer = new Checker(2);
        
-    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), null, consumer, trace);
+    IKvPagination pagination = table.fetchPartitionObjects(new KvPartitionKeyProvider(PARTITION_KEY1), true, 2, ITEMS[1].getSortKey().asString(), null, null, consumer, trace);
 
     assertEquals(ITEMS[2].getSortKey().asString(), pagination.getBefore());
     assertEquals(ITEMS[3].getSortKey().asString(), pagination.getAfter());
@@ -163,7 +163,7 @@ public class TestInMemoryKvTable
     Checker consumer = new Checker(2, -1);
        
     IKvPagination pagination = table.fetchPartitionObjects(
-        new KvPartitionKeyProvider(PARTITION_KEY1), false, 2, ITEMS[3].getSortKey().asString(), null, consumer, trace);
+        new KvPartitionKeyProvider(PARTITION_KEY1), false, 2, ITEMS[3].getSortKey().asString(), null, null, consumer, trace);
    
     assertEquals(ITEMS[2].getSortKey().asString(), pagination.getBefore());
     assertEquals(ITEMS[1].getSortKey().asString(), pagination.getAfter());

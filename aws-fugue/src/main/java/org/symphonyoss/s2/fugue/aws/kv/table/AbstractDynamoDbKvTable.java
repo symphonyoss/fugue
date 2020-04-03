@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
@@ -469,7 +470,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     {
       DeleteConsumer deleteConsumer = new DeleteConsumer(absoluteHashPrefix);
       
-      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, null, deleteConsumer, trace).getAfter();
+      after = doFetchPartitionObjects(versionPartitionKey, true, 12, after, null, null, deleteConsumer, trace).getAfter();
       
       deleteConsumer.dynamoBatchWrite();
     } while (after != null);
@@ -814,6 +815,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   
   class UpdateOrPut
   {
+    private static final String INVALID_ATTR_KEY_LEN = "Additional attribute keys must be between 3 and 10 characters";
+    
     Map<String, AttributeValue> key_              = new HashMap<>();
     ValueMap                    putItem_          = new ValueMap();
     Map<String, AttributeValue> updateItem_       = new HashMap<>();
@@ -836,6 +839,24 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       withHash(   ColumnNameAbsoluteHash, kvItem.getAbsoluteHash());
       withNumber( ColumnNamePodId,        kvItem.getPodId().getValue());
       withString( ColumnNamePayloadType,  kvItem.getType());
+      
+      if(kvItem.getAdditionalAttributes() != null)
+      {
+        for(Entry<String, Object> entry : kvItem.getAdditionalAttributes().entrySet())
+        {
+          if(entry.getKey().length() < 3 || entry.getKey().length() >10)
+            throw new IllegalArgumentException(INVALID_ATTR_KEY_LEN);
+          
+          if(entry.getValue() instanceof Number)
+          {
+            withNumber(entry.getKey(), (Number) entry.getValue());
+          }
+          else
+          {
+            withString(entry.getKey(), entry.getValue().toString());
+          }
+        }
+      }
       
       if(kvItem.getPurgeDate() != null)
       {
@@ -1451,14 +1472,16 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   public IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
+      @Nullable Map<String, Object> filterAttributes,
       Consumer<String> consumer, ITraceContext trace)
   {
-    return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, sortKeyPrefix, new PartitionConsumer(consumer), trace);
+    return doFetchPartitionObjects(partitionKey, scanForwards, limit, after, sortKeyPrefix, filterAttributes, new PartitionConsumer(consumer), trace);
   }
 
   private IKvPagination doFetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
+      @Nullable Map<String, Object> filterAttributes,
       AbstractItemConsumer consumer, ITraceContext trace)
   {
     return doDynamoQueryTask(() ->
@@ -1475,11 +1498,34 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
         valueMap.put(":v_sortKeyPrefix", sortKeyPrefix);
       }
       
+      StringBuilder filter = null;
+      
+      if(filterAttributes != null)
+      {
+        for(Entry<String, Object> entry : filterAttributes.entrySet())
+        {
+          if(filter == null)
+            filter = new StringBuilder();
+          else
+            filter.append(" and ");
+          
+          filter.append(entry.getKey());
+          filter.append(" = :f_" );
+          filter.append(entry.getKey());
+          valueMap.put(":f_" + entry.getKey(), entry.getValue());
+        }
+      }
+      
       QuerySpec spec = new QuerySpec()
           .withKeyConditionExpression(keyConditionExpression)
           .withValueMap(valueMap)
           .withScanIndexForward(scanForwards)
           ;
+      
+      if(filter != null)
+      {
+        spec.withFilterExpression(filter.toString());
+      }
       
       if(limit != null)
       {

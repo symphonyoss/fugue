@@ -1177,7 +1177,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(configValue_ == null)
       {
-        System.err.println("HERE");
         environment.put(FUGUE_CONFIG, storedConfig);
       }
       else if(configValue_.length() < 3000)

@@ -24,6 +24,9 @@
 package org.symphonyoss.s2.fugue.inmemory;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 
 import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.fugue.Fugue;
@@ -51,6 +54,7 @@ public class InMemoryConfiguration extends Configuration
     }
 
   };
+  private static String fugueConfig_ = Fugue.getProperty(Fugue.FUGUE_CONFIG);
   
   private InMemoryConfiguration()
   {
@@ -71,16 +75,14 @@ public class InMemoryConfiguration extends Configuration
 
     private InMemoryConfig()
     {
-      String fugueConfig = Fugue.getProperty(Fugue.FUGUE_CONFIG);
-  
-      if(fugueConfig == null)
-        fugueConfig = "{\"id\":{"
+      if(fugueConfig_ == null)
+        fugueConfig_ = "{\"id\":{"
             + "\"environmentId\":\"s2smoke2\","
             + "\"environmentType\":\"dev\","
             + "\"regionId\":\"us-east-1\","
             + "\"serviceId\":\"inmemory\"}}";
       
-      loadConfig(fugueConfig);
+      loadConfig(fugueConfig_);
     }
     
     private void loadConfig(String directConfig)
@@ -97,6 +99,30 @@ public class InMemoryConfiguration extends Configuration
       {
         throw new ProgramFault("Cannot parse config.", e1);
       }
+    }
+  }
+
+  /**
+   * Set the configuration from the given input stream.
+   * 
+   * @param is An InputStream containing a JSON object.
+   */
+  public static void setConfig(InputStream is)
+  {
+    char[] cbuf = new char[1024];
+    StringBuilder b = new StringBuilder();
+    try(Reader in = new InputStreamReader(is))
+    {
+      int nbytes;
+      
+      while((nbytes = in.read(cbuf))>0)
+        b.append(cbuf, 0, nbytes);
+      
+      fugueConfig_ = b.toString();
+    }
+    catch (IOException e)
+    {
+      throw new IllegalArgumentException("Failed to read config from resource", e);
     }
   }
 }

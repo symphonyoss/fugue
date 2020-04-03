@@ -24,6 +24,7 @@
 package org.symphonyoss.s2.fugue.kv;
 
 import java.time.Instant;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -73,4 +74,15 @@ public interface IKvItem extends IKvPartitionSortKeyProvider
    * @return The pod which owns this object, if any.
    */
   @Nullable IFuguePodId getPodId();
+  
+  /**
+   * Additional attributes are added to the index record when stored. 
+   * Their keys must be between 3 and 10 characters long.
+   * 
+   * @return Additional attributes.
+   */
+  default @Nullable Map<String, Object> getAdditionalAttributes()
+  {
+    return null;
+  }
 }

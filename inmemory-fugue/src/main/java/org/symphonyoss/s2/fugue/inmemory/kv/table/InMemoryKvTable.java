@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.common.fluent.BaseAbstractBuilder;
@@ -109,7 +111,7 @@ public class InMemoryKvTable implements IKvTable
         
         TreeMap<String, IKvItem> p2 = getPartition(pk);
         
-        IKvItem d = p2.remove(sk);
+        p2.remove(sk);
       }
       
       partition.clear();
@@ -161,7 +163,7 @@ public class InMemoryKvTable implements IKvTable
     }
   }
 
-  private void store(IKvItem kvItem, ITraceContext trace)
+  private void store(IKvItem kvItem)
   { 
     String partitionKey = getPartitionKey(kvItem);
     String sortKey = kvItem.getSortKey().asString();
@@ -193,7 +195,7 @@ public class InMemoryKvTable implements IKvTable
   public void store(Collection<IKvItem> kvItems, ITraceContext trace)
   {
     for(IKvItem item : kvItems)
-      store(item, trace);
+      store(item);
   }
 
   @Override
@@ -212,7 +214,7 @@ public class InMemoryKvTable implements IKvTable
     }
     
     for(IKvItem item : kvItems)
-      store(item, trace);
+      store(item);
   }
 
   @Override
@@ -273,7 +275,8 @@ public class InMemoryKvTable implements IKvTable
 
   @Override
   public IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKeyProvider, boolean scanForwards, Integer limit,
-      String after, String sortKeyPrefix, Consumer<String> consumer, ITraceContext trace)
+      String after, String sortKeyPrefix,
+      @Nullable Map<String, Object> filterAttributes, Consumer<String> consumer, ITraceContext trace)
   {
     String partitionKey = getPartitionKey(partitionKeyProvider);
     
@@ -307,13 +310,31 @@ public class InMemoryKvTable implements IKvTable
     
     for(Entry<String, IKvItem> entry : map.entrySet())
     {
-      if(sortKeyPrefix == null || entry.getKey().startsWith(sortKeyPrefix))
-        consumer.accept(entry.getValue().getJson());
-    
+      boolean ok = (sortKeyPrefix == null || entry.getKey().startsWith(sortKeyPrefix));
+      
+      if(ok && filterAttributes != null)
+      {
+        for(Entry<String, Object> attr : filterAttributes.entrySet())
+        {
+          Object rowAttr = entry.getValue().getAdditionalAttributes().get(attr.getKey());
+          
+          if(!attr.getValue().equals(rowAttr))
+          {
+            ok = false;
+            break;
+          }
+        }
+      }
+      
       available--;
       
-      if(--limit <= 0)
-        return new KvPagination(before, available==0 ? null : entry.getKey());
+      if(ok)
+      {
+        consumer.accept(entry.getValue().getJson());
+      
+        if(--limit <= 0)
+          return new KvPagination(before, available==0 ? null : entry.getKey());
+      }
     }
         
     return new KvPagination(before, null);
