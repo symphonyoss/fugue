@@ -42,7 +42,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <s2.common.version>0.2.8</s2.common.version>
+    <s2.common.version>0.2.9-SNAPSHOT</s2.common.version>
+    <oss.commons.version>0.0.1-SNAPSHOT</oss.commons.version>
   </properties>
   
 	<modules>

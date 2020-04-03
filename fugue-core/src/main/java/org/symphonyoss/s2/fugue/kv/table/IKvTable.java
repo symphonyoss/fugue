@@ -24,6 +24,7 @@
 package org.symphonyoss.s2.fugue.kv.table;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -148,19 +149,21 @@ public interface IKvTable extends IFugueComponent
   /**
    * Return objects from the given partition.
    * 
-   * @param partitionKey  The ID of the partition.
-   * @param scanForwards  If true then scan objects in the order of their sort keys, else in reverse order.
-   * @param limit         An optional limit to the number of objects retrieved.
-   * @param after         An optional page cursor to continue a previous query.
-   * @param sortKeyPrefix An optional sort key prefix.
-   * @param consumer      A consumer to receive the retrieved objects.
-   * @param trace         Trace context.
+   * @param partitionKey      The ID of the partition.
+   * @param scanForwards      If true then scan objects in the order of their sort keys, else in reverse order.
+   * @param limit             An optional limit to the number of objects retrieved.
+   * @param after             An optional page cursor to continue a previous query.
+   * @param sortKeyPrefix     An optional sort key prefix.
+   * @param filterAttributes  Optional attribute values to filter results.
+   * @param consumer          A consumer to receive the retrieved objects.
+   * @param trace             Trace context.
    * 
    * @return              Pagination tokens to allow a continuation query to be made.
    */
   IKvPagination fetchPartitionObjects(IKvPartitionKeyProvider partitionKey, boolean scanForwards, Integer limit, 
       @Nullable String after,
       @Nullable String sortKeyPrefix,
+      @Nullable Map<String, Object> filterAttributes,
       Consumer<String> consumer, ITraceContext trace);
 
 
