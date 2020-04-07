@@ -43,6 +43,7 @@ import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.kv.KvCondition;
 import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.IKvTable;
 import org.symphonyoss.s2.fugue.store.ObjectExistsException;
@@ -169,6 +170,44 @@ public class InMemoryKvTable implements IKvTable
     String sortKey = kvItem.getSortKey().asString();
     
     Map<String, IKvItem> partition = getPartition(partitionKey);
+    
+    partition.put(sortKey, kvItem);
+  }
+
+  @Override
+  public synchronized void store(IKvItem kvItem, KvCondition kvCondition, ITraceContext trace)
+  {
+    String partitionKey = getPartitionKey(kvItem);
+    String sortKey = kvItem.getSortKey().asString();
+    
+    Map<String, IKvItem> partition = getPartition(partitionKey);
+    IKvItem existingItem = partition.get(sortKey);
+    
+    if(existingItem != null)
+    {
+      Object value = existingItem.getAdditionalAttributes().get(kvCondition.getName());
+      
+      if(value == null)
+        return;
+      
+      switch(kvCondition.getComparison())
+      {
+        case EQUALS:
+          if(!kvCondition.getValue().equals(value.toString()))
+            return;
+          break;
+          
+        case GREATER_THAN:
+          if(kvCondition.getValue().compareTo(value.toString()) >= 0)
+            return;
+          break;
+          
+        case LESS_THAN:
+          if(kvCondition.getValue().compareTo(value.toString()) <= 0)
+            return;
+          break;
+      }
+    }
     
     partition.put(sortKey, kvItem);
   }

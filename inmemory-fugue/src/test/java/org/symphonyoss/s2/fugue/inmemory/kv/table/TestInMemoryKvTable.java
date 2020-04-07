@@ -10,8 +10,11 @@ import static org.junit.Assert.assertEquals;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -25,6 +28,8 @@ import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKey;
 import org.symphonyoss.s2.fugue.kv.IKvSortKey;
+import org.symphonyoss.s2.fugue.kv.KvComparison;
+import org.symphonyoss.s2.fugue.kv.KvCondition;
 import org.symphonyoss.s2.fugue.kv.KvPartitionKey;
 import org.symphonyoss.s2.fugue.kv.KvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.KvPartitionSortKeyProvider;
@@ -69,6 +74,53 @@ public class TestInMemoryKvTable
       
       assertEquals(item.getJson(), it);
     }
+  }
+  
+  @Test
+  public void testConditionalPut() throws NoSuchObjectException
+  {
+    InMemoryKvTable table = new InMemoryKvTable.Builder().withServiceId("test").build();
+    String sortKey = "1";
+    KvPartitionSortKeyProvider partitionSortKeyProvider = new KvPartitionSortKeyProvider(PARTITION_KEY1, sortKey);
+    
+    List<IKvItem> kvItems = new ArrayList<>(1);
+    
+    IKvItem item1 = new KvItem(PART1, sortKey, "One", "foo", "1");
+    
+    kvItems.add(item1);
+    
+    table.store(kvItems, trace);
+    
+    assertEquals(item1.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    String attrName = "foo";
+    IKvItem item2 = new KvItem(PART1, sortKey, "Two", attrName, "1");
+    
+    table.store(item2, new KvCondition(attrName, KvComparison.LESS_THAN, "1"), trace);
+    
+    assertEquals(item1.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    table.store(item2, new KvCondition(attrName, KvComparison.GREATER_THAN, "1"), trace);
+    
+    assertEquals(item1.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    table.store(item2, new KvCondition(attrName, KvComparison.EQUALS, "1"), trace);
+    
+    assertEquals(item2.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    IKvItem item3 = new KvItem(PART1, sortKey, "Three", attrName, "3");
+    
+    table.store(item3, new KvCondition(attrName, KvComparison.EQUALS, "3"), trace);
+    
+    assertEquals(item2.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    table.store(item3, new KvCondition(attrName, KvComparison.GREATER_THAN, "3"), trace);
+    
+    assertEquals(item2.getJson(), table.fetch(partitionSortKeyProvider, trace));
+    
+    table.store(item3, new KvCondition(attrName, KvComparison.LESS_THAN, "3"), trace);
+    
+    assertEquals(item3.getJson(), table.fetch(partitionSortKeyProvider, trace));
   }
   
   static class Checker implements Consumer<String>
@@ -226,12 +278,24 @@ public class TestInMemoryKvTable
     private final String partitionKey_;
     private final String sortKey_;
     private final String value_;
+    private final Map<String, Object> additionalAttributes_;
     
     public KvItem(String partitionKey, String sortKey, String value)
     {
       partitionKey_ = partitionKey;
       sortKey_ = sortKey;
       value_ = value;
+      additionalAttributes_ = null;
+    }
+
+    public KvItem(String partitionKey, String sortKey, String value, String attrName, Object attrValue)
+    {
+      super();
+      partitionKey_ = partitionKey;
+      sortKey_ = sortKey;
+      value_ = value;
+      additionalAttributes_ = new HashMap<>();
+      additionalAttributes_.put(attrName, attrValue);
     }
 
     @Override
@@ -280,6 +344,12 @@ public class TestInMemoryKvTable
     public Hash getAbsoluteHash()
     {
       return HashProvider.getHashOf(value_.getBytes());
+    }
+
+    @Override
+    public Map<String, Object> getAdditionalAttributes()
+    {
+      return additionalAttributes_;
     }
     
   }

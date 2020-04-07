@@ -53,6 +53,7 @@ import org.symphonyoss.s2.fugue.kv.IKvItem;
 import org.symphonyoss.s2.fugue.kv.IKvPagination;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionKeyProvider;
 import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
+import org.symphonyoss.s2.fugue.kv.KvCondition;
 import org.symphonyoss.s2.fugue.kv.KvPagination;
 import org.symphonyoss.s2.fugue.kv.table.AbstractKvTable;
 import org.symphonyoss.s2.fugue.store.ObjectExistsException;
@@ -359,6 +360,59 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     }
   }
   
+  @Override
+  public void store(IKvItem kvItem, KvCondition kvCondition, ITraceContext trace)
+  {
+    Hash        absoluteHash = kvItem.getAbsoluteHash();
+    List<TransactWriteItem> actions = new ArrayList<>(1);
+    Hash secondaryStoredHash = null;
+    
+    String partitionKey = getPartitionKey(kvItem);
+    String sortKey = kvItem.getSortKey().asString();
+    
+    UpdateOrPut updateOrPut = new UpdateOrPut(kvItem, partitionKey, sortKey, payloadLimit_);
+    
+    ;
+    
+    if(kvItem.isSaveToSecondaryStorage())
+    {
+      storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
+      
+      secondaryStoredHash = kvItem.getAbsoluteHash();
+    }
+    
+    Condition condition = new Condition(
+        "attribute_not_exists(" + kvCondition.getName() + ") or " +
+        kvCondition.getName() + " " + kvCondition.getComparison().getSymbol() + " :v")
+        .withString(":v", kvCondition.getValue());
+    
+    Put put = updateOrPut
+        .createPut()
+        .withConditionExpression(condition.expression_)
+        .withExpressionAttributeValues(condition.attributeValues_);
+    
+    actions.add(new TransactWriteItem().withPut(put));
+    
+    try
+    {
+      write(actions, absoluteHash, "Conditions not met.", trace);
+    }
+    catch (NoSuchObjectException e)
+    {
+      if(secondaryStoredHash != null)
+      {
+        try
+        {
+          deleteFromSecondaryStorage(secondaryStoredHash, trace);
+        }
+        catch(RuntimeException e2)
+        {
+          log_.error("Failed to delete secondary copy of " + secondaryStoredHash, e2);
+        }
+      }
+    }
+  }
+
   class Condition
   {
     String                      expression_;
