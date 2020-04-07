@@ -25,9 +25,9 @@ package org.symphonyoss.s2.fugue.naming;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -36,7 +36,6 @@ import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 
 /**
  * A factory for producing Name instances.
@@ -129,23 +128,23 @@ public class NameFactory implements INameFactory
 
   private ImmutableMap<String, String> createTags()
   {
-    Builder<String, String> builder = new ImmutableMap.Builder<String, String>();
+    Map<String, String> map = new HashMap<>();
     
     for(Entry<String, String> entry : System.getenv().entrySet())
-      setFugueTag(builder, entry.getKey(), entry.getValue());
+      setFugueTag(map, entry.getKey(), entry.getValue());
     
     for(Entry<Object, Object> entry : System.getProperties().entrySet())
-      setFugueTag(builder, entry.getKey().toString(), entry.getValue().toString());
+      setFugueTag(map, entry.getKey().toString(), entry.getValue().toString());
     
-    putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT_TYPE, environmentType_);
-    putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT,      environmentId_);
-    putIfNotNull(builder, Fugue.TAG_FUGUE_REGION,           regionId_);
-    putIfNotNull(builder, Fugue.TAG_FUGUE_POD,              podId_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_ENVIRONMENT_TYPE, environmentType_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_ENVIRONMENT,      environmentId_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_REGION,           regionId_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_POD,              podId_);
     
-    return builder.build();
+    return ImmutableMap.copyOf(map);
   }
 
-  private void setFugueTag(Builder<String, String> builder, String name, String value)
+  private void setFugueTag(Map<String, String> builder, String name, String value)
   {
     if(name.startsWith("FUGUE_TAG_"))
     {
@@ -153,13 +152,13 @@ public class NameFactory implements INameFactory
     }
   }
 
-  private void putIfNotNull(Builder<String, String> builder, String name, String value)
+  private void putIfNotNull(Map<String, String> builder, String name, String value)
   {
       if(value != null)
         builder.put(name, value);
   }
 
-  private void putIfNotNull(Builder<String, String> builder, String name, Integer value)
+  private void putIfNotNull(Map<String, String> builder, String name, Integer value)
   {
       if(value != null)
         builder.put(name, value.toString());
