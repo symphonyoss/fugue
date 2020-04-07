@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -2477,18 +2478,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       registerTaskDefinition(taskName, port, roleName, imageName, jvmHeap, memory);
       
+      ContainerOverride containerOverrides = new ContainerOverride()
+          .withName(taskName.toString())
+          .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
+          .withEnvironment(new KeyValuePair().withName("FUGUE_DRY_RUN").withValue(String.valueOf(dryRun_)))
+          ;
+      
+      for(Entry<String, String> entry : getTags().entrySet())
+        containerOverrides.withEnvironment(new KeyValuePair().withName("FUGUE_TAG_" + entry.getKey()).withValue(entry.getValue()));
+      
       RunTaskResult run = ecsClient_.runTask(new RunTaskRequest()
           .withCluster(clusterName_)
           .withCount(1)
           .withTaskDefinition(taskName.toString())
           .withOverrides(new TaskOverride()
               .withTaskRoleArn(getRoleArn(roleName))
-              .withContainerOverrides(new ContainerOverride()
-                  .withName(taskName.toString())
-                  .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
-                  .withEnvironment(new KeyValuePair().withName("FUGUE_DRY_RUN").withValue(String.valueOf(dryRun_)))
-                  )
-              )
+              .withContainerOverrides(containerOverrides))
           );
       
       String taskArn = run.getTasks().get(0).getTaskArn();

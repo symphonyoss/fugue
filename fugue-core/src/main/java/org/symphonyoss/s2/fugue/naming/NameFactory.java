@@ -25,6 +25,9 @@ package org.symphonyoss.s2.fugue.naming;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -128,12 +131,26 @@ public class NameFactory implements INameFactory
   {
     Builder<String, String> builder = new ImmutableMap.Builder<String, String>();
     
+    for(Entry<String, String> entry : System.getenv().entrySet())
+      setFugueTag(builder, entry.getKey(), entry.getValue());
+    
+    for(Entry<Object, Object> entry : System.getProperties().entrySet())
+      setFugueTag(builder, entry.getKey().toString(), entry.getValue().toString());
+    
     putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT_TYPE, environmentType_);
     putIfNotNull(builder, Fugue.TAG_FUGUE_ENVIRONMENT,      environmentId_);
     putIfNotNull(builder, Fugue.TAG_FUGUE_REGION,           regionId_);
     putIfNotNull(builder, Fugue.TAG_FUGUE_POD,              podId_);
     
     return builder.build();
+  }
+
+  private void setFugueTag(Builder<String, String> builder, String name, String value)
+  {
+    if(name.startsWith("FUGUE_TAG_"))
+    {
+      putIfNotNull(builder, name.substring(10), value);
+    }
   }
 
   private void putIfNotNull(Builder<String, String> builder, String name, String value)

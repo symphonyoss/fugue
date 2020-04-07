@@ -348,10 +348,6 @@ public abstract class FugueDeploy extends CommandLineHandler
     tagIfNotNull(Fugue.TAG_FUGUE_ENVIRONMENT,       environment_);
     tagIfNotNull(Fugue.TAG_FUGUE_REGION,            region_);
     tagIfNotNull(Fugue.TAG_FUGUE_SERVICE,           service_);
-    
-    tagIfNotNull("Owner:portfolio", "objectStore");
-    tagIfNotNull("Org", "engineering");
-    tagIfNotNull("Customer", "symphony");
     tagIfNotNull("CreatedBy", "fugue");
   }
   
@@ -377,7 +373,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     if(podName_ != null && !tenantContextMap_.containsKey(podName_))
       tenantContextMap_.put(podName_, createContext(podName_, createNameFactory(environmentType_, environment_, region_, podName_, null, service_)));
 
-    log_.info("FugueDeploy v3.1");
+    log_.info("FugueDeploy v3.2");
     log_.info("ACTION           = " + action_);
     log_.info("ENVIRONMENT_TYPE = " + environmentType_);
     log_.info("ENVIRONMENT      = " + environment_);
@@ -386,7 +382,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     for(String podName : tenantContextMap_.keySet())
       log_.info(String.format("TENANT           = %s", podName));
     
-    populateTags(tags_);
+    
     
 
     ImmutableJsonObject serviceJson;
@@ -402,6 +398,25 @@ public abstract class FugueDeploy extends CommandLineHandler
     {
       throw new IllegalArgumentException("Unknown service \"" + service_ + "\".", e);
     }
+    
+    IJsonObject<?> tagObject = serviceJson.getObject("tags");
+    
+    if(tagObject != null)
+    {
+      Iterator<String> it = tagObject.getNameIterator();
+      
+      while(it.hasNext())
+      {
+        String name = it.next();
+        String value = tagObject.getString(name, null);
+        
+        if(value != null)
+        {
+          tags_.put(name, value);
+        }
+      }
+    }
+    populateTags(tags_);
     
     Set<String> configFilter = new HashSet<>(serviceJson.getListOf(String.class, CONFIG_FILTER));
 
