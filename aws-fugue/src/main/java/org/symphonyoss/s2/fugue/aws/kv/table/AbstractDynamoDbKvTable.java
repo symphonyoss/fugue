@@ -1260,10 +1260,12 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   @Override
   public void createTable(boolean dryRun)
   {
-    List<Tag> tags = new AwsTags(nameFactory_.getTags())
-        .put(Fugue.TAG_FUGUE_SERVICE, serviceId_)
-        .put(Fugue.TAG_FUGUE_ITEM, objectTableName_)
-        .getDynamoTags();
+    HashMap<String,String> tagMap = new HashMap<>(nameFactory_.getTags());
+    
+    tagMap.put(Fugue.TAG_FUGUE_SERVICE, serviceId_);
+    tagMap.put(Fugue.TAG_FUGUE_ITEM, objectTableName_);
+    
+    List<Tag> tags = new AwsTags(tagMap).getDynamoTags();
     
     String tableArn;
     
