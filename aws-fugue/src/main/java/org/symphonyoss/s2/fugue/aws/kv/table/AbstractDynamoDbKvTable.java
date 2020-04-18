@@ -345,6 +345,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     }
     catch (NoSuchObjectException e)
     {
+      log_.error("Failed to wite objects", e);
       if(secondaryStoredHash != null)
       {
         try
@@ -395,10 +396,13 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     
     try
     {
+      trace.trace("ABOUT_TO_STORE_CONDITIONAL", kvItem);
       write(actions, absoluteHash, "Conditions not met.", trace);
+      trace.trace("STORED_CONDITIONAL", kvItem);
     }
     catch (NoSuchObjectException e)
     {
+      trace.trace("FAILED_TO_STORE_CONDITIONAL", kvItem);
       if(secondaryStoredHash != null)
       {
         try
@@ -657,11 +661,9 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       {
         try
         {
-  //        long start = System.currentTimeMillis();
+          trace.trace("ABOUT_TO_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
           amazonDynamoDB_.transactWriteItems(request);
-  //        long end = System.currentTimeMillis();
-  //        
-  //        System.err.println("T " + (end - start));
+          trace.trace("STORED_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
           return null;
         }
         catch (TransactionCanceledException tce)
@@ -673,6 +675,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
             switch(reason.getCode())
             {
               case "ConditionalCheckFailed":
+                trace.trace("FAILED_FATAL_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
                 throw new NoSuchObjectException(errorMessage);
                 
               case "None":
@@ -681,6 +684,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
                 
               case "TransactionConflict":
                 log_.info("Retry transaction after " + delay + "ms.");
+
+                trace.trace("WAIT_RETRY_TO_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
                 try
                 {
                   Thread.sleep(delay);
@@ -695,12 +700,18 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
                 break;
                 
               default:
+                trace.trace("FAILED_TRANSIENT_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
                 throw new TransientTransactionFault("Transient failure to store object " + absoluteHash, tce);
             }
           }
         }
+        catch(RuntimeException e)
+        {
+          trace.trace("FAILED_TRANSIENT_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
+          throw e;
+        }
       }
-      
+      trace.trace("FAILED_TRANSIENT_STORE_TRANSACTIONAL", "OBJECT", absoluteHash.toStringBase64());
       throw new TransientTransactionFault("Transient failure to update (after " + retryCnt + " retries) object " + absoluteHash, lastException);
     }
     , trace);  

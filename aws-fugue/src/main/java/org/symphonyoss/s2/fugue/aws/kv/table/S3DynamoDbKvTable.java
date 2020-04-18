@@ -80,6 +80,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   {
     try
     {
+      trace.trace("ABOUT-TO-READ-S3", "OBJECT", absoluteHash.toStringBase64());
       S3Object object = s3Client_.getObject(new GetObjectRequest(objectBucketName_, s3Key(absoluteHash)));
       
       if(object.getObjectMetadata().getContentLength() > Integer.MAX_VALUE)
@@ -100,12 +101,15 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
         {
           buf.append(cbuf, 0, nbytes);
         }
-        
+
+        trace.trace("READ-S3", "OBJECT", absoluteHash.toStringBase64());
         return buf.toString();
       }
     }
     catch(AmazonS3Exception | IOException e)
     {
+
+      trace.trace("FAILED-TO-READ-S3", "OBJECT", absoluteHash.toStringBase64());
       throw new NoSuchObjectException("Failed to read object from S3", e);
     }
     // we only call for objects which we know exist and are not in dynamo
@@ -124,8 +128,12 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
     {
       throw new CodingFault("In memory I/O - can't happen", e);
     }
-    
-    trace.trace("WRITTEN-S3");
+    catch(RuntimeException e)
+    {
+      trace.trace("FAILED-TO-WRITE-S3", kvItem);
+      throw e;
+    }
+    trace.trace("WRITTEN-S3", kvItem);
   }
   
   @Override
@@ -133,7 +141,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   {
     s3Client_.deleteObject(objectBucketName_, s3Key(absoluteHash));
     
-    trace.trace("DELETED-S3");
+    trace.trace("DELETED-S3", "OBJECT", absoluteHash.toStringBase64());
   }
   
   private ObjectMetadata getS3MetaData(

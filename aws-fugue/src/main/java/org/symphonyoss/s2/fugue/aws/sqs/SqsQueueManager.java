@@ -103,7 +103,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public synchronized IQueueSender getSender(String queueName)
+  public IQueueSender getSender(String queueName)
   {
     try
     {
@@ -116,7 +116,7 @@ public class SqsQueueManager implements IQueueManager
   }
   
   @Override
-  public synchronized IQueueReceiver getReceiver(String queueName) throws NotFoundException
+  public IQueueReceiver getReceiver(String queueName) throws NotFoundException
   {
     try
     {

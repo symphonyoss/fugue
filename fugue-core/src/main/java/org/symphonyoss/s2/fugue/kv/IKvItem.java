@@ -29,6 +29,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.core.trace.ITraceSubject;
 import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
@@ -37,7 +38,7 @@ import org.symphonyoss.s2.fugue.store.IFuguePodId;
  * @author Bruce Skingle
  *
  */
-public interface IKvItem extends IKvPartitionSortKeyProvider
+public interface IKvItem extends IKvPartitionSortKeyProvider, ITraceSubject
 {
   /**
    * 

@@ -10,7 +10,6 @@ import static org.junit.Assert.assertEquals;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -290,7 +289,6 @@ public class TestInMemoryKvTable
 
     public KvItem(String partitionKey, String sortKey, String value, String attrName, Object attrValue)
     {
-      super();
       partitionKey_ = partitionKey;
       sortKey_ = sortKey;
       value_ = value;
@@ -350,6 +348,18 @@ public class TestInMemoryKvTable
     public Map<String, Object> getAdditionalAttributes()
     {
       return additionalAttributes_;
+    }
+
+    @Override
+    public String getTraceSubjectType()
+    {
+      return "OBJECT-INMEMORY";
+    }
+
+    @Override
+    public String getTraceSubjectId()
+    {
+      return getAbsoluteHash().toStringBase64();
     }
     
   }
