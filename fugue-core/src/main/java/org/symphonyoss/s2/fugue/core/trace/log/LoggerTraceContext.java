@@ -87,7 +87,7 @@ class LoggerTraceContext implements ITraceContext
     
     lastEvent_ = now;
     
-    log_.debug(String.format("TRACE %-50.50s %-50.50s %-20.20s %5d %5d %-14s %-30.30s %-40.40s %-20.20s %s", parentHash_, id_, operationId, operation, total, 
+    log_.debug(String.format("TRACE|%-50.50s|%-50.50s|%-20.20s|%5d|%5d|%-14s|%-30.30s|%-40.40s|%-20.20s|%s|", parentHash_, id_, operationId, operation, total, 
         tenantId_, subjectType_, subjectId_, subjectType, subjectId));
   }
 
