@@ -119,7 +119,7 @@ public abstract class AbstractPullSubscriber implements Runnable
           return;
         }
         
-        //scheduleExtra(1);
+        scheduleExtra(1);
       }
       else
       {
