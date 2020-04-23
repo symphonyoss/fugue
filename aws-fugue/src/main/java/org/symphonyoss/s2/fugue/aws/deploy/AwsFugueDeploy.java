@@ -202,17 +202,37 @@ import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import com.amazonaws.services.lambda.model.AddPermissionRequest;
 import com.amazonaws.services.lambda.model.AddPermissionResult;
+import com.amazonaws.services.lambda.model.CreateAliasRequest;
+import com.amazonaws.services.lambda.model.CreateAliasResult;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
+import com.amazonaws.services.lambda.model.CreateFunctionResult;
 import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
+import com.amazonaws.services.lambda.model.DeleteProvisionedConcurrencyConfigRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
+import com.amazonaws.services.lambda.model.FunctionConfiguration;
+import com.amazonaws.services.lambda.model.GetAliasRequest;
+import com.amazonaws.services.lambda.model.GetAliasResult;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
 import com.amazonaws.services.lambda.model.GetFunctionResult;
+import com.amazonaws.services.lambda.model.GetProvisionedConcurrencyConfigRequest;
+import com.amazonaws.services.lambda.model.GetProvisionedConcurrencyConfigResult;
+import com.amazonaws.services.lambda.model.ListVersionsByFunctionRequest;
+import com.amazonaws.services.lambda.model.ListVersionsByFunctionResult;
+import com.amazonaws.services.lambda.model.ProvisionedConcurrencyConfigNotFoundException;
+import com.amazonaws.services.lambda.model.PublishVersionRequest;
+import com.amazonaws.services.lambda.model.PublishVersionResult;
+import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigRequest;
+import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigResult;
 import com.amazonaws.services.lambda.model.RemovePermissionRequest;
 import com.amazonaws.services.lambda.model.RemovePermissionResult;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
+import com.amazonaws.services.lambda.model.UpdateAliasRequest;
+import com.amazonaws.services.lambda.model.UpdateAliasResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
+import com.amazonaws.services.lambda.model.UpdateFunctionCodeResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
+import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationResult;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
 import com.amazonaws.services.logs.model.CreateLogGroupRequest;
@@ -261,6 +281,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public abstract class AwsFugueDeploy extends FugueDeploy
 {
+  static final String LAMBDA_ALIAS_NAME = "live";
+  
   private static final Logger            log_                          = LoggerFactory.getLogger(AwsFugueDeploy.class);
 
   private static final String            AMAZON                        = "amazon";
@@ -396,11 +418,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
   private String getFunctionInvocationArn(String name)
   {
-    return String.format("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/arn:aws:lambda:%s:%s:function:%s/invocations",
+    return String.format("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/arn:aws:lambda:%s:%s:function:%s:%s/invocations",
         awsRegion_,
         awsRegion_,
         awsAccountId_,
-        name);
+        name,
+        LAMBDA_ALIAS_NAME);
   }
   
   private String getQueueArn(String name)
@@ -1683,7 +1706,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     @Override
     protected void deployLambdaContainer(String name, String imageName, 
-        String roleId, String handler, int memorySize, int timeout, Map<String, String> variables, Collection<String> paths)
+        String roleId, String handler, int memorySize, int timeout, 
+        Integer provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths)
     {
       String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
       Name    roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
@@ -1693,6 +1717,13 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
+        
+
+        
+        
+        String codeSha256;
+        String revisionId;
+        
         try
         {
           GetFunctionResult function = lambdaClient_.getFunction(new GetFunctionRequest()
@@ -1700,13 +1731,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               );
           
           log_.info("Lambda function " + functionName + " already exists, updating...");
-          lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
+          UpdateFunctionCodeResult updateCodeResult = lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
               .withFunctionName(functionName)
               .withS3Bucket(bucketName)
               .withS3Key(key)
               );
           
-          lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
+          codeSha256 = updateCodeResult.getCodeSha256();
+          
+          UpdateFunctionConfigurationResult updateConfigResult = lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
               .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
@@ -1717,6 +1750,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
               );
           
+          revisionId = updateConfigResult.getRevisionId();
+          
           lambdaClient_.tagResource(new com.amazonaws.services.lambda.model.TagResourceRequest()
               .withResource(function.getConfiguration().getFunctionArn())
               .withTags(getTags())
@@ -1726,7 +1761,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         {
           log_.info("Lambda function " + functionName + " does not exist, creating...");
           
-          lambdaClient_.createFunction(new CreateFunctionRequest()
+          CreateFunctionResult createFunctionResult = lambdaClient_.createFunction(new CreateFunctionRequest()
               .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
@@ -1741,6 +1776,135 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   .withS3Key(key)
                   )
               );
+          
+          codeSha256 = createFunctionResult.getCodeSha256();
+          revisionId = createFunctionResult.getRevisionId();
+        }
+        
+        ListVersionsByFunctionResult listVersionsResult = lambdaClient_.listVersionsByFunction(new ListVersionsByFunctionRequest()
+            .withFunctionName(functionName));
+        
+        PublishVersionResult publishVersionResult = lambdaClient_.publishVersion(new PublishVersionRequest()
+            .withCodeSha256(codeSha256)
+            .withRevisionId(revisionId)
+            .withFunctionName(functionName)
+            );
+        
+        try
+        {
+          GetAliasResult getAliasResult = lambdaClient_.getAlias(new GetAliasRequest()
+              .withFunctionName(functionName)
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " exists to revision " + getAliasResult.getRevisionId() + ", updating...");
+
+
+          UpdateAliasResult updateAliasResult = lambdaClient_.updateAlias(new UpdateAliasRequest()
+              .withFunctionName(functionName)
+              .withFunctionVersion(publishVersionResult.getVersion())
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+        }
+        catch(ResourceNotFoundException e)
+        {
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " does not exist, creating...");
+          
+
+          CreateAliasResult createAliasResult = lambdaClient_.createAlias(new CreateAliasRequest()
+              .withFunctionName(functionName)
+              .withFunctionVersion(publishVersionResult.getVersion())
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+        }
+
+        int versionLimit = Integer.parseInt(publishVersionResult.getVersion()) - 1;
+        
+        
+        for(FunctionConfiguration version : listVersionsResult.getVersions())
+        {
+          System.out.println("Version rev=" + version.getRevisionId() + " ver=" + version.getVersion() + " state=" + version.getState());
+          
+          try
+          {
+            int v = Integer.parseInt(version.getVersion());
+            
+            if(v < versionLimit)
+            {
+              log_.info("Deleting old version " + functionName + ":" + v + " (revision " + version.getRevisionId() + ")...");
+              
+              lambdaClient_.deleteFunction(new DeleteFunctionRequest()
+                  .withFunctionName(functionName)
+                  .withQualifier(version.getVersion())
+                  );
+            }
+          }
+          catch(NumberFormatException e)
+          {
+            log_.info("Leaving version " + functionName + ":" + version.getVersion() + " (revision " + version.getRevisionId() + ")");
+          }
+        }
+
+//        
+//        getAliasResult.getFunctionVersion()
+        
+        
+//        GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
+//            .withFunctionName(functionName)
+//            .withQualifier(LAMBDA_ALIAS_NAME)
+//            );
+        
+
+                
+        try
+        {
+          GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+          
+          if(provisionedConcurrentExecutions == null)
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", deleting...");
+            
+            lambdaClient_.deleteProvisionedConcurrencyConfig(new DeleteProvisionedConcurrencyConfigRequest()
+                .withFunctionName(functionName)
+                .withQualifier(LAMBDA_ALIAS_NAME)
+                );
+          }
+          else
+          {
+            if(getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions().equals(provisionedConcurrentExecutions))
+            {
+              log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+            }
+            else
+            {
+              log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", updating...");
+              
+  
+              PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+                  .withFunctionName(functionName)
+                  .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+                  .withQualifier(LAMBDA_ALIAS_NAME)
+                  );
+              
+              log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+            }
+          }       
+        }
+        catch(ProvisionedConcurrencyConfigNotFoundException e)
+        {
+          log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
+          
+          PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
         }
         
         if(!paths.isEmpty())

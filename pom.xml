@@ -43,6 +43,7 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <s2.common.version>0.2.8</s2.common.version>
+    <aws.java.sdk.version>1.11.766</aws.java.sdk.version>
   </properties>
   
 	<modules>

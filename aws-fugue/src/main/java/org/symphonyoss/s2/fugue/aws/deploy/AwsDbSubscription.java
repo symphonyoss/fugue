@@ -41,6 +41,7 @@ import com.amazonaws.services.dynamodbv2.model.StreamViewType;
 import com.amazonaws.services.dynamodbv2.model.UpdateTableRequest;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.model.CreateEventSourceMappingRequest;
+import com.amazonaws.services.lambda.model.DeleteEventSourceMappingRequest;
 import com.amazonaws.services.lambda.model.EventSourceMappingConfiguration;
 import com.amazonaws.services.lambda.model.EventSourcePosition;
 import com.amazonaws.services.lambda.model.ListEventSourceMappingsRequest;
@@ -90,6 +91,12 @@ class AwsDbSubscription extends DbSubscription
       log_.info("DynamoDb stream created as " + eventSourceArn);
     }
     
+    deleteEventSourceMapping(functionName, eventSourceArn);
+    createEventSourceMapping(functionName + ":" + AwsFugueDeploy.LAMBDA_ALIAS_NAME, eventSourceArn);
+  }
+  
+  private void deleteEventSourceMapping(String functionName, String eventSourceArn)
+  {
     ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
         .withFunctionName(functionName)
         .withEventSourceArn(eventSourceArn)
@@ -99,20 +106,63 @@ class AwsDbSubscription extends DbSubscription
     {
       if(mapping.getEventSourceArn().startsWith(eventSourceArn))
       {
-        if("Enabled".equals(mapping.getState()))
+//        if("Enabled".equals(mapping.getState()))
+//        {
+//          log_.info("Event source mapping to " + functionName + " exists and is " + mapping.getState());
+//          
+//          UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
+//              .withUUID(mapping.getUUID())
+//              .withEnabled(false)
+//              );
+//          
+//          log_.info("Event source mapping updated to state " + updateResult.getState());
+//        }
+        
+        lambdaClient_.deleteEventSourceMapping(new DeleteEventSourceMappingRequest()
+            .withUUID(mapping.getUUID())
+            );
+        
+        log_.info("Event source mapping to " + functionName + " deleted");
+        
+        return;
+      }
+    }
+    
+    
+  }
+
+  private void createEventSourceMapping(String functionName, String eventSourceArn)
+  {
+
+    int batchSize = 5;
+    int concurrency = 10;
+    
+    ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
+        .withFunctionName(functionName)
+        .withEventSourceArn(eventSourceArn)
+        );
+    
+    for(EventSourceMappingConfiguration mapping : mappingResult.getEventSourceMappings())
+    {
+      if(mapping.getEventSourceArn().startsWith(eventSourceArn))
+      {
+        if("Enabled".equals(mapping.getState()) && 
+            intEquals(mapping.getBatchSize(), batchSize) && 
+            intEquals(mapping.getParallelizationFactor(), concurrency))
         {
-          log_.info("Event source mapping exists.");
+          log_.info("Event source mapping to " + functionName + " exists.");
           return;
         }
-        
-        log_.info("Event source mapping exists but is " + mapping.getState());
+        log_.info("Event source mapping to " + functionName + " exists but is " + mapping.getState());
         
         UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
             .withUUID(mapping.getUUID())
+            .withBatchSize(batchSize)
+            .withParallelizationFactor(concurrency)
             .withEnabled(true)
             );
         
-        log_.info("Event source mapping updated to state " + updateResult.getState());
+        log_.info("Event source mapping to " + functionName + " updated to state " + updateResult.getState());
         
         return;
       }
@@ -124,11 +174,18 @@ class AwsDbSubscription extends DbSubscription
         .withFunctionName(functionName)
         .withEventSourceArn(eventSourceArn)
         .withStartingPosition(EventSourcePosition.LATEST)
+        .withBatchSize(batchSize)
+        .withParallelizationFactor(concurrency)
         );
     
-    log_.info("Event source mapping created");
+    log_.info("Event source mapping to " + functionName + " created");
   }
-  
+
+  private boolean intEquals(Integer actual, int expected)
+  {
+    return actual != null && actual.equals(expected);
+  }
+
   private String fetchEventSourceArn()
   {
     String eventSourceArn = null;
