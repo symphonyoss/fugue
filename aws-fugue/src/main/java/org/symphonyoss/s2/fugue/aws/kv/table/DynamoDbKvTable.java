@@ -29,7 +29,6 @@ import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 
 /**
  * DynamoDB implementation of IKvTable.
@@ -51,10 +50,12 @@ public class DynamoDbKvTable extends AbstractDynamoDbKvTable<DynamoDbKvTable>
   }
   
   @Override
-  protected void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
+  protected boolean storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
   {
     if(payloadNotStored)
       throw new IllegalArgumentException("This table does not support secondary storage and the payload is too large to store in primary storage.");
+    
+    return false;
   }
   
   @Override

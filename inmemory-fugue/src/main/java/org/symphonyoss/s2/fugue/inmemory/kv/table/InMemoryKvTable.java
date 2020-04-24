@@ -78,6 +78,20 @@ public class InMemoryKvTable implements IKvTable
   }
 
   @Override
+  public void deleteRow(IKvPartitionSortKeyProvider partitionSortKeyProvider, ITraceContext trace)
+  {
+    String partitionKey = getPartitionKey(partitionSortKeyProvider);
+    String sortKey = partitionSortKeyProvider.getSortKey().asString();
+    
+    Map<String, IKvItem> partition = getPartition(partitionKey);
+    
+    synchronized (partition)
+    {
+      partition.remove(sortKey);
+    }
+  }
+
+  @Override
   public void delete(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash,
       IKvPartitionKeyProvider versionPartitionKey, IKvPartitionSortKeyProvider absoluteHashPrefix, ITraceContext trace)
       throws NoSuchObjectException

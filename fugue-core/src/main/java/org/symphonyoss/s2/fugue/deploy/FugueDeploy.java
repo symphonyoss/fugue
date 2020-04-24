@@ -1097,7 +1097,7 @@ public abstract class FugueDeploy extends CommandLineHandler
     protected abstract void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted);
 
     protected abstract void deployLambdaContainer(String name, String imageName, String roleId, String handler, int memorySize, int timeout, 
-        Integer provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths);
+        int provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths);
     protected abstract void postDeployLambdaContainer(String name, Collection<String> paths, Collection<Subscription> subscriptions);
     protected abstract void postDeployContainers();
     
@@ -1525,7 +1525,7 @@ public abstract class FugueDeploy extends CommandLineHandler
                 container.getRequiredString(HANDLER),
                 container.getRequiredInteger(MEMORY),
                 container.getRequiredInteger(TIMEOUT),
-                container.getInteger(PROVISIONED_CONCURRENCY, null),
+                container.getInteger(PROVISIONED_CONCURRENCY, 0),
                 environment,
                 paths
                 );

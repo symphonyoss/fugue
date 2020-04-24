@@ -83,6 +83,7 @@ import com.amazonaws.services.dynamodbv2.model.CancellationReason;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
 import com.amazonaws.services.dynamodbv2.model.CreateTableResult;
 import com.amazonaws.services.dynamodbv2.model.Delete;
+import com.amazonaws.services.dynamodbv2.model.DeleteItemRequest;
 import com.amazonaws.services.dynamodbv2.model.DeleteTableRequest;
 import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveRequest;
 import com.amazonaws.services.dynamodbv2.model.DescribeTimeToLiveResult;
@@ -323,9 +324,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       
       if(kvItem.isSaveToSecondaryStorage())
       {
-        storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
-        
-        secondaryStoredHash = kvItem.getAbsoluteHash();
+        if(storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace))
+          secondaryStoredHash = kvItem.getAbsoluteHash();
       }
       
       Put put = updateOrPut.createPut();
@@ -377,9 +377,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
     
     if(kvItem.isSaveToSecondaryStorage())
     {
-      storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
-      
-      secondaryStoredHash = kvItem.getAbsoluteHash();
+      if(storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace))
+        secondaryStoredHash = kvItem.getAbsoluteHash();
     }
     
     Condition condition = new Condition(
@@ -551,6 +550,23 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
   }
   
   @Override
+  public void deleteRow(IKvPartitionSortKeyProvider partitionSortKeyProvider, ITraceContext trace)
+  {
+    String    existingPartitionKey = getPartitionKey(partitionSortKeyProvider);
+    String    existingSortKey = partitionSortKeyProvider.getSortKey().asString();
+    
+    final Map<String, AttributeValue> itemKey = new HashMap<>();
+    
+    itemKey.put(ColumnNamePartitionKey, new AttributeValue(existingPartitionKey));
+    itemKey.put(ColumnNameSortKey, new AttributeValue(existingSortKey));
+    
+    amazonDynamoDB_.deleteItem(new DeleteItemRequest()
+        .withKey(itemKey)
+        .withTableName(objectTable_.getTableName())
+        );
+  }
+  
+  @Override
   public void update(IKvPartitionSortKeyProvider partitionSortKeyProvider, Hash absoluteHash, Set<IKvItem> kvItems,
       ITraceContext trace) throws NoSuchObjectException
   {
@@ -596,9 +612,8 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
       
       if(kvItem.isSaveToSecondaryStorage())
       {
-        storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace);
-        
-        secondaryStoredHash = kvItem.getAbsoluteHash();
+        if(storeToSecondaryStorage(kvItem, updateOrPut.payloadNotStored_, trace))
+          secondaryStoredHash = kvItem.getAbsoluteHash();
       }
     }
     
@@ -736,8 +751,9 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
    * @param kvItem            An item to be stored.
    * @param payloadNotStored  The payload is too large to store in primary storage.
    * @param trace             A trace context.
+   * @return true if the object was stored
    */
-  protected abstract void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace);
+  protected abstract boolean storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace);
 
   /**
    * Delete the given object from secondary storage.

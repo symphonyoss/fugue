@@ -1707,7 +1707,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void deployLambdaContainer(String name, String imageName, 
         String roleId, String handler, int memorySize, int timeout, 
-        Integer provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths)
+        int provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths)
     {
       String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
       Name    roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
@@ -1848,7 +1848,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withQualifier(LAMBDA_ALIAS_NAME)
               );
           
-          if(provisionedConcurrentExecutions == null)
+          if(provisionedConcurrentExecutions <= 0)
           {
             log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", deleting...");
             
@@ -1880,15 +1880,18 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         }
         catch(ProvisionedConcurrencyConfigNotFoundException e)
         {
-          log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
-          
-          PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
-              .withFunctionName(functionName)
-              .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
-              .withQualifier(LAMBDA_ALIAS_NAME)
-              );
-
-          log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          if(provisionedConcurrentExecutions > 0)
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
+            
+            PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+                .withFunctionName(functionName)
+                .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+                .withQualifier(LAMBDA_ALIAS_NAME)
+                );
+  
+            log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          }
         }
         
         if(!paths.isEmpty())

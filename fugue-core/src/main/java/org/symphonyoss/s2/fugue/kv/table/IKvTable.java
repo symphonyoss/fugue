@@ -24,7 +24,6 @@
 package org.symphonyoss.s2.fugue.kv.table;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -176,6 +175,14 @@ public interface IKvTable extends IFugueComponent
       @Nullable String sortKeyPrefix,
       @Nullable Map<String, Object> filterAttributes,
       Consumer<String> consumer, ITraceContext trace);
+
+  /**
+   * Delete the single row whose primary key is given.
+   * 
+   * @param partitionSortKeyProvider  The partition and sort key of the row to be deleted.
+   * @param trace                     Trace context.
+   */
+  void deleteRow(IKvPartitionSortKeyProvider partitionSortKeyProvider, ITraceContext trace);
 
 
 }

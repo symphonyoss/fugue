@@ -39,7 +39,6 @@ import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.kv.IKvItem;
-import org.symphonyoss.s2.fugue.kv.IKvPartitionSortKeyProvider;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
@@ -62,6 +61,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   
   protected final String   objectBucketName_;
   protected final AmazonS3 s3Client_;
+  private final boolean deferSecondaryStorage_;
   
   protected S3DynamoDbKvTable(S3DynamoDbKvTable.AbstractBuilder<?,?> builder)
   {
@@ -72,6 +72,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
     s3Client_ = builder.s3ClientBuilder_
         .withPathStyleAccessEnabled(true)
       .build();
+    deferSecondaryStorage_ = builder.deferSecondaryStorage_;
   }
 
   @Override
@@ -115,14 +116,42 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
     // we only call for objects which we know exist and are not in dynamo
   }
   
-  @Override
-  protected void storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
+  public void storeToSecondaryStorage(Hash absoluteHash, String payload, ITraceContext trace)
   {
+    byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
+    
+    try(InputStream in = new ByteArrayInputStream(bytes))
+    {
+      s3Client_.putObject(new PutObjectRequest(objectBucketName_, s3Key(absoluteHash), in, getS3MetaData(absoluteHash, bytes.length)));
+      trace.trace("WRITTEN-S3");
+    }
+    catch (IOException e)
+    {
+      throw new CodingFault("In memory I/O - can't happen", e);
+    }
+    catch(RuntimeException e)
+    {
+      trace.trace("FAILED-TO-WRITE-S3");
+      throw e;
+    }
+  }
+  
+  @Override
+  protected boolean storeToSecondaryStorage(IKvItem kvItem, boolean payloadNotStored, ITraceContext trace)
+  {
+    if(deferSecondaryStorage_ && !payloadNotStored)
+    {
+      trace.trace("DEFER-S3", kvItem);
+      return false;
+    }
+    
     byte[] bytes = kvItem.getJson().getBytes(StandardCharsets.UTF_8);
     
     try(InputStream in = new ByteArrayInputStream(bytes))
     {
       s3Client_.putObject(new PutObjectRequest(objectBucketName_, s3Key(kvItem.getAbsoluteHash()), in, getS3MetaData(kvItem.getAbsoluteHash(), bytes.length)));
+      trace.trace("WRITTEN-S3", kvItem);
+      return true;
     }
     catch (IOException e)
     {
@@ -133,7 +162,6 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
       trace.trace("FAILED-TO-WRITE-S3", kvItem);
       throw e;
     }
-    trace.trace("WRITTEN-S3", kvItem);
   }
   
   @Override
@@ -159,12 +187,15 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   
   protected String s3Key(Hash absoluteHash)
   {
+    return s3Key(absoluteHash.toStringUrlSafeBase64());
+  }
+  
+  private String s3Key(String partitionKey)
+  {
     // Return the S3 key used to store an object, we break the partition key into several directories to prevent a single directory
     // from getting too large.
     
     StringBuilder s = new StringBuilder();
-    
-    String partitionKey = absoluteHash.toStringUrlSafeBase64();
     
     return s.append(partitionKey.substring(0, 4))
         .append(SEPARATOR)
@@ -177,6 +208,7 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AbstractDynamoDbKvTable<B>> extends AbstractDynamoDbKvTable.AbstractBuilder<T,B>
   {
     protected final AmazonS3ClientBuilder       s3ClientBuilder_;
+    protected boolean deferSecondaryStorage_;
     
     protected AbstractBuilder(Class<T> type)
     {
@@ -206,6 +238,13 @@ public class S3DynamoDbKvTable extends AbstractDynamoDbKvTable<S3DynamoDbKvTable
         .withRegion(region_)
 //        .withClientConfiguration(clientConfig)
         ;
+    }
+
+    public T withDeferSecondaryStorage(boolean deferSecondaryStorage)
+    {
+      deferSecondaryStorage_ = deferSecondaryStorage;
+      
+      return self();
     }
 
     @Override
