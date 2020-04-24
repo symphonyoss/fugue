@@ -56,6 +56,9 @@ class AwsDbSubscription extends DbSubscription
   private final AWSLambda             lambdaClient_;
   private final AmazonDynamoDBStreams dynamoStreamsClient_;
   private final AmazonDynamoDB        amazonDynamoDB_;
+
+  private final int batchSize_;
+  private final int concurrency_;
   
   AwsDbSubscription(JsonObject<?> json, INameFactory nameFactory, AWSLambda lambdaClient, AmazonDynamoDBStreams dynamoStreamsClient,
       AmazonDynamoDB amazonDynamoDB)
@@ -65,6 +68,9 @@ class AwsDbSubscription extends DbSubscription
     lambdaClient_ = lambdaClient;
     dynamoStreamsClient_ = dynamoStreamsClient;
     amazonDynamoDB_ = amazonDynamoDB;
+
+    batchSize_ = json.getInteger("batchSize", 5);
+    concurrency_ = json.getInteger("concurrency", 1);
   }
 
   @Override
@@ -134,8 +140,6 @@ class AwsDbSubscription extends DbSubscription
   private void createEventSourceMapping(String functionName, String eventSourceArn)
   {
 
-    int batchSize = 5;
-    int concurrency = 10;
     
     ListEventSourceMappingsResult mappingResult = lambdaClient_.listEventSourceMappings(new ListEventSourceMappingsRequest()
         .withFunctionName(functionName)
@@ -147,8 +151,8 @@ class AwsDbSubscription extends DbSubscription
       if(mapping.getEventSourceArn().startsWith(eventSourceArn))
       {
         if("Enabled".equals(mapping.getState()) && 
-            intEquals(mapping.getBatchSize(), batchSize) && 
-            intEquals(mapping.getParallelizationFactor(), concurrency))
+            intEquals(mapping.getBatchSize(), batchSize_) && 
+            intEquals(mapping.getParallelizationFactor(), concurrency_))
         {
           log_.info("Event source mapping to " + functionName + " exists.");
           return;
@@ -157,8 +161,8 @@ class AwsDbSubscription extends DbSubscription
         
         UpdateEventSourceMappingResult updateResult = lambdaClient_.updateEventSourceMapping(new UpdateEventSourceMappingRequest()
             .withUUID(mapping.getUUID())
-            .withBatchSize(batchSize)
-            .withParallelizationFactor(concurrency)
+            .withBatchSize(batchSize_)
+            .withParallelizationFactor(concurrency_)
             .withEnabled(true)
             );
         
@@ -174,8 +178,8 @@ class AwsDbSubscription extends DbSubscription
         .withFunctionName(functionName)
         .withEventSourceArn(eventSourceArn)
         .withStartingPosition(EventSourcePosition.LATEST)
-        .withBatchSize(batchSize)
-        .withParallelizationFactor(concurrency)
+        .withBatchSize(batchSize_)
+        .withParallelizationFactor(concurrency_)
         );
     
     log_.info("Event source mapping to " + functionName + " created");

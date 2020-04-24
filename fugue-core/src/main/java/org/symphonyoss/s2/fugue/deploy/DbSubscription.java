@@ -34,7 +34,7 @@ public abstract class DbSubscription extends Subscription
   {
     super(json, 1000);
     
-    tableName_ = nameFactory.getTableName(json.getRequiredString("tableName")).toString();;
+    tableName_ = nameFactory.getTableName(json.getRequiredString("tableName")).toString();
   }
 
   public String getTableName()

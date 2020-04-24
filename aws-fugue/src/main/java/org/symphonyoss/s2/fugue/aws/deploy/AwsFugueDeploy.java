@@ -1717,10 +1717,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
-        
-
-        
-        
         String codeSha256;
         String revisionId;
         
@@ -1824,8 +1820,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         for(FunctionConfiguration version : listVersionsResult.getVersions())
         {
-          System.out.println("Version rev=" + version.getRevisionId() + " ver=" + version.getVersion() + " state=" + version.getState());
-          
           try
           {
             int v = Integer.parseInt(version.getVersion());
@@ -1842,20 +1836,10 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           }
           catch(NumberFormatException e)
           {
+            // This is $LATEST
             log_.info("Leaving version " + functionName + ":" + version.getVersion() + " (revision " + version.getRevisionId() + ")");
           }
         }
-
-//        
-//        getAliasResult.getFunctionVersion()
-        
-        
-//        GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
-//            .withFunctionName(functionName)
-//            .withQualifier(LAMBDA_ALIAS_NAME)
-//            );
-        
-
                 
         try
         {

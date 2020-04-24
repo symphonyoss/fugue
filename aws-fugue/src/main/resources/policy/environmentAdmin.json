@@ -159,17 +159,7 @@
             "Sid": "Lambda",
             "Effect": "Allow",
             "Action": [
-                "lambda:CreateFunction",
-                "lambda:DeleteFunction",
-                "lambda:UpdateFunctionCode",
-                "lambda:GetFunction",
-                "lambda:UpdateFunctionConfiguration",
-                "lambda:GetFunctionConfiguration",
-                "lambda:GetPolicy",
-                "lambda:AddPermission",
-                "lambda:RemovePermission",
-                "lambda:TagResource",
-                "lambda:UpdateEventSourceMapping",
+                "lambda:*",
                 "s3:GetObject"
             ],
             "Resource": [
