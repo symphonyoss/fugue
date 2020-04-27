@@ -1798,21 +1798,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           codeSha256 = createFunctionResult.getCodeSha256();
           revisionId = createFunctionResult.getRevisionId();
         }
+
+        log_.info("RevisionId " + revisionId);
         
-        ListVersionsByFunctionResult listVersionsResult = lambdaClient_.listVersionsByFunction(new ListVersionsByFunctionRequest()
-            .withFunctionName(functionName));
         
         PublishVersionResult publishVersionResult = lambdaClient_.publishVersion(new PublishVersionRequest()
             .withCodeSha256(codeSha256)
             .withRevisionId(revisionId)
             .withFunctionName(functionName)
             );
-        
-
-        if(!paths.isEmpty())
-        {
-          setLambdaApiGatewayPolicy(functionName);
-        }
         
         try
         {
@@ -1843,11 +1837,31 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               );
         }
 
+
+        if(!paths.isEmpty())
+        {
+          setLambdaApiGatewayPolicy(functionName,
+              LAMBDA_ALIAS_NAME
+//              publishVersionResult.getVersion()
+              );
+          
+          GetFunctionResult getFunctionResult = lambdaClient_.getFunction(new GetFunctionRequest()
+              .withFunctionName(functionName)
+              );
+          
+          revisionId = getFunctionResult.getConfiguration().getRevisionId();
+
+          log_.info("Updated RevisionId " + revisionId);
+        }
+        
         int versionLimit = Integer.parseInt(publishVersionResult.getVersion()) - 1;
         
         
         try
         {
+          ListVersionsByFunctionResult listVersionsResult = lambdaClient_.listVersionsByFunction(new ListVersionsByFunctionRequest()
+              .withFunctionName(functionName));
+
           for(FunctionConfiguration version : listVersionsResult.getVersions())
           {
             try
@@ -1965,7 +1979,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private void setLambdaApiGatewayPolicy(String functionName)
+    private void setLambdaApiGatewayPolicy(String functionName, String qualifier)
     {
       String apiGatewaySourceArn_ = String.format("arn:aws:execute-api:%s:%s:%s/*",
           awsRegion_,
@@ -1974,26 +1988,32 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       try
       {
-        RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
-            .withFunctionName(functionName)
-            .withStatementId("apiGatewayInvoke")
-            );
+//        RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
+//            .withFunctionName(functionName)
+//            .withQualifier(qualifier)
+//            .withStatementId("apiGatewayInvoke")
+//            );
+//        
+//        log_.info("Removed existing lambda permission " + removeResult);
         
-        log_.info("Removed existing lambda permission " + removeResult);
+        AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
+            .withFunctionName(functionName)
+            .withQualifier(qualifier)
+            .withAction("lambda:InvokeFunction")
+            .withPrincipal("apigateway.amazonaws.com")
+            .withStatementId("apiGatewayInvoke")
+            .withSourceArn(apiGatewaySourceArn_)
+            );
+      
+        log_.info("Added lambda permission " + permissionResult);      
       }
-      catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
+//      catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
+      catch(ResourceConflictException e)
       {
-        // does not exist anyway which is fine.
+        // already exists which is fine.
+        e.printStackTrace();
       }
-      AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
-          .withFunctionName(functionName)
-          .withAction("lambda:InvokeFunction")
-          .withPrincipal("apigateway.amazonaws.com")
-          .withStatementId("apiGatewayInvoke")
-          .withSourceArn(apiGatewaySourceArn_)
-          );
-    
-      log_.info("Added lambda permission " + permissionResult);      
+      
     }
 
     private void createApiGatewayPaths(String functionInvokeArn, Collection<String> paths)
