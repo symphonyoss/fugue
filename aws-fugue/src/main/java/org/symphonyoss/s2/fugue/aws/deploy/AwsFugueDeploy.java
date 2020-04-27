@@ -1808,6 +1808,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             .withFunctionName(functionName)
             );
         
+
+        if(!paths.isEmpty())
+        {
+          setLambdaApiGatewayPolicy(functionName);
+        }
+        
         try
         {
           GetAliasResult getAliasResult = lambdaClient_.getAlias(new GetAliasRequest()
@@ -1873,10 +1879,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         if(checkProvisionedCapacity)
           checkProvisionedCapacity(functionName, provisionedConcurrentExecutions);
         
-        if(!paths.isEmpty())
-        {
-          setLambdaApiGatewayPolicy(functionName);
-        }
       }
       if(action_.isUndeploy_)
       {
