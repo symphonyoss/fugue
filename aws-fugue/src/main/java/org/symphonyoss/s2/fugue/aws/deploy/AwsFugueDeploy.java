@@ -226,6 +226,7 @@ import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigReques
 import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigResult;
 import com.amazonaws.services.lambda.model.RemovePermissionRequest;
 import com.amazonaws.services.lambda.model.RemovePermissionResult;
+import com.amazonaws.services.lambda.model.ResourceConflictException;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
 import com.amazonaws.services.lambda.model.UpdateAliasRequest;
 import com.amazonaws.services.lambda.model.UpdateAliasResult;
@@ -1717,6 +1718,27 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
+        boolean checkProvisionedCapacity = true;
+        
+        try
+        {
+          GetAliasResult getAliasResult = lambdaClient_.getAlias(new GetAliasRequest()
+              .withFunctionName(functionName)
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " exists to revision " + getAliasResult.getRevisionId() + ", checking provisioned capacity...");
+          
+          checkProvisionedCapacity(functionName, provisionedConcurrentExecutions);
+          checkProvisionedCapacity = false;
+
+        }
+        catch(ResourceNotFoundException e)
+        {
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " does not exist, check provisioned capacity later.");
+        }
+        
         String codeSha256;
         String revisionId;
         
@@ -1818,81 +1840,38 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         int versionLimit = Integer.parseInt(publishVersionResult.getVersion()) - 1;
         
         
-        for(FunctionConfiguration version : listVersionsResult.getVersions())
-        {
-          try
-          {
-            int v = Integer.parseInt(version.getVersion());
-            
-            if(v < versionLimit)
-            {
-              log_.info("Deleting old version " + functionName + ":" + v + " (revision " + version.getRevisionId() + ")...");
-              
-              lambdaClient_.deleteFunction(new DeleteFunctionRequest()
-                  .withFunctionName(functionName)
-                  .withQualifier(version.getVersion())
-                  );
-            }
-          }
-          catch(NumberFormatException e)
-          {
-            // This is $LATEST
-            log_.info("Leaving version " + functionName + ":" + version.getVersion() + " (revision " + version.getRevisionId() + ")");
-          }
-        }
-                
         try
         {
-          GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
-              .withFunctionName(functionName)
-              .withQualifier(LAMBDA_ALIAS_NAME)
-              );
-          
-          if(provisionedConcurrentExecutions <= 0)
+          for(FunctionConfiguration version : listVersionsResult.getVersions())
           {
-            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", deleting...");
-            
-            lambdaClient_.deleteProvisionedConcurrencyConfig(new DeleteProvisionedConcurrencyConfigRequest()
-                .withFunctionName(functionName)
-                .withQualifier(LAMBDA_ALIAS_NAME)
-                );
+            try
+            {
+              int v = Integer.parseInt(version.getVersion());
+              
+              if(v < versionLimit)
+              {
+                log_.info("Deleting old version " + functionName + ":" + v + " (revision " + version.getRevisionId() + ")...");
+                
+                lambdaClient_.deleteFunction(new DeleteFunctionRequest()
+                    .withFunctionName(functionName)
+                    .withQualifier(version.getVersion())
+                    );
+              }
+            }
+            catch(NumberFormatException e)
+            {
+              // This is $LATEST
+              log_.info("Leaving version " + functionName + ":" + version.getVersion() + " (revision " + version.getRevisionId() + ")");
+            }
           }
-          else
-          {
-            if(getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions().equals(provisionedConcurrentExecutions))
-            {
-              log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
-            }
-            else
-            {
-              log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", updating...");
-              
-  
-              PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
-                  .withFunctionName(functionName)
-                  .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
-                  .withQualifier(LAMBDA_ALIAS_NAME)
-                  );
-              
-              log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
-            }
-          }       
         }
-        catch(ProvisionedConcurrencyConfigNotFoundException e)
+        catch(ResourceConflictException e)
         {
-          if(provisionedConcurrentExecutions > 0)
-          {
-            log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
-            
-            PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
-                .withFunctionName(functionName)
-                .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
-                .withQualifier(LAMBDA_ALIAS_NAME)
-                );
-  
-            log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
-          }
+          log_.warn("Old lambda version not deleted", e);
         }
+        
+        if(checkProvisionedCapacity)
+          checkProvisionedCapacity(functionName, provisionedConcurrentExecutions);
         
         if(!paths.isEmpty())
         {
@@ -1925,6 +1904,62 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       if(getNameFactory().getPodId() != null)
       {
         deleteObsoleteFunction(getNameFactory().getPhysicalServiceItemName(name).toString());
+      }
+    }
+
+    private void checkProvisionedCapacity(String functionName, int provisionedConcurrentExecutions)
+    {
+      try
+      {
+        GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
+            .withFunctionName(functionName)
+            .withQualifier(LAMBDA_ALIAS_NAME)
+            );
+        
+        if(provisionedConcurrentExecutions <= 0)
+        {
+          log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", deleting...");
+          
+          lambdaClient_.deleteProvisionedConcurrencyConfig(new DeleteProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+        }
+        else
+        {
+          if(getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions().equals(provisionedConcurrentExecutions))
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          }
+          else
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", updating...");
+            
+
+            PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+                .withFunctionName(functionName)
+                .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+                .withQualifier(LAMBDA_ALIAS_NAME)
+                );
+            
+            log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          }
+        }       
+      }
+      catch(ProvisionedConcurrencyConfigNotFoundException e)
+      {
+        if(provisionedConcurrentExecutions > 0)
+        {
+          log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
+          
+          PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+        }
       }
     }
 
