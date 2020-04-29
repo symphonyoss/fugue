@@ -1615,7 +1615,7 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
         spec.withMaxResultSize(limit);
       }
       
-      if(after != null)
+      if(after != null && after.length()>0)
       {
         spec.withExclusiveStartKey(
             new KeyAttribute(ColumnNamePartitionKey, getPartitionKey(partitionKey)),
@@ -1641,6 +1641,11 @@ public abstract class AbstractDynamoDbKvTable<T extends AbstractDynamoDbKvTable<
             before = item.getString(ColumnNameSortKey);
           }
         }
+      }
+      
+      if(before == null && after != null)
+      {
+        before = "";
       }
       
       lastEvaluatedKey = items.getLastLowLevelResult().getQueryResult().getLastEvaluatedKey();
