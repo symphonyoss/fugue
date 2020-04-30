@@ -16,6 +16,7 @@ As a result, PRs submitted to the symphonyoss/fugue project cannot be accepted u
 
 Need an ICLA? Unsure if you are covered under an existing CCLA? Email [help@finos.org](mailto:help@finos.org?subject=CLA)
 
+
 # Contributing Issues
 
 ## Prerequisites
@@ -43,7 +44,6 @@ To make review of PRs easier, please:
  * Minimise non-functional changes (e.g. whitespace).
  * Ensure all new files include a header comment block containing the [Apache License v2.0 and your copyright information](http://www.apache.org/licenses/LICENSE-2.0#apply).
  * If necessary (e.g. due to 3rd party dependency licensing requirements), update the [NOTICE file](https://github.com/symphonyoss/fugue/blob/master/NOTICE) with any new attribution or other notices
-
 
 ## Commit and PR Messages
 
