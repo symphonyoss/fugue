@@ -25,14 +25,14 @@ package org.symphonyoss.s2.fugue;
 
 import org.symphonyoss.s2.common.fluent.IBuilder;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
-import org.symphonyoss.s2.fugue.counter.IBusyCounter;
+import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
 
 public interface IFugueAssemblyBuilder<T extends IFugueAssemblyBuilder<T,B>, B extends IFugueAssembly> extends IBuilder<T, B>
 {
 
   T withContainer(IFugeComponentContainer<?> container);
 
-  T withBusyCounter(IBusyCounter busyCounter);
-
   IGlobalConfiguration getConfiguration();
+
+  T withBusyCounterFactory(ITopicBusyCounterFactory busyCounter);
 }

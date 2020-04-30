@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.pubsub;
 
+import javax.annotation.Nullable;
+
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 
 import com.google.common.collect.ImmutableSet;
@@ -40,6 +42,34 @@ public interface ITopicSubscriptionAdmin extends ISubscriptionAdmin
    * @return The subscription names for this subscription.
    */
   @Override
-  ImmutableSet<? extends SubscriptionName> getSubscriptionNames();
+  ImmutableSet<SubscriptionName> getSubscriptionNames();
+
+  /**
+   * Return the name of the property to be used for filtering.
+   * 
+   * @return The subscription names for this subscription.
+   */
+  @Nullable String getFilterPropertyName();
+
+  /**
+   * Return true iff filtering is exclusive, otherwise it is inclusive.
+   * 
+   * @return true iff filtering is exclusive, otherwise it is inclusive.
+   */
+  boolean isFilterExclude();
+
+  /**
+   * Return the set of values to filter.
+   * 
+   * @return The set of values to filter.
+   */
+  ImmutableSet<String> getFilterPropertyValues();
+
+  /**
+   * Return the name of a lambda function to be triggered to process messages on this subscription.
+   * 
+   * @return The name of a lambda function to be triggered to process messages on this subscription.
+   */
+  String getLambdaConsumer();
 
 }

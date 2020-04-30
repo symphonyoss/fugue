@@ -53,7 +53,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleSubscriberManager extends AbstractPullSubscriberManager<GoogleSubscriberManager>
+public class GoogleSubscriberManager extends AbstractPullSubscriberManager<String, GoogleSubscriberManager>
 {
   private static final Logger          log_            = LoggerFactory.getLogger(GoogleSubscriberManager.class);
 
@@ -74,7 +74,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, GoogleSubscriberManager>
+  public static class Builder extends AbstractPullSubscriberManager.Builder<Builder, String, GoogleSubscriberManager>
   {
     private String                 projectId_;
 
@@ -122,7 +122,7 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
   }
 
   @Override
-  protected void initSubscription(ISubscription subscription)
+  protected void initSubscription(ISubscription<String> subscription)
   { 
 
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create())
@@ -132,9 +132,9 @@ public class GoogleSubscriberManager extends AbstractPullSubscriberManager<Googl
         log_.info("Validating subscription " + subscriptionName + "...");
         
         validateSubcription(subscriptionAdminClient, subscriptionName.toString());
-  
+        
         GoogleSubscriber subscriber = new GoogleSubscriber(this, ProjectSubscriptionName.format(projectId_,  subscriptionName.toString()),
-            getTraceFactory(), subscription.getConsumer(), getCounter(), getBusyCounter(), nameFactory_.getPodName());
+            getTraceFactory(), subscription.getConsumer(), getCounter(), createBusyCounter(subscriptionName), nameFactory_.getPodName());
   
         subscribers_.add(subscriber);
         log_.info("Subscribing to " + subscriptionName + "...");  

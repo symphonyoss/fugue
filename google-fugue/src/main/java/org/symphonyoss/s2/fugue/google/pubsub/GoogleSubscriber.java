@@ -32,7 +32,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.CodingFault;
-import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContextTransaction;
@@ -84,7 +83,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
-    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS);
+    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS, consumer);
     
     if(Fugue.isDebugSingleThread())
     {
@@ -207,10 +206,18 @@ public class GoogleSubscriber extends AbstractPullSubscriber
     }
 
     @Override
+    public String toString()
+    {
+      return receivedMessage_.toString();
+    }
+
+    @Override
     public void run()
     {
       PubsubMessage message = receivedMessage_.getMessage();
       Timestamp     ts      = message.getPublishTime();
+      
+      log_.debug("process message " + getMessageId());
       
       try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:Google", message.getMessageId(),
           tenantId_, Instant.ofEpochSecond(ts.getSeconds(), ts.getNanos())))
@@ -237,6 +244,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
             
             subscriber_.acknowledgeCallable().call(acknowledgeRequest);
             traceTransaction.finished();
+            log_.debug("ACK message " + getMessageId());
           }
           else
           {
@@ -254,6 +262,7 @@ public class GoogleSubscriber extends AbstractPullSubscriber
             subscriber_.modifyAckDeadlineCallable().call(request);
             
             traceTransaction.aborted();
+            log_.debug("NAK message " + getMessageId());
           }
         }
       }

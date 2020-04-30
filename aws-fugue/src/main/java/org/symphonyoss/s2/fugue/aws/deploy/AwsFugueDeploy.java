@@ -1,7 +1,7 @@
 /*
  *
  *
- * Copyright 2018 Symphony Communication Services, LLC.
+ * Copyright 2018-2019 Symphony Communication Services, LLC.
  *
  * Licensed to The Symphony Software Foundation (SSF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,20 +48,67 @@ import org.symphonyoss.s2.common.dom.json.IJsonArray;
 import org.symphonyoss.s2.common.dom.json.IJsonDomNode;
 import org.symphonyoss.s2.common.dom.json.IJsonObject;
 import org.symphonyoss.s2.common.dom.json.ImmutableJsonObject;
+import org.symphonyoss.s2.common.dom.json.JsonObject;
 import org.symphonyoss.s2.common.dom.json.jackson.JacksonAdaptor;
 import org.symphonyoss.s2.common.fault.CodingFault;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.common.type.provider.IStringProvider;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.aws.config.S3Helper;
 import org.symphonyoss.s2.fugue.aws.secret.AwsSecretManager;
 import org.symphonyoss.s2.fugue.deploy.ConfigHelper;
 import org.symphonyoss.s2.fugue.deploy.ConfigProvider;
 import org.symphonyoss.s2.fugue.deploy.FugueDeploy;
 import org.symphonyoss.s2.fugue.deploy.FugueDeployAction;
+import org.symphonyoss.s2.fugue.deploy.Subscription;
 import org.symphonyoss.s2.fugue.naming.CredentialName;
 import org.symphonyoss.s2.fugue.naming.INameFactory;
 import org.symphonyoss.s2.fugue.naming.Name;
 
+import com.amazonaws.services.apigateway.AmazonApiGateway;
+import com.amazonaws.services.apigateway.AmazonApiGatewayClientBuilder;
+import com.amazonaws.services.apigateway.model.ConnectionType;
+import com.amazonaws.services.apigateway.model.CreateBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.CreateBasePathMappingResult;
+import com.amazonaws.services.apigateway.model.CreateDeploymentRequest;
+import com.amazonaws.services.apigateway.model.CreateDeploymentResult;
+import com.amazonaws.services.apigateway.model.CreateDomainNameRequest;
+import com.amazonaws.services.apigateway.model.CreateDomainNameResult;
+import com.amazonaws.services.apigateway.model.CreateResourceRequest;
+import com.amazonaws.services.apigateway.model.CreateResourceResult;
+import com.amazonaws.services.apigateway.model.CreateRestApiRequest;
+import com.amazonaws.services.apigateway.model.CreateRestApiResult;
+import com.amazonaws.services.apigateway.model.DeleteMethodRequest;
+import com.amazonaws.services.apigateway.model.DeleteRestApiRequest;
+import com.amazonaws.services.apigateway.model.EndpointConfiguration;
+import com.amazonaws.services.apigateway.model.EndpointType;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.GetBasePathMappingResult;
+import com.amazonaws.services.apigateway.model.GetDomainNameRequest;
+import com.amazonaws.services.apigateway.model.GetDomainNameResult;
+import com.amazonaws.services.apigateway.model.GetMethodRequest;
+import com.amazonaws.services.apigateway.model.GetMethodResult;
+import com.amazonaws.services.apigateway.model.GetResourcesRequest;
+import com.amazonaws.services.apigateway.model.GetResourcesResult;
+import com.amazonaws.services.apigateway.model.GetRestApisRequest;
+import com.amazonaws.services.apigateway.model.GetRestApisResult;
+import com.amazonaws.services.apigateway.model.GetStageRequest;
+import com.amazonaws.services.apigateway.model.GetStageResult;
+import com.amazonaws.services.apigateway.model.IntegrationType;
+import com.amazonaws.services.apigateway.model.Op;
+import com.amazonaws.services.apigateway.model.PatchOperation;
+import com.amazonaws.services.apigateway.model.PutIntegrationRequest;
+import com.amazonaws.services.apigateway.model.PutIntegrationResult;
+import com.amazonaws.services.apigateway.model.PutMethodRequest;
+import com.amazonaws.services.apigateway.model.PutMethodResult;
+import com.amazonaws.services.apigateway.model.Resource;
+import com.amazonaws.services.apigateway.model.RestApi;
+import com.amazonaws.services.apigateway.model.SecurityPolicy;
+import com.amazonaws.services.apigateway.model.TagResourceRequest;
+import com.amazonaws.services.apigateway.model.UpdateBasePathMappingRequest;
+import com.amazonaws.services.apigateway.model.UpdateDomainNameRequest;
+import com.amazonaws.services.apigateway.model.UpdateStageRequest;
+import com.amazonaws.services.apigateway.model.UpdateStageResult;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.cloudwatchevents.AmazonCloudWatchEvents;
@@ -75,8 +122,14 @@ import com.amazonaws.services.cloudwatchevents.model.PutTargetsRequest;
 import com.amazonaws.services.cloudwatchevents.model.RemoveTargetsRequest;
 import com.amazonaws.services.cloudwatchevents.model.RuleState;
 import com.amazonaws.services.cloudwatchevents.model.Target;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreams;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreamsClientBuilder;
+import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.ecs.AmazonECS;
 import com.amazonaws.services.ecs.AmazonECSClientBuilder;
+import com.amazonaws.services.ecs.model.AmazonECSException;
 import com.amazonaws.services.ecs.model.Container;
 import com.amazonaws.services.ecs.model.ContainerDefinition;
 import com.amazonaws.services.ecs.model.ContainerOverride;
@@ -98,47 +151,14 @@ import com.amazonaws.services.ecs.model.RegisterTaskDefinitionRequest;
 import com.amazonaws.services.ecs.model.RunTaskRequest;
 import com.amazonaws.services.ecs.model.RunTaskResult;
 import com.amazonaws.services.ecs.model.Service;
+import com.amazonaws.services.ecs.model.ServiceNotFoundException;
 import com.amazonaws.services.ecs.model.Task;
 import com.amazonaws.services.ecs.model.TaskOverride;
 import com.amazonaws.services.ecs.model.TransportProtocol;
 import com.amazonaws.services.ecs.model.UpdateServiceRequest;
 import com.amazonaws.services.ecs.model.UpdateServiceResult;
-import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
-import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
-import com.amazonaws.services.elasticloadbalancingv2.model.Action;
-import com.amazonaws.services.elasticloadbalancingv2.model.ActionTypeEnum;
-import com.amazonaws.services.elasticloadbalancingv2.model.AddTagsRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.AvailabilityZone;
-import com.amazonaws.services.elasticloadbalancingv2.model.Certificate;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateListenerResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateLoadBalancerResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateRuleResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.CreateTargetGroupResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DeleteLoadBalancerRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DeleteRuleRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeListenersResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeRulesResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.DescribeTargetGroupsResult;
-import com.amazonaws.services.elasticloadbalancingv2.model.Listener;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
-import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerNotFoundException;
-import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancerSchemeEnum;
-import com.amazonaws.services.elasticloadbalancingv2.model.ModifyRuleRequest;
-import com.amazonaws.services.elasticloadbalancingv2.model.ProtocolEnum;
-import com.amazonaws.services.elasticloadbalancingv2.model.Rule;
-import com.amazonaws.services.elasticloadbalancingv2.model.RuleCondition;
 import com.amazonaws.services.elasticloadbalancingv2.model.Tag;
-import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroup;
-import com.amazonaws.services.elasticloadbalancingv2.model.TargetGroupNotFoundException;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagement;
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClientBuilder;
 import com.amazonaws.services.identitymanagement.model.AccessKey;
@@ -180,14 +200,40 @@ import com.amazonaws.services.identitymanagement.model.Role;
 import com.amazonaws.services.identitymanagement.model.UpdateAssumeRolePolicyRequest;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AddPermissionRequest;
+import com.amazonaws.services.lambda.model.AddPermissionResult;
+import com.amazonaws.services.lambda.model.CreateAliasRequest;
+import com.amazonaws.services.lambda.model.CreateAliasResult;
 import com.amazonaws.services.lambda.model.CreateFunctionRequest;
+import com.amazonaws.services.lambda.model.CreateFunctionResult;
 import com.amazonaws.services.lambda.model.DeleteFunctionRequest;
+import com.amazonaws.services.lambda.model.DeleteProvisionedConcurrencyConfigRequest;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.FunctionCode;
+import com.amazonaws.services.lambda.model.FunctionConfiguration;
+import com.amazonaws.services.lambda.model.GetAliasRequest;
+import com.amazonaws.services.lambda.model.GetAliasResult;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
+import com.amazonaws.services.lambda.model.GetFunctionResult;
+import com.amazonaws.services.lambda.model.GetProvisionedConcurrencyConfigRequest;
+import com.amazonaws.services.lambda.model.GetProvisionedConcurrencyConfigResult;
+import com.amazonaws.services.lambda.model.ListVersionsByFunctionRequest;
+import com.amazonaws.services.lambda.model.ListVersionsByFunctionResult;
+import com.amazonaws.services.lambda.model.ProvisionedConcurrencyConfigNotFoundException;
+import com.amazonaws.services.lambda.model.PublishVersionRequest;
+import com.amazonaws.services.lambda.model.PublishVersionResult;
+import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigRequest;
+import com.amazonaws.services.lambda.model.PutProvisionedConcurrencyConfigResult;
+import com.amazonaws.services.lambda.model.RemovePermissionRequest;
+import com.amazonaws.services.lambda.model.RemovePermissionResult;
+import com.amazonaws.services.lambda.model.ResourceConflictException;
 import com.amazonaws.services.lambda.model.ResourceNotFoundException;
+import com.amazonaws.services.lambda.model.UpdateAliasRequest;
+import com.amazonaws.services.lambda.model.UpdateAliasResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionCodeRequest;
+import com.amazonaws.services.lambda.model.UpdateFunctionCodeResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
+import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationResult;
 import com.amazonaws.services.logs.AWSLogs;
 import com.amazonaws.services.logs.AWSLogsClientBuilder;
 import com.amazonaws.services.logs.model.CreateLogGroupRequest;
@@ -197,6 +243,7 @@ import com.amazonaws.services.logs.model.GetLogEventsRequest;
 import com.amazonaws.services.logs.model.GetLogEventsResult;
 import com.amazonaws.services.logs.model.LogGroup;
 import com.amazonaws.services.logs.model.OutputLogEvent;
+import com.amazonaws.services.logs.model.PutRetentionPolicyRequest;
 import com.amazonaws.services.route53.AmazonRoute53;
 import com.amazonaws.services.route53.AmazonRoute53ClientBuilder;
 import com.amazonaws.services.route53.model.Change;
@@ -225,7 +272,6 @@ import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
-import com.amazonaws.waiters.WaiterParameters;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -236,6 +282,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public abstract class AwsFugueDeploy extends FugueDeploy
 {
+  static final String LAMBDA_ALIAS_NAME = "live";
+  
   private static final Logger            log_                          = LoggerFactory.getLogger(AwsFugueDeploy.class);
 
   private static final String            AMAZON                        = "amazon";
@@ -243,13 +291,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            REGION                        = "regionName";
   private static final String            REGIONS                       = "environmentTypeRegions";
   private static final String            CLUSTER_NAME                  = "ecsCluster";
-  private static final String            VPC_ID                        = "vpcId";
   private static final String            LOAD_BALANCER_CERTIFICATE_ARN = "loadBalancerCertificateArn";
-  private static final String            LOAD_BALANCER_SECURITY_GROUPS = "loadBalancerSecurityGroups";
-  private static final String            LOAD_BALANCER_SUBNETS         = "loadBalancerSubnets";
-//  private static final String            IALB_ARN                      = "ialbArn";
-//  private static final String            IALB_DNS                      = "ialbDns";
-//  private static final String            R53_ZONE                      = "r53Zone";
+  private static final String            PUBLIC_CERTIFICATE_ARN        = "publicCertificateArn";
   
   private static final String            POLICY                         = "policy";
   private static final String            GROUP                          = "group";
@@ -261,8 +304,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private static final String            CICD                           = "cicd";
   private static final String            CONFIG                         = "config";
   private static final String            LAMBDA                         = "lambda";
-  @Deprecated
-  public static final String            DYNAMO_AUTOSCALE               = "dynamo-autoscale";
 
   private static final ObjectMapper      MAPPER                        = new ObjectMapper();
 
@@ -313,36 +354,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   private final AwsSecretManager         secretManager_                = new AwsSecretManager.Builder().withRegion("us-east-1").build();
 
   private String                         awsAccountId_;
-//  private User                           awsUser_;
   private String                         awsRegion_;
   private String                         awsClientRegion_ = "us-east-1"; // used to create client instances
-  private String                         awsVpcId_;
   private String                         awsLoadBalancerCertArn_;
-  private List<String>                   awsLoadBalancerSecurityGroups_ = new LinkedList<>();
-  private List<String>                   awsLoadBalancerSubnets_        = new LinkedList<>();
-//  private String                         awsIalbArn_;
-//  private String                         awsIalbDns_;
-//  private String                         awsR53Zone_;
+  private String                         awsPublicCertArn_;
 
   private List<String>                   environmentTypeRegions_       = new LinkedList<>();
   private Map<String, String>            environmentTypeConfigBuckets_ = new HashMap<>();
   private String                         configBucket_;
   private String                         callerRefPrefix_              = UUID.randomUUID().toString() + "-";
+  private String                         clusterName_;
 
-  private AmazonElasticLoadBalancing     elbClient_;
   private AmazonRoute53                  r53Clinet_;
   private AmazonIdentityManagement       iamClient_;
   private AmazonCloudWatch               cwClient_;
   private AmazonCloudWatchEvents         cweClient_;
   private AWSLambda                      lambdaClient_;
+  private AmazonECS                      ecsClient_;
+  private AWSLogs                        logsClient_;
+  private AmazonApiGateway               apiClient_;
+  private AmazonDynamoDBStreams          dynamoStreamsClient_;
 
-  private AmazonECS ecsClient_;
+  private AmazonDynamoDB amazonDynamoDB_;
 
-  private String clusterName_;
-//
-//  private String clusterArn_;
-
-  private AWSLogs logsClient_;
+  private DynamoDB dynamoDB_;
 
 
 
@@ -375,6 +410,31 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     return getIamPolicy("policy", policyName);
   }
   
+  private String getApiArn(String name)
+  {
+    // arn:aws:execute-api:region:account-id:api-id/stage-name/HTTP-VERB/resource-path-specifier
+    // arn:aws:apigateway:region::resource-path-specifier.
+    return getNoAccountArn("apigateway", "/restapis", name);
+  }
+  
+  private String getFunctionInvocationArn(String name)
+  {
+    return String.format("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/arn:aws:lambda:%s:%s:function:%s:%s/invocations",
+        awsRegion_,
+        awsRegion_,
+        awsAccountId_,
+        name,
+        LAMBDA_ALIAS_NAME);
+  }
+  
+  private String getQueueArn(String name)
+  {
+    return String.format("arn:aws:sqs:%s:%s:%s",
+        awsRegion_,
+        awsAccountId_,
+        name);
+  }
+  
   private String getIamPolicy(String type, String name)
   {
     return getArn("iam", type, name);
@@ -384,6 +444,16 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   {
     return String.format("arn:aws:%s::%s:%s/%s", service, awsAccountId_, type, name);
   }
+
+  private String getNoAccountArn(String service, String type, String name)
+  {
+    return String.format("arn:aws:%s:%s::%s/%s", service, awsRegion_, type, name);
+  }
+
+  private String getArn(String service, String type)
+  {
+    return String.format("arn:aws:%s::%s:%s", service, awsAccountId_, type);
+  }
   
   private void abort(String message, Throwable cause)
   {
@@ -391,46 +461,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     throw new IllegalStateException(message, cause);
   }
-  
-  
-  
-  // Need to figure out how to do templates for this...
-//  private void registerTaskDef(String name, int port, String healthCheckPath, String podId)
-//  {
-//    Name logGroupName = new Name(getEnvironmentType(), getEnvironment(), getRealm(), podId, getService());
-//    
-//    createLogGroupIfNecessary(logGroupName.toString());
-//    
-//    //TODO: allow per service override of template
-//    String taskDef = loadTemplateFromResource("ecs/taskDefinition.json");
-//    
-//    RegisterTaskDefinitionResult registerResult = ecsClient_.registerTaskDefinition(new RegisterTaskDefinitionRequest()
-//        .withFamily("family")
-//        );
-//  }
-//
-//  private void createLogGroupIfNecessary(String logGroupName)
-//  {
-//    DescribeLogGroupsResult describeLogsResult = logsClient_.describeLogGroups(new DescribeLogGroupsRequest()
-//        .withLimit(1)
-//        .withLogGroupNamePrefix(logGroupName.toString())
-//        );
-//    
-//    for(LogGroup logGroup : describeLogsResult.getLogGroups())
-//    {
-//      if(logGroupName.equals(logGroup.getLogGroupName()))
-//      {
-//        log_.info("LogGroup " + logGroupName + " already exists.");
-//        return;
-//      }
-//    }
-//    
-//    CreateLogGroupResult createResult = logsClient_.createLogGroup(new CreateLogGroupRequest()
-//        .withLogGroupName(logGroupName)
-//        );
-//    
-//    log_.info("LogGroup " + logGroupName + " created.");
-//  }
 
   private String getServiceHostName(String podId)
   {
@@ -478,53 +508,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 //    }
   }
 
-  
-
-//  private void createDnsZones()
-//  {
-//    String name       = getDnsSuffix();
-//    
-//    if(baseZoneId_ == null)
-//      baseZoneId_ = createOrGetHostedZone(name, false);
-//    
-////    name = getEnvironmentType() + "." + name;
-////    
-//////    if(environmentTypeZoneId_ == null)
-//////      environmentTypeZoneId_ = createOrGetHostedZone(name);
-////    
-////    name = getEnvironment() + "." + name;
-////    
-//////    if(environmentZoneId_ == null)
-//////      environmentZoneId_ = createOrGetHostedZone(name);
-////    
-////    String regionalName = getRegion() + "." + name;
-////    
-//////    if(regionZoneId_ == null)
-//////      regionZoneId_ = createOrGetHostedZone(regionalName);
-////    
-////    name = getService() + "." + name;
-////    
-////    if(serviceZoneId_ == null)
-////      serviceZoneId_ = createOrGetHostedZone(name);
-////    
-////    regionalName = getService() + "." + regionalName;
-////    
-////    if(regionalServiceZoneId_ == null)
-////      regionalServiceZoneId_ = createOrGetHostedZone(regionalName);
-////    
-//////    if(getTenant() != null)
-//////    {
-//////      name = getTenant() + "." + name;
-//////      
-//////      if(tenantZoneId_ == null)
-//////        tenantZoneId_ = createOrGetHostedZone(name);
-//////      
-//////      regionalName = getTenant() + "." + regionalName;
-//////      
-//////      if(regionalTenantZoneId_ == null)
-//////        regionalTenantZoneId_ = createOrGetHostedZone(regionalName);
-//////    }
-//  }
   
   private String createOrGetHostedZone(String name, boolean create)
   {
@@ -579,17 +562,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       awsAccountId_           = amazon.getRequiredString(ACCOUNT_ID);
       awsRegion_              = amazon.getString(REGION, null);
-      awsVpcId_               = amazon.getRequiredString(VPC_ID);
       clusterName_            = amazon.getRequiredString(CLUSTER_NAME);
       awsLoadBalancerCertArn_ = amazon.getRequiredString(LOAD_BALANCER_CERTIFICATE_ARN);
+      awsPublicCertArn_       = amazon.getRequiredString(PUBLIC_CERTIFICATE_ARN);
 
       if(awsRegion_ != null)
         awsClientRegion_ = awsRegion_;
-      
-//        awsIalbArn_   = amazon.getRequiredString(IALB_ARN);
-//        awsIalbDns_   = amazon.getRequiredString(IALB_DNS);
-//        awsR53Zone_   = amazon.getRequiredString(R53_ZONE);
-      
       
       GetCallerIdentityResult callerIdentity = sts_.getCallerIdentity(new GetCallerIdentityRequest());
       
@@ -601,11 +579,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         throw new IllegalStateException("AWS Account ID is " + awsAccountId_ + " but our credentials are for account " + actualAccountId);
       }
-      
-      //awsUser_ = iam_.getUser().getUser();
-      
-      getStringArray(amazon, LOAD_BALANCER_SUBNETS, awsLoadBalancerSubnets_);
-      getStringArray(amazon, LOAD_BALANCER_SECURITY_GROUPS, awsLoadBalancerSecurityGroups_);
 
       IJsonDomNode regionsNode = amazon.get(REGIONS);
       if(regionsNode instanceof IJsonObject)
@@ -625,8 +598,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           String bucketName = regionObject.getString(AWS_CONFIG_BUCKET,
               nameFactory.getConfigBucketName(name).toString());
-              //FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
-//              getGlobalNamePrefix() + FUGUE_PREFIX + getEnvironmentType() + Name.SEPARATOR + name + CONFIG_SUFFIX);
           environmentTypeConfigBuckets_.put(name, bucketName);
           
           if(awsRegion_ != null && name.equals(awsRegion_))
@@ -642,10 +613,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         
         throw new IllegalStateException("The top level configuration object called \"/" + AMAZON + "/" + REGIONS + "\" must be an object not a " + node.getClass().getSimpleName());
       }
-
-      elbClient_ = AmazonElasticLoadBalancingClientBuilder.standard()
-          .withRegion(awsClientRegion_)
-          .build();
       
       r53Clinet_ = AmazonRoute53ClientBuilder.standard()
           .withRegion(awsClientRegion_)
@@ -677,6 +644,21 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           AWSLambdaClientBuilder.standard()
           .withRegion(awsClientRegion_)
           .build();
+      
+      apiClient_ = 
+          AmazonApiGatewayClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      amazonDynamoDB_ = AmazonDynamoDBClientBuilder.standard()
+          .withRegion(awsClientRegion_)
+          .build();
+      
+      dynamoDB_               = new DynamoDB(amazonDynamoDB_);
+      
+      dynamoStreamsClient_ = AmazonDynamoDBStreamsClientBuilder.standard()
+        .withRegion(awsClientRegion_)
+        .build();
     }
     else
     {
@@ -685,8 +667,11 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       throw new IllegalStateException("The top level configuration object called \"" + AMAZON + "\" must be an object not a " + node.getClass().getSimpleName());
     }
+    
+    
+    
   }
-  
+
   private void getStringArray(IJsonObject<?> amazon, String nodeName, List<String> list)
   {
     IJsonDomNode sgNode = amazon.get(nodeName);
@@ -722,8 +707,12 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         .standard()
         .withRegion(region)
         .build();
+    
+    Map<String, String> tags = new HashMap<>(getTags());
+    
+    tags.put(Fugue.TAG_FUGUE_ITEM, name);
 
-    S3Helper.createBucketIfNecessary(s3, name, false);
+    S3Helper.createBucketIfNecessary(s3, name, tags, false);
   }
   
   
@@ -1146,25 +1135,42 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   }
 
 
+  protected String getEnvironmentPrefix()
+  {
+    return isPrimaryEnvironment() ? "" : getEnvironment() + "-";
+  }
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+  protected String getStageName()
+  {
+    return "master";
+  }
 
   protected class AwsDeploymentContext extends DeploymentContext
   {
+    private static final String API_GATEWAY_PATH = "(none)";
+
+    private static final String ANY = "ANY";
+
+    private static final String NONE = "NONE";
+
     private LoadBalancer loadBalancer_;
   
-    private String defaultTargetGroupArn_;
-  
-    private String listenerArn_;
+    // ARN and ID of the actual API gateway
+    private String apiGatewayArn_;
+    private String apiGatewayId_;
+    
+    // For master environments the public domain name mapping
+    private String apiGatewayMasterDomainName_;
+    private String apiGatewayMasterTargetDomain_;
+
+    // For all environments the private domain name mapping
+    private String apiGatewayPrivateDomainName_;
+    private String apiGatewayPrivateTargetDomain_;
+    
+    private boolean deploy_;
+
+    private boolean createStage_;
+
     
     protected AwsDeploymentContext(String podName, INameFactory nameFactory)
     {
@@ -1172,11 +1178,48 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     }
 
     @Override
+    protected Subscription newQueueSubscription(JsonObject<?> sn)
+    {
+      return new AwsTopicSubscription(sn, getNameFactory(), lambdaClient_,
+          String.format("arn:aws:sqs:%s:%s:",
+              awsRegion_,
+              awsAccountId_)
+          );
+    }
+
+    @Override
+    protected Subscription newDbSubscription(JsonObject<?> sn)
+    {
+      return new AwsDbSubscription(sn, getNameFactory(), lambdaClient_, dynamoStreamsClient_, amazonDynamoDB_);
+    }
+
+    @Override
+    protected void putFugueConfig(Map<String, String> environment)
+    {
+      String storedConfig = "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
+          "-" + getAwsRegion() + "-config/config/" +
+          getNameFactory().getPhysicalServiceName() + ".json";
+      
+      if(configValue_ == null)
+      {
+        environment.put(FUGUE_CONFIG, storedConfig);
+      }
+      else if(configValue_.length() < 3000)
+      {
+        environment.put(FUGUE_CONFIG, configValue_);
+        environment.put(FUGUE_STORED_CONFIG, storedConfig);
+      }
+      else
+      {
+        environment.put(FUGUE_CONFIG, storedConfig);
+      }
+    }
+
+    @Override
     protected void createEnvironment()
     {
       List<String>  keys      = new LinkedList<>();
       Name          baseName  = getNameFactory().getName();
-      //getEnvironmentType() + Name.SEPARATOR + getEnvironment();
       
       createEnvironmentAdminUser(baseName, keys);
       
@@ -1218,8 +1261,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentAdmin.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
       createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
@@ -1238,8 +1279,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       createEnvironmentTypeAdminUser(baseName, keys, nonKeyUsers);
       createEnvironmentTypeCicdUser(baseName, keys, nonKeyUsers);
       createEnvironmentTypeSupportUser(baseName, keys, nonKeyUsers);
-      
-      createEnvironmentTypeRoles(baseName);
 
       if(keys.isEmpty())
       {
@@ -1253,13 +1292,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           
           checkAccessKey(name, userName, keys, null, true);
         }
-//        CredentialName  name = 
-//            getNameFactory().getCredentialName(podId, owner)
-//            new CredentialName("fugue-" + getEnvironmentType(),
-//          null, // environment
-//          null, // realm
-//          null, // tenant
-//          "root");
         
         CredentialName  name    = getNameFactory().getFugueCredentialName("root");
       
@@ -1270,11 +1302,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       {
         createBucketIfNecessary(region, environmentTypeConfigBuckets_.get(region));
       }
-    }
-
-    private void createEnvironmentTypeRoles(Name baseName)
-    {
-      createAssumedRole(baseName.append(DYNAMO_AUTOSCALE), "dynamoDbAutoscale");
     }
     
     private void createAssumedRole(Name name, String templateName)
@@ -1290,8 +1317,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       Name name = baseName.append(ADMIN);
       
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeAdmin.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
       createRole(name, TRUST_ECS_DOCUMENT, policyArn);
     }
@@ -1303,8 +1328,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String infraPolicyArn = createPolicyFromResource(baseName.append("infra-list-all"), "policy/environmentTypeInfraListAll.json");
       String appPolicyArn = createPolicyFromResource(baseName.append("app-list-all"), "policy/environmentTypeAppListAll.json");
       String fuguePolicyArn = createPolicyFromResource(name, "policy/environmentTypeSupport.json");
-//      String groupName = createGroup(name, policyArn);
-//      String result    = createUser(name, groupName, keys);
       
 
       String assumeRolePolicy = loadTemplateFromResource("policy/environmentTypeSupportTrust.json");
@@ -1326,8 +1349,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       String policyArn = createPolicyFromResource(name, "policy/environmentTypeCicd.json");
       String groupName = createGroup(name, policyArn);
       createUser(name, groupName, keys, nonKeyUsers);
-      
-//      createRole(name, policyArn);
     }
     
     @Override
@@ -1347,7 +1368,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     protected void processRole(String roleName, String roleSpec, String trustSpec)
     {
       Name name = getNameFactory().getLogicalServiceItemName(roleName);
-//          Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), roleName).toString();
       
       String policyArn = createPolicy(name, roleSpec);
       
@@ -1494,89 +1514,63 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     @Override
     protected void configureServiceNetwork()
     {
-      try
+      String hostName;
+
+      if(isPrimaryEnvironment())
       {
-        String hostName;
-
-        if(isPrimaryEnvironment() && getPodName() != null)
+        if(getPodName() == null)
         {
-          String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
-
-          hostName = isPrimaryEnvironment() ? getServiceHostName(podId) : null;
+          hostName = getServiceHostName(null);
         }
         else
         {
-          hostName = null;
+          String  podId        = "" + getConfig().getRequiredObject("id").getRequiredInteger("podId"); 
+
+          hostName = getServiceHostName(podId);
         }
-        
-        String regionalHostName = getNameFactory()
-            .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-        
-        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
-        
-        getOrCreateCluster();
-        
       }
-      catch(RuntimeException e)
+      else
       {
-        e.printStackTrace();
-        
-        throw e;
+        hostName = null;
       }
+      
+      createR53RecordSet(hostName);
+      
+      getOrCreateCluster();
     }
 
     @Override
     protected void deployServiceContainer(String name, int port, Collection<String> paths, String healthCheckPath,
-        int instances, Name roleName, String imageName, int jvmHeap, int memory)
+        int instances, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted)
     {
-      try
+      if(!deleted && action_.isDeploy_)
       {
-        if(action_.isDeploy_)
-        {
-          Name    targetGroupName = getNameFactory().getPhysicalServiceItemName(name);
-          String targetGroupArn = createTargetGroup(targetGroupName, healthCheckPath, port);
-          String regionalHostName = getNameFactory()
-              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-          
-          String wildCardHostName = getNameFactory()
-              .withRegionId("*")
-              .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
-          
-  //        //new Name(getEnvironmentType(), getEnvironment(), "*", podId, getService()).toString().toLowerCase() + "." + getDnsSuffix();
-  //        
-          configureNetworkRule(targetGroupArn, wildCardHostName, name, port, paths, healthCheckPath);
-  //        
-  //        createR53RecordSet(hostName, regionalHostName, loadBalancer_);
-          
-          getOrCreateCluster();
-          
-    //      registerTaskDef(name, port, healthCheckPath, podId);
-          
-          createService(targetGroupArn, name, port, instances, paths, roleName, imageName, jvmHeap, memory);
-        }
-        else
-        {
-          deleteService(name);
-        }
-      }
-      catch(RuntimeException e)
-      {
-        e.printStackTrace();
+        deleteTaskDefinitions(name, 5);
         
-        throw e;
+        getOrCreateCluster();
+        
+  //      registerTaskDef(name, port, healthCheckPath, podId);
+        
+        createService(name, port, instances, paths, roleName, imageName, jvmHeap, memory);
+      }
+      else
+      {
+        deleteService(name);
       }
     }
     
     
     @Override
-    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory)
+    protected void deployScheduledTaskContainer(String name, int port, Collection<String> paths, String schedule, Name roleName, String imageName, int jvmHeap, int memory, boolean deleted)
     {
       Name serviceName  = getNameFactory().getPhysicalServiceItemName(name);
       Name baseName     = serviceName.append("schedule");
       Name ruleName     = baseName.append("rule");
 
-      if(action_.isDeploy_)
+      if(!deleted && action_.isDeploy_)
       { 
+        deleteTaskDefinitions(name, 5);
+        
         registerTaskDefinition(serviceName, port, roleName, imageName, jvmHeap, memory);
         
         
@@ -1606,7 +1600,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
   
         cweClient_.putTargets(request);
       }
-      if(action_.isUndeploy_)
+      if(deleted || action_.isUndeploy_)
       {
         // undeploy
         try
@@ -1625,7 +1619,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             targetArns.add(target.getEcsParameters().getTaskDefinitionArn());
           }
           
-          deleteTaskDefinitions(targetArns);
+          deleteTaskDefinitions(targetArns, 0);
           
           
           cweClient_.removeTargets(removeTargetsRequest);
@@ -1647,32 +1641,74 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private void deleteTaskDefinitions(Iterable<String> targetArns)
+    private synchronized void deleteTaskDefinitions(Iterable<String> targetArns, int remaining)
     {
-      Set<String> taskDefFamilies = new HashSet<>();
-      
-      for(String targetArn : targetArns)
+      try
       {
-        taskDefFamilies.add(stripAfter(stripBefore(targetArn, '/'), ':'));
-      }
-
-      for(String taskDefFamily : taskDefFamilies)
-      {
-        ListTaskDefinitionsResult list = ecsClient_.listTaskDefinitions(new ListTaskDefinitionsRequest()
-            .withFamilyPrefix(taskDefFamily));
+        Set<String> taskDefFamilies = new HashSet<>();
         
-        for(String taskDefArn : list.getTaskDefinitionArns())
+        for(String targetArn : targetArns)
         {
-          log_.info("Deregistering task definition " + taskDefArn + "...");
-          ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
-              .withTaskDefinition(taskDefArn));
+          taskDefFamilies.add(stripAfter(stripBefore(targetArn, '/'), ':'));
         }
+  
+        for(String taskDefFamily : taskDefFamilies)
+        {
+          ListTaskDefinitionsResult list = ecsClient_.listTaskDefinitions(new ListTaskDefinitionsRequest()
+              .withFamilyPrefix(taskDefFamily));
+          
+          int limit = (list.getTaskDefinitionArns().size() - remaining);
+          
+          if(action_.isDeploy_ && limit > 10)
+            limit = 10;
+          
+          for(int i=0 ; i< limit ; i++)
+          {
+            String taskDefArn = list.getTaskDefinitionArns().get(i);
+            
+            log_.info("Deregistering task definition " + taskDefArn + "...");
+            ecsClient_.deregisterTaskDefinition(new DeregisterTaskDefinitionRequest()
+                .withTaskDefinition(taskDefArn));
+            
+            Thread.sleep(action_.isDeploy_ ? 1000 : 100);
+          }
+        }
+      }
+      catch(InterruptedException | AmazonECSException e)
+      {
+        log_.warn("Failed to delete task definition", e);
+      }
+    }
+
+    @Override
+    protected void postDeployLambdaContainer(String name, Collection<String> paths, Collection<Subscription> subscriptions)
+    {
+      String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
+
+      log_.info("postDeployLambdaContainer(" + name + ", " + paths + ");");
+      
+      if(action_.isDeploy_)
+      {
+        if(!paths.isEmpty())
+          createApiGatewayPaths(getFunctionInvocationArn(functionName), paths);
+        
+        if(!subscriptions.isEmpty())
+          createLambdaSubscriptions(functionName, subscriptions);
+      }
+    }
+
+    private void createLambdaSubscriptions(String functionName, Collection<Subscription> subscriptions)
+    {
+      for(Subscription subscription : subscriptions)
+      {
+        subscription.create(functionName);
       }
     }
 
     @Override
     protected void deployLambdaContainer(String name, String imageName, 
-        String roleId, String handler, int memorySize, int timeout, Map<String, String> variables)
+        String roleId, String handler, int memorySize, int timeout, 
+        int provisionedConcurrentExecutions, Map<String, String> variables, Collection<String> paths)
     {
       String  functionName  = getNameFactory().getLogicalServiceItemName(name).toString();
       Name    roleName      = getNameFactory().getLogicalServiceItemName(roleId).append(ROLE);
@@ -1682,20 +1718,46 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       if(action_.isDeploy_)
       {
+        boolean checkProvisionedCapacity = true;
+        
         try
         {
-          lambdaClient_.getFunction(new GetFunctionRequest()
+          GetAliasResult getAliasResult = lambdaClient_.getAlias(new GetAliasRequest()
+              .withFunctionName(functionName)
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " exists to revision " + getAliasResult.getRevisionId() + ", checking provisioned capacity...");
+          
+          checkProvisionedCapacity(functionName, provisionedConcurrentExecutions);
+          checkProvisionedCapacity = false;
+
+        }
+        catch(ResourceNotFoundException e)
+        {
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " does not exist, check provisioned capacity later.");
+        }
+        
+        String codeSha256;
+        String revisionId;
+        
+        try
+        {
+          GetFunctionResult function = lambdaClient_.getFunction(new GetFunctionRequest()
               .withFunctionName(functionName)
               );
           
           log_.info("Lambda function " + functionName + " already exists, updating...");
-          lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
+          UpdateFunctionCodeResult updateCodeResult = lambdaClient_.updateFunctionCode(new UpdateFunctionCodeRequest()
               .withFunctionName(functionName)
               .withS3Bucket(bucketName)
               .withS3Key(key)
               );
           
-          lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
+          codeSha256 = updateCodeResult.getCodeSha256();
+          
+          UpdateFunctionConfigurationResult updateConfigResult = lambdaClient_.updateFunctionConfiguration(new UpdateFunctionConfigurationRequest()
               .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
@@ -1705,12 +1767,19 @@ public abstract class AwsFugueDeploy extends FugueDeploy
               .withRole(getRoleArn(roleName))
               .withRuntime(com.amazonaws.services.lambda.model.Runtime.Java8)
               );
+          
+          revisionId = updateConfigResult.getRevisionId();
+          
+          lambdaClient_.tagResource(new com.amazonaws.services.lambda.model.TagResourceRequest()
+              .withResource(function.getConfiguration().getFunctionArn())
+              .withTags(getTags())
+              );
         }
         catch(ResourceNotFoundException e)
         {
           log_.info("Lambda function " + functionName + " does not exist, creating...");
           
-          lambdaClient_.createFunction(new CreateFunctionRequest()
+          CreateFunctionResult createFunctionResult = lambdaClient_.createFunction(new CreateFunctionRequest()
               .withFunctionName(functionName)
               .withHandler(handler)
               .withMemorySize(memorySize)
@@ -1725,7 +1794,105 @@ public abstract class AwsFugueDeploy extends FugueDeploy
                   .withS3Key(key)
                   )
               );
+          
+          codeSha256 = createFunctionResult.getCodeSha256();
+          revisionId = createFunctionResult.getRevisionId();
         }
+
+        log_.info("RevisionId " + revisionId);
+        
+        
+        PublishVersionResult publishVersionResult = lambdaClient_.publishVersion(new PublishVersionRequest()
+            .withCodeSha256(codeSha256)
+            .withRevisionId(revisionId)
+            .withFunctionName(functionName)
+            );
+        
+        try
+        {
+          GetAliasResult getAliasResult = lambdaClient_.getAlias(new GetAliasRequest()
+              .withFunctionName(functionName)
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " exists to revision " + getAliasResult.getRevisionId() + ", updating...");
+
+
+          UpdateAliasResult updateAliasResult = lambdaClient_.updateAlias(new UpdateAliasRequest()
+              .withFunctionName(functionName)
+              .withFunctionVersion(publishVersionResult.getVersion())
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+        }
+        catch(ResourceNotFoundException e)
+        {
+
+          log_.info("Lambda function " + functionName + " alias " + LAMBDA_ALIAS_NAME + " does not exist, creating...");
+          
+
+          CreateAliasResult createAliasResult = lambdaClient_.createAlias(new CreateAliasRequest()
+              .withFunctionName(functionName)
+              .withFunctionVersion(publishVersionResult.getVersion())
+              .withName(LAMBDA_ALIAS_NAME)
+              );
+        }
+
+
+        if(!paths.isEmpty())
+        {
+          setLambdaApiGatewayPolicy(functionName,
+              LAMBDA_ALIAS_NAME
+//              publishVersionResult.getVersion()
+              );
+          
+          GetFunctionResult getFunctionResult = lambdaClient_.getFunction(new GetFunctionRequest()
+              .withFunctionName(functionName)
+              );
+          
+          revisionId = getFunctionResult.getConfiguration().getRevisionId();
+
+          log_.info("Updated RevisionId " + revisionId);
+        }
+        
+        int versionLimit = Integer.parseInt(publishVersionResult.getVersion()) - 1;
+        
+        
+        try
+        {
+          ListVersionsByFunctionResult listVersionsResult = lambdaClient_.listVersionsByFunction(new ListVersionsByFunctionRequest()
+              .withFunctionName(functionName));
+
+          for(FunctionConfiguration version : listVersionsResult.getVersions())
+          {
+            try
+            {
+              int v = Integer.parseInt(version.getVersion());
+              
+              if(v < versionLimit)
+              {
+                log_.info("Deleting old version " + functionName + ":" + v + " (revision " + version.getRevisionId() + ")...");
+                
+                lambdaClient_.deleteFunction(new DeleteFunctionRequest()
+                    .withFunctionName(functionName)
+                    .withQualifier(version.getVersion())
+                    );
+              }
+            }
+            catch(NumberFormatException e)
+            {
+              // This is $LATEST
+              log_.info("Leaving version " + functionName + ":" + version.getVersion() + " (revision " + version.getRevisionId() + ")");
+            }
+          }
+        }
+        catch(ResourceConflictException e)
+        {
+          log_.warn("Old lambda version not deleted", e);
+        }
+        
+        if(checkProvisionedCapacity)
+          checkProvisionedCapacity(functionName, provisionedConcurrentExecutions);
+        
       }
       if(action_.isUndeploy_)
       {
@@ -1756,6 +1923,460 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
+    private void checkProvisionedCapacity(String functionName, int provisionedConcurrentExecutions)
+    {
+      try
+      {
+        GetProvisionedConcurrencyConfigResult getProvisionedConcurrencyConfigResult = lambdaClient_.getProvisionedConcurrencyConfig(new GetProvisionedConcurrencyConfigRequest()
+            .withFunctionName(functionName)
+            .withQualifier(LAMBDA_ALIAS_NAME)
+            );
+        
+        if(provisionedConcurrentExecutions <= 0)
+        {
+          log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", deleting...");
+          
+          lambdaClient_.deleteProvisionedConcurrencyConfig(new DeleteProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+        }
+        else
+        {
+          if(getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions().equals(provisionedConcurrentExecutions))
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          }
+          else
+          {
+            log_.info("Lambda function " + functionName + " provisioned capacity is set to " + getProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions() + ", updating...");
+            
+
+            PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+                .withFunctionName(functionName)
+                .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+                .withQualifier(LAMBDA_ALIAS_NAME)
+                );
+            
+            log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+          }
+        }       
+      }
+      catch(ProvisionedConcurrencyConfigNotFoundException e)
+      {
+        if(provisionedConcurrentExecutions > 0)
+        {
+          log_.info("Lambda function " + functionName + " provisioned capacity does not exist, creating...");
+          
+          PutProvisionedConcurrencyConfigResult putProvisionedConcurrencyConfigResult = lambdaClient_.putProvisionedConcurrencyConfig(new PutProvisionedConcurrencyConfigRequest()
+              .withFunctionName(functionName)
+              .withProvisionedConcurrentExecutions(provisionedConcurrentExecutions)
+              .withQualifier(LAMBDA_ALIAS_NAME)
+              );
+
+          log_.info("Lambda function " + functionName + " provisioned capacity has been set to " + putProvisionedConcurrencyConfigResult.getRequestedProvisionedConcurrentExecutions());
+        }
+      }
+    }
+
+    private void setLambdaApiGatewayPolicy(String functionName, String qualifier)
+    {
+      String apiGatewaySourceArn_ = String.format("arn:aws:execute-api:%s:%s:%s/*",
+          awsRegion_,
+          awsAccountId_,
+          apiGatewayId_);
+
+      try
+      {
+//        RemovePermissionResult removeResult = lambdaClient_.removePermission(new RemovePermissionRequest()
+//            .withFunctionName(functionName)
+//            .withQualifier(qualifier)
+//            .withStatementId("apiGatewayInvoke")
+//            );
+//        
+//        log_.info("Removed existing lambda permission " + removeResult);
+        
+        AddPermissionResult permissionResult = lambdaClient_.addPermission(new AddPermissionRequest()
+            .withFunctionName(functionName)
+            .withQualifier(qualifier)
+            .withAction("lambda:InvokeFunction")
+            .withPrincipal("apigateway.amazonaws.com")
+            .withStatementId("apiGatewayInvoke")
+            .withSourceArn(apiGatewaySourceArn_)
+            );
+      
+        log_.info("Added lambda permission " + permissionResult);      
+      }
+//      catch(com.amazonaws.services.lambda.model.ResourceNotFoundException e)
+      catch(ResourceConflictException e)
+      {
+        // already exists which is fine.
+        e.printStackTrace();
+      }
+      
+    }
+
+    private void createApiGatewayPaths(String functionInvokeArn, Collection<String> paths)
+    {
+      Map<String, String> pathIdMap = new HashMap<>();
+      Set<String> remainingPaths = new HashSet<>();
+      Set<String> remainingMethods = new HashSet<>();
+      
+      for(String path : paths)
+      {
+        remainingPaths.add(path.replace("*", "{proxy+}"));
+      }
+      
+      String rootResourceId = null;
+      
+
+      GetResourcesResult resources = apiClient_.getResources(new GetResourcesRequest()
+        .withRestApiId(apiGatewayId_)
+        );
+      
+      for(Resource resource : resources.getItems())
+      {
+        pathIdMap.put(resource.getPath(), resource.getId());
+        
+        if(resource.getPath().equals("/"))
+          rootResourceId = resource.getId();
+        
+        if(remainingPaths.remove(resource.getPath()))
+        {
+          log_.info("Resource " + resource.getPath() + " exists.");
+        
+          // Are they correct?
+          
+          
+          
+          if(resource.getResourceMethods() == null)
+          {
+            log_.info("Resource " + resource.getPath() + " has no methods, will add...");
+            remainingMethods.add(resource.getId());
+          }
+          else
+          {
+            for(String methodName : resource.getResourceMethods().keySet())
+            {
+              log_.info("Existing method " + methodName);
+              
+              if(ANY.equals(methodName))
+              {
+                GetMethodResult method = apiClient_.getMethod(new GetMethodRequest()
+                  .withHttpMethod(ANY)
+                  .withResourceId(resource.getId())
+                  .withRestApiId(apiGatewayId_)
+                  );
+                
+                if(NONE.equals(method.getAuthorizationType())
+                    && IntegrationType.AWS_PROXY.toString().equals(method.getMethodIntegration().getType())
+                    && functionInvokeArn.equals(method.getMethodIntegration().getUri())
+                    )
+                {
+                  log_.info("Existing method is good.");
+                }
+                else
+                {
+                  log_.info("Existing method needs to be updated.");
+                  deleteMethod(method.getHttpMethod(), resource.getId());
+                  remainingMethods.add(resource.getId());
+                }
+              }
+              else
+              {
+                deleteMethod(methodName, resource.getId());
+              }
+            }
+          }
+        }
+      }
+      
+      if(rootResourceId == null)
+        throw new IllegalStateException("Unable to locste root resource for api gateway " + apiGatewayId_);
+      
+      for(String path : remainingPaths)
+      {
+        log_.info("Creating path " + path);
+        
+        createApiGatewayPath(pathIdMap, functionInvokeArn, rootResourceId, path.split("/"), 1, "");
+        deploy_=true;
+      }
+      
+      for(String resourceId : remainingMethods)
+      {
+        log_.info("Creating method for resource " + resourceId);
+        
+        createMethod(functionInvokeArn, resourceId);
+        deploy_=true;
+      }
+      
+      try
+      {
+        GetStageResult stage = apiClient_.getStage(new GetStageRequest()
+          .withRestApiId(apiGatewayId_)
+          .withStageName(getStageName())
+          );
+        
+        log_.info("Stage exists as " + stage);
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Stage does not exist.");
+        createStage_ = true;
+        deploy_=true;
+      }
+      
+      
+    }
+
+    @Override
+    protected void postDeployContainers()
+    {
+      log_.info("postDeployContainers deploy_ = " + deploy_ + ":" + apiGatewayId_ + ", createStage_ = " + createStage_ + ":" + getStageName());
+      if(deploy_)
+      {
+        checkStage();
+        CreateDeploymentResult deployment = apiClient_.createDeployment(new CreateDeploymentRequest()
+            .withRestApiId(apiGatewayId_)
+            .withStageName(getStageName())
+            );
+        checkStage();
+        if(!createStage_)
+        {
+          UpdateStageResult stage = apiClient_.updateStage(new UpdateStageRequest()
+              .withRestApiId(apiGatewayId_)
+              .withStageName(getStageName())
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/deploymentId")
+                  .withValue(deployment.getId())
+                  )
+              );
+          
+          log_.info("Updated stage " + stage);
+        }
+      }
+      createApiGatewayBasePath();
+    }
+
+    private void checkStage()
+    {
+      log_.info("Check Stage " + getStageName());
+      try
+      {
+        GetStageResult stage = apiClient_.getStage(new GetStageRequest()
+          .withRestApiId(apiGatewayId_)
+          .withStageName(getStageName())
+          );
+        
+        log_.info("Stage exists as " + stage);
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Stage does not exist.");
+        createStage_ = true;
+        deploy_=true;
+      }
+    }
+
+    private void deleteMethod(String httpMethod, String resourceId)
+    {
+      log_.info("Deleting method: " + httpMethod);
+      
+      try
+      {
+        apiClient_.deleteMethod(new DeleteMethodRequest()
+            .withHttpMethod(httpMethod)
+            .withResourceId(resourceId)
+            .withRestApiId(apiGatewayId_)
+            );
+      }
+      catch(RuntimeException e)
+      {
+        log_.warn("Failed to delete method", e);
+      }
+    }
+
+    private void createApiGatewayPath(Map<String, String> pathIdMap, String functionInvokeArn, String parentResourceId, String[] pathElements, int cnt, String currentPath)
+    {
+      currentPath = currentPath + "/" + pathElements[cnt];
+      
+      String resourceId = pathIdMap.get(currentPath);
+      
+      if(resourceId == null)
+      {
+        CreateResourceResult resource = apiClient_.createResource(new CreateResourceRequest()
+            .withRestApiId(apiGatewayId_)
+            .withParentId(parentResourceId)
+            .withPathPart(pathElements[cnt])
+            .withRestApiId(apiGatewayId_)
+            );
+        
+        resourceId = resource.getId();
+        pathIdMap.put(currentPath, resourceId);
+      }
+      
+      if(pathElements.length > ++cnt)
+      {
+        createApiGatewayPath(pathIdMap, functionInvokeArn, resourceId, pathElements, cnt, currentPath);
+      }
+      else
+      {
+        createMethod(functionInvokeArn, resourceId);
+      }
+    }
+
+    private void createMethod(String functionInvokeArn, String resourceId)
+    {
+      PutMethodResult method = apiClient_.putMethod(new PutMethodRequest()
+          .withHttpMethod(ANY)
+          .withResourceId(resourceId)
+          .withRestApiId(apiGatewayId_)
+          .withAuthorizationType(NONE)
+          );
+      
+      PutIntegrationResult integration = apiClient_.putIntegration(new PutIntegrationRequest()
+          .withResourceId(resourceId)
+          .withRestApiId(apiGatewayId_)
+          .withHttpMethod(ANY)
+          .withUri(functionInvokeArn)
+          .withIntegrationHttpMethod("POST")
+          .withType(IntegrationType.AWS_PROXY)
+          .withConnectionType(ConnectionType.INTERNET)
+          );
+      
+      log_.info("Created method " + method.getHttpMethod() + " with integration " + integration.getType() + " to " + integration.getUri());
+    }
+
+    private void createApiGatewayBasePath()
+    {
+      if(apiGatewayId_ != null)
+      {
+        if(apiGatewayMasterDomainName_ != null)
+        {
+          apiGatewayMasterTargetDomain_ = createApiGatewayBasePath(apiGatewayMasterDomainName_, awsPublicCertArn_);
+          doCreateR53RecordSet(apiGatewayMasterDomainName_, apiGatewayMasterTargetDomain_, true, false, 
+              apiGatewayMasterDomainName_.length() - getPublicDnsSuffix().length(), true);
+        }
+        
+        apiGatewayPrivateTargetDomain_ = createApiGatewayBasePath(apiGatewayPrivateDomainName_, awsLoadBalancerCertArn_);
+        doCreateR53RecordSet(apiGatewayPrivateDomainName_, apiGatewayPrivateTargetDomain_, true, false);
+      }
+    }
+
+    private String createApiGatewayBasePath(String apiGatewayDomainName_, String apiGatewayCertArn_)
+    {
+      String apiGatewayTargetDomain_;
+      
+      try
+      {
+        GetDomainNameResult existingDomain = apiClient_.getDomainName(new GetDomainNameRequest()
+            .withDomainName(apiGatewayDomainName_)
+            );
+        
+        if(apiGatewayCertArn_.equals(existingDomain.getRegionalCertificateArn()) &&
+            existingDomain.getSecurityPolicy().equals(SecurityPolicy.TLS_1_2.toString()))
+        {
+          apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists with correct certificate.");
+        }
+        else
+        {
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " exists, but the certificate is wrong.");
+          
+          apiClient_.updateDomainName(new UpdateDomainNameRequest()
+              .withDomainName(apiGatewayDomainName_)
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/regionalCertificateArn")
+                  .withValue(apiGatewayCertArn_)
+                  ,
+                  new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/securityPolicy")
+                  .withValue(SecurityPolicy.TLS_1_2.toString())
+                  )
+              );
+          
+          apiGatewayTargetDomain_ = existingDomain.getRegionalDomainName();
+          log_.info("API Gateway custom domain " + apiGatewayDomainName_ + " certificate updated to " + apiGatewayCertArn_);
+        }
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        CreateDomainNameResult newDomain = apiClient_.createDomainName(new CreateDomainNameRequest()
+            .withDomainName(apiGatewayDomainName_)
+            .withRegionalCertificateArn(apiGatewayCertArn_)
+            .withSecurityPolicy(SecurityPolicy.TLS_1_2)
+            .withEndpointConfiguration(new EndpointConfiguration()
+                .withTypes(EndpointType.REGIONAL)
+                )
+            );
+        
+        apiGatewayTargetDomain_ = newDomain.getRegionalDomainName();
+        
+        log_.info("Created API Gateway domain in hosted zone " + newDomain.getRegionalHostedZoneId());
+      }
+
+      // whats the ARN format for this?
+//        try
+//        {
+//          apiClient_.tagResource(new TagResourceRequest()
+//            .withResourceArn(getNoAccountArn("apigateway", "/domainname", apiGatewayDomainName_)));
+//        }
+//        catch(RuntimeException e)
+//        {
+//          log_.info("Failed to tag domain", e);
+//        }
+      try
+      {
+        GetBasePathMappingResult existsingPath = apiClient_.getBasePathMapping(new GetBasePathMappingRequest()
+          .withDomainName(apiGatewayDomainName_)
+          .withBasePath(API_GATEWAY_PATH)
+          );
+        
+        if(existsingPath.getRestApiId().equals(apiGatewayId_) && getStageName().equals(existsingPath.getStage()))
+        {
+          log_.info("API Gateway path exists");
+        }
+        else
+        {
+          log_.info("API Gateway path exists, but to wrong API Gateway and/ stage");
+          
+          apiClient_.updateBasePathMapping(new UpdateBasePathMappingRequest()
+              .withDomainName(apiGatewayDomainName_)
+              .withBasePath(API_GATEWAY_PATH)
+              .withPatchOperations(new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/restapiId")
+                  .withValue(apiGatewayId_)
+                  ,
+                  new PatchOperation()
+                  .withOp(Op.Replace)
+                  .withPath("/stage")
+                  .withValue(getStageName())
+                  )
+              );
+          
+          log_.info("Updated API Gateway path exists to " + apiGatewayId_);
+        }
+      }
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {
+        log_.info("Creating API Gateway path...");
+        CreateBasePathMappingResult newPath = apiClient_.createBasePathMapping(new CreateBasePathMappingRequest()
+            .withBasePath("")
+            .withDomainName(apiGatewayDomainName_)
+            .withRestApiId(apiGatewayId_)
+            .withStage(getStageName())
+            );
+        
+        log_.info("API Gateway path created to API " + newPath.getRestApiId());
+      }
+      
+      return apiGatewayTargetDomain_;
+    }
+
     private void deleteObsoleteFunction(String obsoleteFunctionName)
     {
       try
@@ -1775,15 +2396,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    @Override
-    protected String getFugueConfig()
-    {
-      return "https://s3." + getAwsRegion() + ".amazonaws.com/sym-s2-fugue-" + getNameFactory().getEnvironmentType() +
-          "-" + getAwsRegion() + "-config/config/" +
-          
-          getNameFactory().getPhysicalServiceName() + ".json";
-    }
-
     private String getClusterArn()
     {
       return "arn:aws:ecs:" + awsRegion_ + ":" + awsAccountId_ + ":cluster/" + clusterName_;
@@ -1799,18 +2411,26 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return "arn:aws:iam::" + awsAccountId_ + ":role/" + name;
     }
 
-    private void createR53RecordSet(String host, String regionalHost, LoadBalancer loadBalancer)
+    private void createR53RecordSet(String host)
     {
-      if(host != null)
-        createR53RecordSet(host, regionalHost, true);
+      String regionalHostName = getNameFactory()
+          .getRegionalServiceName().toString().toLowerCase() + "." + getDnsSuffix();
       
-      if(loadBalancer != null)
-        createR53RecordSet(regionalHost, loadBalancer.getDNSName(), false);
+      if(host != null)
+        doCreateR53RecordSet(host, regionalHostName, false, true);
+      
+      if(loadBalancer_ != null)
+        doCreateR53RecordSet(regionalHostName, loadBalancer_.getDNSName(), false, false);
     }
     
-    private void createR53RecordSet(String source, String target, boolean multiValue)
+    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue)
     {
-      String zoneId = createOrGetHostedZone(source.substring(source.indexOf('.') + 1), false);
+      doCreateR53RecordSet(source, target, create, multiValue, source.indexOf('.') + 1, false);
+    }
+    
+    private void doCreateR53RecordSet(String source, String target, boolean create, boolean multiValue, int pos, boolean doNotDelete)
+    {
+      String zoneId = createOrGetHostedZone(source.substring(pos), create);
       
       if(zoneId.startsWith("/hostedzone/"))
         zoneId = zoneId.substring(12);
@@ -1825,7 +2445,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
           );
       
       List<ResourceRecordSet> recordSetList = result.getResourceRecordSets();
-      boolean                 exists        = false;
       boolean                 ok            = false;
       
       for(ResourceRecordSet recordSet : recordSetList)
@@ -1835,7 +2454,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
             )
         {
           log_.info("R53 record set exists for " + source);
-          exists = true;
           
           for(ResourceRecord record : recordSet.getResourceRecords())
           {
@@ -1922,7 +2540,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
       else
       {
-        if(ok)
+        if(ok && !doNotDelete)
         {
           log_.info("Deleting R53 record set for " + source + " to " + target + "...");
           
@@ -1997,203 +2615,67 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       return a.equals(b);
     }
 
-    private String createTargetGroup(Name name, String healthCheckPath, int port)
-    {
-      String shortName = name.getShortName(32);
-      
-      try
-      {
-        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
-        
-        List<TargetGroup> groups = desc.getTargetGroups();
-        
-        if(groups.size() != 1)
-            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
-        
-        log_.info("Target group " + name + " (" + shortName + ") already exists.");
-        return elbTag(groups.get(0).getTargetGroupArn());
-      }
-      catch(TargetGroupNotFoundException e)
-      {
-        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
-      }
-      
-      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
-          .withName(shortName)
-          .withHealthCheckPath(healthCheckPath)
-          .withHealthCheckProtocol(ProtocolEnum.HTTP)
-          .withProtocol(ProtocolEnum.HTTP)
-          .withVpcId(awsVpcId_)
-          .withPort(port)
-          );
-      
-      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
-    }
-
-
-    private String elbTag(String arn)
-    {
-      List<Tag> tags = new LinkedList<>();
-      
-      for(Entry<String, String> entry : getTags().entrySet())
-      {
-        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
-      }
-      
-      tagIfNotNull(tags, "FUGUE_TENANT", getPodName());
-      
-      if(!tags.isEmpty())
-      {
-        elbClient_.addTags(new AddTagsRequest()
-            .withResourceArns(arn)
-            .withTags(tags)
-            );
-      }
-    
-      return arn;
-    }
+//    private String createTargetGroup(Name name, String healthCheckPath, int port)
+//    {
+//      String shortName = name.getShortName(32);
+//      
+//      try
+//      {
+//        DescribeTargetGroupsResult desc = elbClient_.describeTargetGroups(new DescribeTargetGroupsRequest().withNames(shortName));
+//        
+//        List<TargetGroup> groups = desc.getTargetGroups();
+//        
+//        if(groups.size() != 1)
+//            throw new IllegalStateException("Describe target group by name returns " + groups.size() + " results!");
+//        
+//        log_.info("Target group " + name + " (" + shortName + ") already exists.");
+//        return elbTag(groups.get(0).getTargetGroupArn());
+//      }
+//      catch(TargetGroupNotFoundException e)
+//      {
+//        log_.info("Target group " + name + " (" + shortName + ") does not exist, will create it...");
+//      }
+//      
+//      CreateTargetGroupResult result = elbClient_.createTargetGroup(new CreateTargetGroupRequest()
+//          .withName(shortName)
+//          .withHealthCheckPath(healthCheckPath)
+//          .withHealthCheckProtocol(ProtocolEnum.HTTP)
+//          .withProtocol(ProtocolEnum.HTTP)
+//          .withVpcId(awsVpcId_)
+//          .withPort(port)
+//          );
+//      
+//      return elbTag(result.getTargetGroups().get(0).getTargetGroupArn());
+//    }
+//
+//
+//    private String elbTag(String arn)
+//    {
+//      List<Tag> tags = new LinkedList<>();
+//      
+//      for(Entry<String, String> entry : getTags().entrySet())
+//      {
+//        tags.add(new Tag().withKey(entry.getKey()).withValue(entry.getValue()));
+//      }
+//      
+//      tagIfNotNull(tags, "FUGUE_TENANT", getPodName());
+//      
+//      if(!tags.isEmpty())
+//      {
+//        elbClient_.addTags(new AddTagsRequest()
+//            .withResourceArns(arn)
+//            .withTags(tags)
+//            );
+//      }
+//    
+//      return arn;
+//    }
     
     private void tagIfNotNull(List<Tag> tags, String name, String value)
     {
       if(value != null)
       {
         tags.add(new Tag().withKey(name).withValue(value));
-      }
-    }
-
-    private void configureNetworkRule(String targetGroupArn, String host, String name, int port, Collection<String> paths, String healthCheckPath)
-    {
-      if(action_.isDeploy_ && !isPrimaryEnvironment())
-        return;
-      
-      List<String> remainingPaths = new ArrayList<>();
-      
-      remainingPaths.addAll(paths);
-      
-      DescribeRulesResult ruleDescription = elbClient_.describeRules(new DescribeRulesRequest()
-          .withListenerArn(listenerArn_)
-          );
-      
-      List<Rule> ruleList = ruleDescription.getRules();
-      int        priority = 1000;
-      
-      for(Rule rule : ruleList)
-      {
-        String conditionHost = null;
-        String conditionPath = null;
-        
-        for(RuleCondition c : rule.getConditions())
-        {
-          if(c.getField().equals(HOST_HEADER))
-          {
-            if(c.getValues().size() > 0)
-              conditionHost = c.getValues().get(0);
-          }
-          else if(c.getField().equals(PATH_PATERN))
-          {
-            if(c.getValues().size() > 0)
-              conditionPath = c.getValues().get(0);
-          }
-        }
-        
-        String actionTargetArn = null;
-        
-        // since there is only one action I can't see how there will not always be exactly one of these but....
-        for(Action action : rule.getActions())
-        {
-          actionTargetArn = action.getTargetGroupArn();
-        }
-        
-        if(host.equals(conditionHost))
-        {
-          // remove old host rules
-          
-          log_.info("Deleting rule " + rule.getRuleArn() + " for host " + conditionHost + " for path " + conditionPath);
-          
-          elbClient_.deleteRule(new DeleteRuleRequest()
-              .withRuleArn(rule.getRuleArn())
-              );
-        }
-        else
-        {
-          if(conditionHost == null)
-          {
-            if(remainingPaths.remove(conditionPath))
-            {
-              if(targetGroupArn.equals(actionTargetArn))
-              {
-                log_.debug("Rule " + rule.getRuleArn() + " for path " + conditionPath + " is OK, nothing to do");
-              }
-              else
-              {
-                log_.info("Updating rule " + rule.getRuleArn() + " for path " + conditionPath);
-                // the rule is there but it's wrong
-                elbClient_.modifyRule(new ModifyRuleRequest()
-                    .withRuleArn(rule.getRuleArn())
-                    .withActions(new Action()
-                        .withTargetGroupArn(targetGroupArn)
-                        .withType(ActionTypeEnum.Forward)
-                        )
-                    );
-              }
-            }
-            else
-            {
-              // this rule is for a path which we don't have, maybe it was removed from the service
-              
-              if(!"default".equals(rule.getPriority()))
-              {
-                if(targetGroupArn.equals(actionTargetArn))
-                {
-                  log_.info("Deleting rule " + rule.getRuleArn() + " for non-existant path " + conditionPath);
-                  
-                  elbClient_.deleteRule(new DeleteRuleRequest()
-                      .withRuleArn(rule.getRuleArn())
-                      );
-                }
-              }
-            }
-          }
-          
-          if(!"default".equals(rule.getPriority()))
-          {
-            try
-            {
-              int p = Integer.parseInt(rule.getPriority());
-              
-              if(p >= priority)
-                priority = p + 1;
-            }
-            catch(NumberFormatException e)
-            {
-              log_.warn("Rule has non-integer priority: " + rule);
-            }
-          }
-        }
-      }
-      
-      for(String path : remainingPaths)
-      {
-        log_.info("Creating rule for host " + host + " for non-existant path " + path + "...");
-        
-        CreateRuleResult createRuleResult = elbClient_.createRule(new CreateRuleRequest()
-            .withListenerArn(listenerArn_)
-            .withConditions(
-//                new RuleCondition()
-//                  .withField(HOST_HEADER)
-//                  .withValues(host),
-                new RuleCondition()
-                  .withField(PATH_PATERN)
-                  .withValues(path)
-                )
-            .withActions(new Action()
-                .withTargetGroupArn(targetGroupArn)
-                .withType(ActionTypeEnum.Forward)
-                )
-            .withPriority(priority++)
-            );
-        
-        log_.info("Created rule " + createRuleResult.getRules().get(0).getRuleArn() + " for host " + host + " for non-existant path " + path);
       }
     }
     
@@ -2204,18 +2686,22 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
       registerTaskDefinition(taskName, port, roleName, imageName, jvmHeap, memory);
       
+      ContainerOverride containerOverrides = new ContainerOverride()
+          .withName(taskName.toString())
+          .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
+          .withEnvironment(new KeyValuePair().withName("FUGUE_DRY_RUN").withValue(String.valueOf(dryRun_)))
+          ;
+      
+      for(Entry<String, String> entry : getTags().entrySet())
+        containerOverrides.withEnvironment(new KeyValuePair().withName("FUGUE_TAG_" + entry.getKey()).withValue(entry.getValue()));
+      
       RunTaskResult run = ecsClient_.runTask(new RunTaskRequest()
           .withCluster(clusterName_)
           .withCount(1)
           .withTaskDefinition(taskName.toString())
           .withOverrides(new TaskOverride()
               .withTaskRoleArn(getRoleArn(roleName))
-              .withContainerOverrides(new ContainerOverride()
-                  .withName(taskName.toString())
-                  .withEnvironment(new KeyValuePair().withName("FUGUE_ACTION").withValue(String.valueOf(action_)))
-                  .withEnvironment(new KeyValuePair().withName("FUGUE_DRY_RUN").withValue(String.valueOf(dryRun_)))
-                  )
-              )
+              .withContainerOverrides(containerOverrides))
           );
       
       String taskArn = run.getTasks().get(0).getTaskArn();
@@ -2226,7 +2712,6 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     
     private void waitTaskComplete(Name taskName, String taskArn, TimeUnit timeUnit, long timeout)
     {
-      int debug=0;
       long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
       String logGroupName = getNameFactory().getPhysicalServiceName().toString();
       String logStreamName = getService() + '/' + taskName + '/' + taskArn.substring(taskArn.lastIndexOf('/') + 1);
@@ -2346,28 +2831,14 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     {
       // createDnsZones();
       
-      if(hasDockerContainers())
+      if(action_.isDeploy_)
       {
-        if(action_.isDeploy_)
-        {
-          if(isPrimaryEnvironment()) // we can't find the IP addresses for this.......
-            loadBalancer_ = getLoadBalancer(true);
-          
-          Name targetGroupName = getNameFactory().getPhysicalServiceItemName(DEFAULT);
-              //new Name(getEnvironmentType(), getEnvironment(), getTenantId(), getService(), DEFAULT);
-          
-          if(isPrimaryEnvironment())
-          {
-            defaultTargetGroupArn_ = createTargetGroup(targetGroupName, "/HealthCheck", 80);
-          
-            listenerArn_ = createLoadBalancerListener(loadBalancer_, defaultTargetGroupArn_);
-          }
-        }
-        
-        if(action_.isUndeploy_)
-        {
-          loadBalancer_ = getLoadBalancer(false);
-        }
+        getApiGateway(getPathCnt() > 0);
+      }
+      
+      if(action_.isUndeploy_)
+      {
+        getApiGateway(false);
       }
     }
 
@@ -2378,67 +2849,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       
       if(hasDockerContainers())
       {
-        deleteLoadBalancer();
+        deleteApiGateway();
       }
-    }
-    
-    private String createLoadBalancerListener(LoadBalancer loadBalancer, String defaultTargetGroupArn)
-    {
-      DescribeListenersResult describeResponse = elbClient_.describeListeners(new DescribeListenersRequest()
-          .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-          );
-      
-      List<Listener> listeners = describeResponse.getListeners();
-      
-      if(!listeners.isEmpty())
-      {
-        String listenerArn = listeners.get(0).getListenerArn();
-        log_.info("Listener " + listenerArn + " already exists.");
-        return listenerArn;
-      }
-//      for(Listener listener : listeners)
-//      {
-//        if(ProtocolEnum.HTTPS.equals(listener.getProtocol()))
-//        {
-//          for(Certificate cert : listener.getCertificates())
-//          {
-//            cert.getCertificateArn()
-//          }
-//        }
-//      }
-      
-      
-      log_.info("Creating listener...");
-      
-//      elbClient_.Cer
-//      GetServerCertificateResult certificateResult = iamClient_.getServerCertificate(new GetServerCertificateRequest()
-//          .withServerCertificateName("NAME")
-//          );
-//      
-//      Certificate certificate = certificateResult.getServerCertificate();
-      
-//      elbClient_.addListenerCertificates(new AddListenerCertificatesRequest()
-//          .withCertificates(certificates)
-//          );
-      
-      CreateListenerResult createResult = elbClient_.createListener(new CreateListenerRequest()
-          .withCertificates(new Certificate()
-            .withCertificateArn(awsLoadBalancerCertArn_)
-          )
-          .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-          .withProtocol(ProtocolEnum.HTTPS)
-          .withPort(443)
-          .withDefaultActions(new Action()
-              .withType(ActionTypeEnum.Forward)
-              .withTargetGroupArn(defaultTargetGroupArn)
-              )
-          );
-      
-      listeners = createResult.getListeners();
-      
-      String listenerArn = listeners.get(0).getListenerArn();
-      log_.info("Listener " + listenerArn + " created.");
-      return listenerArn;
     }
     
     private void deleteTaskDef(Name name, int port, Collection<String> paths, String healthCheckPath)
@@ -2457,9 +2869,30 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private void deleteService(String name)
     {
+      deleteTaskDefinitions(name, 0);
       Name    serviceName = getNameFactory().getPhysicalServiceItemName(name);
       
       log_.info("Deleting service " + serviceName + "...");
+      
+      try
+      {
+      
+        ecsClient_.deleteService(new DeleteServiceRequest()
+            .withCluster(clusterName_)
+            .withForce(true)
+            .withService(serviceName.toString()));
+        
+        log_.info("Deleted service " + serviceName + ".");
+      }
+      catch(ServiceNotFoundException e)
+      {
+        log_.info("Service " + serviceName + " did not exist anyway.");
+      }
+    }
+
+    private void deleteTaskDefinitions(String name, int remaining)
+    {
+      Name    serviceName = getNameFactory().getPhysicalServiceItemName(name);
       
       DescribeServicesResult services = ecsClient_.describeServices(new DescribeServicesRequest()
           .withCluster(clusterName_)
@@ -2473,14 +2906,7 @@ public abstract class AwsFugueDeploy extends FugueDeploy
         targetArns.add(service.getTaskDefinition());
       }
       
-      deleteTaskDefinitions(targetArns);
-      
-      ecsClient_.deleteService(new DeleteServiceRequest()
-          .withCluster(clusterName_)
-          .withForce(true)
-          .withService(serviceName.toString()));
-      
-      log_.info("Deleted service " + serviceName + ".");
+      deleteTaskDefinitions(targetArns, remaining);
     }
 
     private void registerTaskDefinition(Name serviceName, int port, Name roleName, String imageName, int jvmHeap, int memory)
@@ -2540,6 +2966,8 @@ public abstract class AwsFugueDeploy extends FugueDeploy
 
     private String createLogGroupIfNecessary()
     {
+      boolean create = true;
+      
       String name = getNameFactory().getPhysicalServiceName().toString();
       
       DescribeLogGroupsResult result = logsClient_.describeLogGroups(new DescribeLogGroupsRequest()
@@ -2549,18 +2977,28 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       for(LogGroup group : result.getLogGroups())
       {
         if(group.getLogGroupName().equals(name))
-          return name;
+        {
+          create = false;
+          break;
+        }
       }
       
-      logsClient_.createLogGroup(new CreateLogGroupRequest()
-          .withLogGroupName(name)
-          .withTags(getTags())
-          );
+      if(create)
+      {
+        logsClient_.createLogGroup(new CreateLogGroupRequest()
+            .withLogGroupName(name)
+            .withTags(getTags())
+            );
+        
+        logsClient_.putRetentionPolicy(new PutRetentionPolicyRequest()
+            .withLogGroupName(name)
+            .withRetentionInDays(14));
+      }
       
       return name;
     }
 
-    private void createService(String targetGroupArn, String name, int port, int desiredCnt,
+    private void createService(String name, int port, int desiredCnt,
         Collection<String> paths, Name roleName, String imageName, int jvmHeap, int memory)
     {
       log_.info("Cluster name is " + clusterName_);
@@ -2609,15 +3047,15 @@ public abstract class AwsFugueDeploy extends FugueDeploy
     //            )
             ;
         
-        if(isPrimaryEnvironment() && !paths.isEmpty())
-        {
-          request
-            .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
-              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
-              .withContainerPort(port)
-              .withTargetGroupArn(targetGroupArn)
-            );
-        }
+//        if(isPrimaryEnvironment() && !paths.isEmpty())
+//        {
+//          request
+//            .withLoadBalancers(new com.amazonaws.services.ecs.model.LoadBalancer()
+//              .withContainerName(serviceName.toString()) // TODO: change to just "name" once we get task def working from Java
+//              .withContainerPort(port)
+//              .withTargetGroupArn(targetGroupArn)
+//            );
+//        }
         CreateServiceResult createServiceResult = ecsClient_.createService(request);
         
         log_.info("Created service " + serviceName + "as" + createServiceResult.getService().getServiceArn() + " with status " + createServiceResult.getService().getStatus() + ".");
@@ -2639,194 +3077,86 @@ public abstract class AwsFugueDeploy extends FugueDeploy
       }
     }
 
-    private LoadBalancer getLoadBalancer(boolean createIfNecessary)
+    private void getApiGateway(boolean createIfNecessary)
     {
-      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
-//          new Name(getEnvironmentType(), getEnvironment(), tenant, getService()).getShortName(32);
+      String name = getNameFactory().getEnvironmentName(null).toString();
+          //.getLogicalServiceName().toString();
+          //getEnvironmentPrefix() + getNameFactory().getServiceImageName();
       
       try
       {
-        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
-            .withNames(name)
-            );
+        String pos = null;
         
-        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
-        
-        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
+        do
         {
-          LoadBalancer loadBalancer = loadBalancerList.get(0);
-    
-          log_.info("Load balancer exists as " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
+          GetRestApisResult getResult = apiClient_.getRestApis(new GetRestApisRequest().withPosition(pos));
           
-          if(!createIfNecessary)
-            return loadBalancer;
-          
-          boolean ok = true;
-          
-          if(!loadBalancer.getScheme().equals(LoadBalancerSchemeEnum.Internal.toString()))
+          for(RestApi api : getResult.getItems())
           {
-            log_.info("Load balancer is not Internal but " + loadBalancer.getScheme());
-            ok = false;
-          }
-          
-          if(ok)
-          {
-            // So the LB exists, check that it has the correct security groups and subnets
-            int     cnt = awsLoadBalancerSecurityGroups_.size();
-            
-            for(String sg : loadBalancer.getSecurityGroups())
+            if(api.getName().equals(name))
             {
-              if(awsLoadBalancerSecurityGroups_.contains(sg))
-              {
-                cnt--;
-              }
-              else
-              {
-                log_.info("Load balancer is missing security group " + sg);
-                ok = false;
-                break;
-              }
-            }
-            
-            if(cnt > 0)
-            {
-              log_.info("Load balancer has additional security groups");
-              ok = false;
-            }
-            
-            if(ok)
-            {
-              cnt = awsLoadBalancerSubnets_.size();
-              for(AvailabilityZone az : loadBalancer.getAvailabilityZones())
-              {
-                if(awsLoadBalancerSubnets_.contains(az.getSubnetId()))
-                {
-                  cnt--;
-                }
-                else
-                {
-                  log_.info("Load balancer has additional subnet " + az.getSubnetId());
-                  ok = false;
-                  break;
-                }
-              }
-              
-              if(cnt > 0)
-              {
-
-                log_.info("Load balancer is missing subnets");
-                ok = false;
-              }
+              apiGatewayId_ = api.getId();
+              log_.info("ApiGateway " + name + " exists as Api ID " + apiGatewayId_);
+              break;
             }
           }
-          
-          if(ok)
-          {
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " is good, no more to do");
-            elbTag(loadBalancer.getLoadBalancerArn());
-            return loadBalancer;
-          }
-          else
-          {
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " needs to be updated...");
-            
-//            // To fix this we ned to get all the rules, delete the LB, create a new one, and add all the rules back
-//            throw new IllegalStateException("Loadbalancer needs to be updated");
-            
-            
-            
-            // disabled for testing
-            elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
-                .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-                );
-            
-
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " waiting for deletion...");
-            
-            elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
-                new DescribeLoadBalancersRequest()
-                  .withLoadBalancerArns(loadBalancer.getLoadBalancerArn())
-                )
-                );
-            
-
-            log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " deleted.");
-            
-            // TODO: delete this return when we delete the load balancer
-            //return loadBalancer;
-          }
-        }
+          pos = getResult.getPosition();
+        }while(apiGatewayId_==null && pos!=null);
       }
-      catch(LoadBalancerNotFoundException e)
+      catch(com.amazonaws.services.apigateway.model.NotFoundException e)
+      {}
+      
+      if(createIfNecessary)
       {
-        if(createIfNecessary)
+        if(apiGatewayId_ == null)
         {
-          log_.info("Load balancer " + name + " does not exist, creating...");
+          CreateRestApiResult createResult = apiClient_.createRestApi(new CreateRestApiRequest()
+              .withName(name)
+              .withDescription(name + (getPodName() == null ? " Service" : " Pod " + getPodName()) + " API")
+              .withEndpointConfiguration(new EndpointConfiguration()
+                  .withTypes(EndpointType.REGIONAL)
+                  )
+              );
+          
+          apiGatewayId_ = createResult.getId();
+          log_.info("ApiGateway " + name + " created as Api ID " + apiGatewayId_);
         }
-        else
-        {
-          log_.info("Load balancer " + name + " does not exist.");
-          return null;
-        }
+        
+        setApiGatewayArn();
+        
+        apiClient_.tagResource(new TagResourceRequest()
+            .withResourceArn(apiGatewayArn_)
+            .withTags(getTags())
+            );
       }
-
-      CreateLoadBalancerResult createResponse = elbClient_.createLoadBalancer(new CreateLoadBalancerRequest()
-          .withName(name)
-          .withSecurityGroups(awsLoadBalancerSecurityGroups_)
-          .withSubnets(awsLoadBalancerSubnets_)
-          .withScheme(LoadBalancerSchemeEnum.Internal)
-          );
-      
-      LoadBalancer loadBalancer = createResponse.getLoadBalancers().get(0);
-      
-      log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " created.");
-      
-      elbTag(loadBalancer.getLoadBalancerArn());
-      
-      return loadBalancer;
+      else if(apiGatewayId_ != null)
+        setApiGatewayArn();
     }
     
-
-
-    private void deleteLoadBalancer()
+    private void setApiGatewayArn()
     {
-      String name = getNameFactory().getPhysicalServiceName().getShortName(32);
+      apiGatewayArn_ = getApiArn(apiGatewayId_);
       
-      try
+      
+      String envTypePrefix = "prod".equals(getEnvironmentType()) ? "" : getEnvironmentType() + ".";
+      
+      if("master".equals(getEnvironment()))
       {
-        DescribeLoadBalancersResult describeResult = elbClient_.describeLoadBalancers(new DescribeLoadBalancersRequest()
-            .withNames(name)
-            );
-        
-        List<LoadBalancer> loadBalancerList = describeResult.getLoadBalancers();
-        
-        if(loadBalancerList.size() > 0 && name.equals(loadBalancerList.get(0).getLoadBalancerName()))
-        {
-          LoadBalancer loadBalancer = loadBalancerList.get(0);
-    
-          log_.info("Deleting load balancer " + loadBalancer.getLoadBalancerArn() + " at " + loadBalancer.getDNSName());
-          
-         
-          elbClient_.deleteLoadBalancer(new DeleteLoadBalancerRequest()
-              .withLoadBalancerArn(loadBalancer.getLoadBalancerArn())
-              );
-          
-
-          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " waiting for deletion...");
-          
-          elbClient_.waiters().loadBalancersDeleted().run(new WaiterParameters<DescribeLoadBalancersRequest>(
-              new DescribeLoadBalancersRequest()
-                .withLoadBalancerArns(loadBalancer.getLoadBalancerArn())
-              )
-              );
-          
-
-          log_.info("Load balancer " + loadBalancer.getLoadBalancerArn() + " deleted.");
-        }
+        apiGatewayMasterDomainName_= envTypePrefix + "api." + getPublicDnsSuffix();
+        //apiGatewayMasterCertArn_ = awsPublicCertArn_;
       }
-      catch(LoadBalancerNotFoundException e)
+      
+      apiGatewayPrivateDomainName_ = getEnvironment() + "-" + "api." + getDnsSuffix();
+//      apiGatewayCertArn_ = awsLoadBalancerCertArn_;
+    }
+    
+    private void deleteApiGateway()
+    {
+      if(apiGatewayArn_ != null)
       {
-          log_.info("Load balancer " + name + " does not exist.");
+//        apiClient_.deleteRestApi(new DeleteRestApiRequest()
+//            .withRestApiId(apiGatewayId_)
+//            );
       }
     }
   }

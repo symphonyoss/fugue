@@ -14,6 +14,7 @@ import org.symphonyoss.s2.common.fault.FaultAccumulator;
 import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.AbstractSubscriberAdmin;
+import org.symphonyoss.s2.fugue.pubsub.ITopicSubscriptionAdmin;
 
 import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
@@ -108,8 +109,14 @@ public class GoogleSubscriberAdmin extends AbstractSubscriberAdmin<GoogleSubscri
   }
 
   @Override
-  protected void createSubcription(SubscriptionName subscriptionName, boolean dryRun)
+  protected void createSubcription(SubscriptionName subscriptionName, ITopicSubscriptionAdmin subscription, boolean dryRun)
   {
+    if(subscription.getFilterPropertyName() != null)
+      throw new IllegalArgumentException("Google pubsub does not support filtering.");
+    
+    if(subscription.getLambdaConsumer() != null)
+      throw new IllegalArgumentException("Google pubsub does not support lambda triggers.");
+    
     TopicName topicName = subscriptionName.getTopicName();
     try
     {

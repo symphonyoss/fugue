@@ -24,6 +24,7 @@
 package org.symphonyoss.s2.fugue.deploy;
 
 import java.util.Map;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -54,8 +55,9 @@ public class ConfigHelper
    * Get the multi-tenant default config.
    * 
    * @param config The JsonObject onto which the config should be overlaid.
+   * @param pathFilter A set of paths for which config is required.
    */
-  public void overlayDefaults(@Nonnull MutableJsonObject config)
+  public void overlayDefaults(@Nonnull MutableJsonObject config, Set<String> pathFilter)
   {
   }
   
@@ -63,8 +65,9 @@ public class ConfigHelper
    * Get the multi-tenant override config.
    * 
    * @param config The JsonObject onto which the config should be overlaid.
+   * @param pathFilter A set of paths for which config is required.
    */
-  public void overlayOverrides(@Nonnull MutableJsonObject config)
+  public void overlayOverrides(@Nonnull MutableJsonObject config, Set<String> pathFilter)
   {
   }
   
@@ -74,8 +77,9 @@ public class ConfigHelper
    * @param tenantId            The ID of the required tenant configuration.
    * 
    * @param config The JsonObject onto which the config should be overlaid.
+   * @param pathFilter A set of paths for which config is required.
    */
-  public void overlayDefaults(@Nonnull String tenantId, @Nonnull MutableJsonObject config)
+  public void overlayDefaults(@Nonnull String tenantId, @Nonnull MutableJsonObject config, Set<String> pathFilter)
   {
   }
   
@@ -84,8 +88,9 @@ public class ConfigHelper
    * 
    * @param tenantId The ID of the required tenant configuration.
    * @param config The JsonObject onto which the config should be overlaid.
+   * @param pathFilter A set of paths for which config is required.
    */
-  public void overlayOverrides(@Nonnull String tenantId, @Nonnull MutableJsonObject config)
+  public void overlayOverrides(@Nonnull String tenantId, @Nonnull MutableJsonObject config, Set<String> pathFilter)
   {
   }
   

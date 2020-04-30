@@ -26,10 +26,15 @@ package org.symphonyoss.s2.fugue.http;
 /**
  * A provider of servlets.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public interface IServletProvider
 {
+  /**
+   * Register servlets provided with the given container.
+   * 
+   * @param servletContainer  A servlet container with which this provider's servlets should be registered.
+   */
   void registerServlets(IServletContainer servletContainer);
 }

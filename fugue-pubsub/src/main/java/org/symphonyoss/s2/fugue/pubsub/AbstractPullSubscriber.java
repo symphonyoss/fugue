@@ -34,30 +34,38 @@ import org.symphonyoss.s2.fugue.counter.ICounter;
 import org.symphonyoss.s2.fugue.counter.ScaleAction;
 import org.symphonyoss.s2.fugue.deploy.ExecutorBatch;
 import org.symphonyoss.s2.fugue.deploy.IBatch;
+import org.symphonyoss.s2.fugue.pipeline.ICloseableConsumer;
 
 public abstract class AbstractPullSubscriber implements Runnable
 {
   private static final Logger log_ = LoggerFactory.getLogger(AbstractPullSubscriber.class);
   
-  private final AbstractPullSubscriberManager<?> manager_;
-  private final String                           subscriptionName_;
-  private final ICounter                         counter_;
-  private final IBusyCounter                     busyCounter_;
-  private final long                             extensionFrequency_;
-  private boolean                                running_ = true;
+  private final AbstractPullSubscriberManager<?, ?> manager_;
+  private final String                              subscriptionName_;
+  private final ICounter                            counter_;
+  private final IBusyCounter                        busyCounter_;
+  private final long                                extensionFrequency_;
+  private final ICloseableConsumer                  consumer_;
+  private boolean                                   running_ = true;
 
   
-  public AbstractPullSubscriber(AbstractPullSubscriberManager<?> manager,
+  public AbstractPullSubscriber(AbstractPullSubscriberManager<?,?> manager,
       String subscriptionName,
       
       ICounter counter, IBusyCounter busyCounter,
-      long extensionFrequency)
+      long extensionFrequency, ICloseableConsumer consumer)
   {
     manager_ = manager;
     subscriptionName_ = subscriptionName;
     counter_ = counter;
     busyCounter_ = busyCounter;
     extensionFrequency_ = extensionFrequency;
+    consumer_ = consumer;
+  }
+
+  public void close()
+  {
+    consumer_.close();
   }
 
   protected abstract IPullSubscriberContext getContext() throws IOException;
@@ -105,26 +113,25 @@ public abstract class AbstractPullSubscriber implements Runnable
         messages = context.blockingPull();
         
         log_.info("Blocking read for " + subscriptionName_ + " returned " + messages.size());
+        
+        if(messages.isEmpty())
+        {
+          return;
+        }
+        
+        scheduleExtra(1);
       }
       else
       {
         if(busyCounter_ != null)
           busyCounter_.busy(messages.size());
         
-        if(isRunning() && !Fugue.isDebugSingleThread())
-        {
-          manager_.submit(getNonIdleSubscriber(), false);
-
-          log_.debug("Extra schedule " + subscriptionName_);
-        }
+        scheduleExtra(1);
         
         log_.info("Non-Blocking read for " + subscriptionName_ + " returned " + messages.size());
       }
       
-      if(messages.isEmpty())
-      {
-        return;
-      }
+      
       
       IBatch<IPullSubscriberMessage>  batch = new ExecutorBatch<>(manager_.getHandlerExecutor());
       
@@ -134,6 +141,7 @@ public abstract class AbstractPullSubscriber implements Runnable
       for(IPullSubscriberMessage message : messages)
       {
         log_.debug("handle message " + message.getMessageId());
+//        log_.debug("handle message " + message);
         batch.submit(message);
       }
       
@@ -177,6 +185,18 @@ public abstract class AbstractPullSubscriber implements Runnable
     finally
     {
       log_.debug("Done pull request");
+    }
+  }
+
+  private void scheduleExtra(int count)
+  {
+
+    if(isRunning() && !Fugue.isDebugSingleThread())
+    {
+      for(int i=0 ; i<count ; i++)
+        manager_.submit(getNonIdleSubscriber(), false);
+
+      log_.debug("Extra schedule " + count + " for " + subscriptionName_);
     }
   }
 

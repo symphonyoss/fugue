@@ -22,15 +22,18 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.IFugueComponent;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 import org.symphonyoss.s2.fugue.store.IFugueObject;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreWritable;
 import org.symphonyoss.s2.fugue.store.IFugueVersionedObject;
+import org.symphonyoss.s2.fugue.store.ObjectExistsException;
 
 /**
  * IFundamentalObjectStoreWritable implementation based on DynamoDB and S3.
@@ -77,26 +80,28 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
   }
   
   @Override
-  public String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
-      List<? extends IFugueObject> additionalObjects)
+  public void saveIfNotExists(IFugueObject idObject, IFugueObject payload, int payloadLimit, ITraceContext trace) throws ObjectExistsException
   {
-    synchronized(absoluteMap_)
+    if(payload.getPayload() instanceof IFugueVersionedObject && ((IFugueVersionedObject)payload.getPayload()).getBaseHash().equals(idObject.getAbsoluteHash()))
     {
-      String current = absoluteMap_.get(idObject.getAbsoluteHash());
-      
-      if(current == null)
+      synchronized(absoluteMap_)
       {
-        doSave(idObject);
+        String current = absoluteMap_.get(idObject.getAbsoluteHash());
         
-        for(IFugueObject additionalObject : additionalObjects)
+        if(current == null)
         {
-          doSave(additionalObject);
+          doSave(idObject);
+          save(payload, payloadLimit, trace);
         }
-        
-        return null;
+        else
+        {
+          throw new ObjectExistsException("Object exists");
+        }
       }
-
-      return current;
+    }
+    else
+    {
+      throw new IllegalArgumentException("Payload baseHash must be ID absoluteHash");
     }
   }
   
@@ -110,11 +115,11 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
     {
       IFugueVersionedObject versionedObject = (IFugueVersionedObject)fundamentalObject.getPayload();
       
-      doSaveCurrent(versionedObject.getBaseHash(), versionedObject.getRangeKey(), blob);
+      doSaveCurrent(versionedObject.getBaseHash(), versionedObject.getRangeKey(), blob, versionedObject.getAbsoluteHash());
     }
   }
 
-  private void doSaveCurrent(Hash baseHash, String rangeKey, String blob)
+  private void doSaveCurrent(Hash baseHash, String rangeKey, String blob, Hash absoluteHash)
   {
     synchronized(currentMap_)
     {
@@ -127,11 +132,21 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
       }
       
       versions.put(rangeKey, blob);
+      
+      List<Hash> baseList = baseMap_.get(baseHash);
+      
+      if(baseList == null)
+      {
+        baseList = new LinkedList<>();
+        baseMap_.put(baseHash, baseList);
+      }
+      
+      baseList.add(absoluteHash);
     }
   }
   
   @Override
-  public void save(IFugueObject fundamentalObject, ITraceContext trace)
+  public void save(IFugueObject fundamentalObject, int payloadLimit, ITraceContext trace)
   {
     String blob = fundamentalObject.toString();
     
@@ -166,7 +181,7 @@ public class InMemoryObjectStoreWritable extends InMemoryObjectStoreSecondaryWri
       absoluteMap_.put(absoluteHash, blob);
     }
     
-    doSaveCurrent(baseHash, rangeKey, blob);
+    doSaveCurrent(baseHash, rangeKey, blob, absoluteHash);
     
   }
 }

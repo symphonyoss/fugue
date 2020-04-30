@@ -38,12 +38,12 @@ import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
  * from multiple threads, they <b>MUST</b> require an {@link IThreadSafeConsumer}
  * to do so.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  * @param <T> The type of payload consumed.
  */
 @NotThreadSafe
-public interface IConsumer<T> extends IRetryableConsumer<T>, AutoCloseable
+public interface IConsumer<T> extends ISimpleRetryableConsumer<T>, ICloseableConsumer
 {
   /**
    * Consume the given item.

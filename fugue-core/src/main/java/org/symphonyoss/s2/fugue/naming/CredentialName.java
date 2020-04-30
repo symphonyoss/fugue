@@ -51,6 +51,16 @@ public class CredentialName extends Name
     tenantId_ = tenantId;
     owner_ = owner;
   }
+  
+  protected CredentialName(String prefix, String environmentTypeId, String environmentId, String owner, String suffix)
+  {
+    super(prefix, environmentTypeId, environmentId, owner, suffix);
+
+    environmentTypeId_ = environmentTypeId;
+    environmentId_ = environmentId;
+    tenantId_ = null;
+    owner_ = owner;
+  }
 
   public String getEnvironmentTypeId()
   {

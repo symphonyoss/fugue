@@ -40,7 +40,7 @@ class LoggerTraceContext implements ITraceContext
   private final String                               subjectType_;
   private final String                               subjectId_;
   private final String                               tenantId_;
-  private final Hash                                 hash_;
+//  private final Hash                                 hash_;
   private final LoggerTraceContextTransactionFactory factory_;
   private final String                               parentHash_;
   private final Instant                              timestamp_;
@@ -57,7 +57,7 @@ class LoggerTraceContext implements ITraceContext
     subjectType_ = subjectType;
     subjectId_ = subjectId;
     tenantId_ = tenantId;
-    hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
+    //hash_ = HashProvider.getCompositeHashOf(id_, subjectType_, subjectId_);
     
     trace("STARTED");
     
@@ -69,7 +69,7 @@ class LoggerTraceContext implements ITraceContext
   @Override
   public Hash getHash()
   {
-    return hash_;
+    return id_; //hash_;
   }
 
   @Override
@@ -87,7 +87,7 @@ class LoggerTraceContext implements ITraceContext
     
     lastEvent_ = now;
     
-    log_.debug(String.format("TRACE %-50.50s %-50.50s %-20.20s %5d %5d %-14s %-30.30s %-40.40s %-20.20s %s", parentHash_, id_, operationId, operation, total, 
+    log_.debug(String.format("TRACE|%-50.50s|%-50.50s|%-20.20s|%5d|%5d|%-14s|%-30.30s|%-40.40s|%-20.20s|%s|", parentHash_, id_, operationId, operation, total, 
         tenantId_, subjectType_, subjectId_, subjectType, subjectId));
   }
 
@@ -114,7 +114,7 @@ class LoggerTraceContext implements ITraceContext
   {
     factory_.increment(subjectType);
     
-    return new LoggerTraceContextTransaction(factory_, hash_, subjectType, subjectId, tenantId, time);
+    return new LoggerTraceContextTransaction(factory_, id_, subjectType, subjectId, tenantId, time);
   }
 
   @Override
@@ -127,5 +127,12 @@ class LoggerTraceContext implements ITraceContext
   public Instant getTimestamp()
   {
     return timestamp_;
+  }
+
+  @Override
+  public void setCounter(int count)
+  {
+    // TODO Auto-generated method stub
+    
   }
 }

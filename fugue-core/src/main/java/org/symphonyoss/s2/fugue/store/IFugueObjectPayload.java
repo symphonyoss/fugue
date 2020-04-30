@@ -21,6 +21,8 @@
 
 package org.symphonyoss.s2.fugue.store;
 
+import java.time.Instant;
+
 import javax.annotation.Nullable;
 
 /**
@@ -47,4 +49,16 @@ public interface IFugueObjectPayload
    * @return The pod which owns this object, if any.
    */
   @Nullable IFuguePodId getPodId();
+
+  /**
+   * 
+   * @return The type id of the payload in this object, if any.
+   */
+  @Nullable String getPayloadType();
+
+  /**
+   * 
+   * @return The purge date for this object, if any.
+   */
+  @Nullable Instant getPurgeDate();
 }

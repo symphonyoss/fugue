@@ -64,4 +64,10 @@ class SnsPublisher implements IPublisher
   {
     return SnsPublisherManager.MAX_MESSAGE_SIZE;
   }
+
+  @Override
+  public int getBillableMessageSize()
+  {
+    return SnsPublisherManager.BILLABLE_MESSAGE_SIZE;
+  }
 }

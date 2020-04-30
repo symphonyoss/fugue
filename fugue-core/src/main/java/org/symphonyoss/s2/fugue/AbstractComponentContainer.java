@@ -23,9 +23,11 @@
 
 package org.symphonyoss.s2.fugue;
 
-import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +61,7 @@ public class AbstractComponentContainer<T extends IFugeComponentContainer<T>> ex
 
   private ArrayDeque<IFugueComponent>          stopStack_           = new ArrayDeque<>();
   private int                                  maxMemory_;
+  private int                                  maxHeapSize_;
   private String                               pid_;
   private boolean                              running_;
   
@@ -344,14 +347,32 @@ public class AbstractComponentContainer<T extends IFugeComponentContainer<T>> ex
     long endTime = timeout <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + timeout;
     Runtime runtime = Runtime.getRuntime();
     pid_ = getPid();
-    ProcessBuilder builder = new ProcessBuilder()
-        .command("ps", "-o", "pid,rss,vsz,time");
+    
+    File statm = new File("/proc/self/statm");
+    
+//    ProcessBuilder builder = new ProcessBuilder()
+//        .command("ps", "-o", "pid,rss,vsz,time");
     
     while(isRunning() && System.currentTimeMillis() < endTime)
     {
-      log_.info(String.format("JVM Memory: %4d used, %4d free, %4d total, %3d processors", runtime.freeMemory() / MEGABYTE, runtime.totalMemory() / MEGABYTE, runtime.maxMemory() / MEGABYTE, runtime.availableProcessors()));
-      run(builder);
-      log_.info("pid " + pid_ + " max memory " + maxMemory_);
+      int heapSize = (int) ((runtime.totalMemory() - runtime.freeMemory()) / MEGABYTE);
+      
+      if(heapSize > maxHeapSize_)
+        maxHeapSize_ = heapSize;
+      
+      log_.info(String.format("JVM Memory: used = %4d, free = %4d, total = %4d, max = %4d, %3d processors", 
+          heapSize,
+          runtime.freeMemory() / MEGABYTE, runtime.totalMemory() / MEGABYTE, runtime.maxMemory() / MEGABYTE,
+          runtime.availableProcessors()));
+      
+      if(statm.exists())
+      {
+        readMem(statm);
+
+        log_.info("pid " + pid_ + " maxMemory = " + maxMemory_ + ", maxHeap = " + maxHeapSize_);
+      }
+      
+//      run(builder);
       
       long bedtime = endTime - System.currentTimeMillis();
       
@@ -370,56 +391,76 @@ public class AbstractComponentContainer<T extends IFugeComponentContainer<T>> ex
     return self();
   }
 
-  private void run(ProcessBuilder builder)
+//  private void run(ProcessBuilder builder)
+//  {
+//    try
+//    {
+//      Process process = builder.start();
+//      
+//      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream())))
+//      {
+//        String line = in.readLine();
+//        log_.info(line);
+//        while((line = in.readLine()) != null)
+//        {
+//          String[] words = line.trim().split(" +");
+//          
+//          if(pid_.equals(words[0]))
+//          {
+//            log_.info(line);
+//            try
+//            {
+//              String word = words[1];
+//              int mem = 0;
+//              
+//              if(word.endsWith("m"))
+//                mem = Integer.parseInt(word.substring(0, word.length()-1));
+//              else if(word.endsWith("g"))
+//                  mem = (int)(1000 * Double.parseDouble(word.substring(0, word.length()-1)));
+//              else
+//                mem = Integer.parseInt(word);
+//              
+//              if(mem > maxMemory_)
+//                maxMemory_ = mem;
+//            }
+//            catch(NumberFormatException e)
+//            {
+//              log_.error("Failed to parse memory", e);
+//            }
+//          }
+//        }
+//      }
+//      
+//      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getErrorStream())))
+//      {
+//        String line;
+//        while((line = in.readLine()) != null)
+//          log_.warn(line);
+//      }
+//    }
+//    catch (IOException e)
+//    {
+//      log_.error("Unable to run command", e);
+//    }
+//  }
+
+  private void readMem(File statm)
   {
-    try
+    try(InputStream in = new FileInputStream(statm))
     {
-      Process process = builder.start();
+      StringBuilder b = new StringBuilder();
+      int           c;
       
-      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream())))
+      while((c = in.read()) != -1)
       {
-        String line = in.readLine();
-        log_.info(line);
-        while((line = in.readLine()) != null)
-        {
-          String[] words = line.trim().split(" +");
-          
-          if(pid_.equals(words[0]))
-          {
-            log_.info(line);
-            try
-            {
-              String word = words[1];
-              int mem = 0;
-              
-              if(word.endsWith("m"))
-                mem = Integer.parseInt(word.substring(0, word.length()-1));
-              else if(word.endsWith("g"))
-                  mem = (int)(1000 * Double.parseDouble(word.substring(0, word.length()-1)));
-              else
-                mem = Integer.parseInt(word);
-              
-              if(mem > maxMemory_)
-                maxMemory_ = mem;
-            }
-            catch(NumberFormatException e)
-            {
-              log_.error("Failed to parse memory", e);
-            }
-          }
-        }
+        b.append((char)c);
       }
       
-      try(BufferedReader in = new BufferedReader(new InputStreamReader(process.getErrorStream())))
-      {
-        String line;
-        while((line = in.readLine()) != null)
-          log_.warn(line);
-      }
+      log_.info("Mem: " + b);
     }
     catch (IOException e)
     {
-      log_.error("Unable to run command", e);
+      log_.warn("Unable to read memory usage", e);
     }
   }
 

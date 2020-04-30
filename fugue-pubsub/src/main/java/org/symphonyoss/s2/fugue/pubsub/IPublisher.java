@@ -40,6 +40,12 @@ public interface IPublisher extends IThreadSafeConsumer<IPubSubMessage>
   int getMaximumMessageSize();
   
   /**
+   * 
+   * @return The size of a billable message unit in bytes.
+   */
+  int getBillableMessageSize();
+  
+  /**
    * Consume the given item.
    * 
    * A normal return from this method indicates that the item has been fully processed,

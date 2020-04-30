@@ -23,10 +23,6 @@
 
 package org.symphonyoss.s2.fugue.store;
 
-import java.util.List;
-
-import javax.annotation.Nullable;
-
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
 
 /**
@@ -40,21 +36,21 @@ public interface IFugueObjectStoreWritable extends IFugueObjectStoreSecondaryWri
   /**
    * Save the given object.
    * 
-   * @param object An object to be stored.
-   * @param trace  A trace context.
+   * @param object            An object to be stored.
+   * @param payloadLimit      Max size of payload which will be written to primary storage.
+   * @param trace             A trace context.
    */
-  void save(IFugueObject object, ITraceContext trace);
+  void save(IFugueObject object, int payloadLimit, ITraceContext trace);
 
   /**
-   * If the given ID object does not exist then save it and all of the additional objects in a single transaction and return null,
-   * otherwise return the existing object.
+   * If the given ID object does not exist then save it and the additional object in a single transaction.
    * 
    * @param idObject          An ID object.
+   * @param payload           An additional object to be stored if the given ID object does not already exist.
+   * @param payloadLimit      Max size of payload which will be written to primary storage.
    * @param trace             A trace context.
-   * @param additionalObjects Additional objects to be stored if the given ID obejct does not already exist.
    * 
-   * @return The existing ID object or null.
+   * @throws ObjectExistsException if the given idObject already exists, and no change has been made to the object store.
    */
-  @Nullable String saveIfNotExists(IFugueObject idObject, ITraceContext trace,
-      List<? extends IFugueObject> additionalObjects);
+  void saveIfNotExists(IFugueObject idObject, IFugueObject payload, int payloadLimit, ITraceContext trace) throws ObjectExistsException;
 }

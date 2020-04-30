@@ -23,17 +23,72 @@
 
 package org.symphonyoss.s2.fugue.aws.lambda;
 
-import java.io.IOException;
+import java.io.BufferedReader;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.codec.binary.Base64;
 import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 import org.symphonyoss.s2.fugue.lambda.JsonLambdaRequest;
 
-import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.databind.JsonNode;
+
+/*
+{
+  "body":"{\"name\":\"value\"}",
+  "headers":{
+    "{"headerName"":"\"headerValue\"}"
+  },
+  "httpMethod":"POST",
+  "isBase64Encoded":false,
+  "multiValueHeaders":{
+    "{"headerName"":[
+      "\"headerValue\"}"
+    ]
+  },
+  "multiValueQueryStringParameters":{
+    "bruce":[
+      "skingle"
+    ],
+    "matt":[
+      "harper",
+      "skingle"
+    ]
+  },
+  "path":"/hello",
+  "queryStringParameters":{
+    "bruce":"skingle",
+    "matt":"skingle"
+  },
+  "requestContext":{
+    "accountId":"189141687483",
+    "apiId":"q0tgk0oqxa",
+    "domainName":"testPrefix.testDomainName",
+    "domainPrefix":"testPrefix",
+    "extendedRequestId":"cgfXZE6TIAMFsQA=",
+    "httpMethod":"POST",
+    "identity":{
+      "accessKey":"ASIASYCNZDS554BDU77T",
+      "accountId":"189141687483",
+      "apiKey":"test-invoke-api-key",
+      "apiKeyId":"test-invoke-api-key-id",
+      "caller":"AROASYCNZDS5VH5M63V3D:bruce.skingle@symphony.com",
+      "sourceIp":"test-invoke-source-ip",
+      "user":"AROASYCNZDS5VH5M63V3D:bruce.skingle@symphony.com",
+      "userAgent":"aws-internal/3 aws-sdk-java/1.11.563 Linux/4.9.137-0.1.ac.218.74.329.metal1.x86_64 OpenJDK_64-Bit_Server_VM/25.212-b03 java/1.8.0_212 vendor/Oracle_Corporation",
+      "userArn":"arn:aws:sts::189141687483:assumed-role/Sym-SSO-DUO-Dev-Standard-Role/bruce.skingle@symphony.com"
+    },
+    "path":"/hello",
+    "requestId":"bf5dc7b2-a184-11e9-a61c-e90ba41b088c",
+    "resourceId":"va69eo",
+    "resourcePath":"/hello",
+    "stage":"test-invoke-stage"
+  },
+  "resource":"/hello"
+}
+*/
+
 
 public class AwsLambdaRequest extends JsonLambdaRequest
 {
@@ -41,9 +96,11 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   private final Map<String, String> pathParams_;
   private final Map<String, String> requestHeaders_;
   private final ImmutableByteArray  body_;
-  private Map<String, String> stageVariables_;
-  private String awsRequestId_ = "UNKNOWN";
-  private long awsRequestEpoch_;
+  private final Map<String, String>       stageVariables_;
+  private String                    awsRequestId_ = "UNKNOWN-" + UUID.randomUUID().toString();
+  private long                      awsRequestEpoch_;
+  private final String                    httpMethod_;
+  private final String                    path_;
   
   public AwsLambdaRequest(InputStream inputStream)
   {
@@ -88,6 +145,24 @@ public class AwsLambdaRequest extends JsonLambdaRequest
         body_ = ImmutableByteArray.newInstance(body);
       }
     }
+    
+    httpMethod_ = getString("httpMethod");
+    
+//    JsonNode pathParameters = getJson().get("pathParameters");
+//    
+//    if(pathParameters != null)
+//    {
+//      JsonNode proxy = pathParameters.get("proxy");
+//      
+//      if(proxy != null)
+//        path_ = "/" + proxy.asText();
+//      else
+//        path_ = getString("path");
+//    }
+//    else
+    {
+      path_ = getString("path");
+    }
   }
 
   public String getAwsRequestId()
@@ -101,9 +176,9 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   }
 
   @Override
-  public Map<String, String> getQueryParams()
+  public String getParameter(String name)
   {
-    return queryParams_;
+    return queryParams_.get(name);
   }
 
   @Override
@@ -113,9 +188,9 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   }
 
   @Override
-  public Map<String, String> getRequestHeaders()
+  public String getHeader(String name)
   {
-    return requestHeaders_;
+    return requestHeaders_.get(name);
   }
 
   @Override
@@ -128,5 +203,20 @@ public class AwsLambdaRequest extends JsonLambdaRequest
   public ImmutableByteArray getBody()
   {
     return body_;
+  }
+
+  public String getHttpMethod()
+  {
+    return httpMethod_;
+  }
+
+  public BufferedReader getReader()
+  {
+    return new BufferedReader(body_.getReader());
+  }
+
+  public String getPath()
+  {
+    return path_;
   }
 }

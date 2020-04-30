@@ -124,4 +124,11 @@ class FileTraceContext implements ITraceContext
   {
     return Instant.EPOCH;
   }
+
+  @Override
+  public void setCounter(int count)
+  {
+    // TODO Auto-generated method stub
+    
+  }
 }

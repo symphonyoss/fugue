@@ -63,10 +63,27 @@ public class AwsFugueAssembly implements IFugueAssembly
     return container_.register(component);
   }
   
+  /**
+   * @return The global configuration for this assembly.
+   */
+  public IGlobalConfiguration getConfiguration()
+  {
+    return config_;
+  }
+
+  /**
+   * @return The name factory for this assembly.
+   */
+  public INameFactory getNameFactory()
+  {
+    return nameFactory_;
+  }
+  
   protected static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends AwsFugueAssembly>
   extends BaseAbstractBuilder<T, B>
   {
     protected IGlobalConfiguration              config_;
+    protected String                            serviceId_;
     protected INameFactory                      nameFactory_;
     protected String                            region_;
     protected StsManager                        stsManager_;
@@ -81,6 +98,20 @@ public class AwsFugueAssembly implements IFugueAssembly
     public T withConfiguration(IGlobalConfiguration config)
     {
       config_ = config;
+      
+      return self();
+    }
+
+    public T withServiceId(String serviceId)
+    {
+      serviceId_ = serviceId;
+      
+      return self();
+    }
+
+    public T withNameFactory(INameFactory nameFactory)
+    {
+      nameFactory_ = nameFactory;
       
       return self();
     }
@@ -118,7 +149,12 @@ public class AwsFugueAssembly implements IFugueAssembly
         config_ = new GlobalConfiguration(S3Configuration.FACTORY.newInstance());
       
       if(nameFactory_ == null)
+      {
         nameFactory_ = new NameFactory(config_);
+        
+        if(serviceId_ != null)
+          nameFactory_ = nameFactory_.withServiceId(serviceId_);
+      }
       
       region_                   = config_.getCloudRegionId(); //.getAmazonConfiguration().getRegionName();
       stsManager_               = new StsManager(region_);

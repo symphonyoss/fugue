@@ -25,14 +25,17 @@ package org.symphonyoss.s2.fugue.naming;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.annotation.Nonnull;
 
 import org.symphonyoss.s2.common.hash.Hash;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IGlobalConfiguration;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 
 /**
  * A factory for producing Name instances.
@@ -106,6 +109,12 @@ public class NameFactory implements INameFactory
   }
   
   @Override
+  public INameFactory withServiceId(String serviceId)
+  {
+    return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, podName_, podId_, serviceId);
+  }
+  
+  @Override
   public INameFactory withPod(String podName, Integer podId)
   {
     return new NameFactory(globalNamePrefix_, environmentType_, environmentId_, regionId_, podName, podId, serviceId_);
@@ -119,24 +128,37 @@ public class NameFactory implements INameFactory
 
   private ImmutableMap<String, String> createTags()
   {
-    Builder<String, String> builder = new ImmutableMap.Builder<String, String>();
+    Map<String, String> map = new HashMap<>();
     
-    putIfNotNull(builder, "FUGUE_ENVIRONMENT_TYPE", environmentType_);
-    putIfNotNull(builder, "FUGUE_ENVIRONMENT",      environmentId_);
-    putIfNotNull(builder, "FUGUE_REGION",           regionId_);
-    putIfNotNull(builder, "FUGUE_POD_NAME",         podName_);
-    putIfNotNull(builder, "FUGUE_POD_ID",           podId_);
+    for(Entry<String, String> entry : System.getenv().entrySet())
+      setFugueTag(map, entry.getKey(), entry.getValue());
     
-    return builder.build();
+    for(Entry<Object, Object> entry : System.getProperties().entrySet())
+      setFugueTag(map, entry.getKey().toString(), entry.getValue().toString());
+    
+    putIfNotNull(map, Fugue.TAG_FUGUE_ENVIRONMENT_TYPE, environmentType_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_ENVIRONMENT,      environmentId_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_REGION,           regionId_);
+    putIfNotNull(map, Fugue.TAG_FUGUE_POD,              podId_);
+    
+    return ImmutableMap.copyOf(map);
   }
 
-  private void putIfNotNull(Builder<String, String> builder, String name, String value)
+  private void setFugueTag(Map<String, String> builder, String name, String value)
+  {
+    if(name.startsWith("FUGUE_TAG_"))
+    {
+      putIfNotNull(builder, name.substring(10), value);
+    }
+  }
+
+  private void putIfNotNull(Map<String, String> builder, String name, String value)
   {
       if(value != null)
         builder.put(name, value);
   }
 
-  private void putIfNotNull(Builder<String, String> builder, String name, Integer value)
+  private void putIfNotNull(Map<String, String> builder, String name, Integer value)
   {
       if(value != null)
         builder.put(name, value.toString());
@@ -359,6 +381,12 @@ public class NameFactory implements INameFactory
   {
     return createName(getGlobalNamePrefix(), environmentType_, environmentId_, regionId_, name);
   }
+  
+  @Override
+  public Name getEnvironmentName(String name)
+  {
+    return createName(getGlobalNamePrefix(), environmentType_, environmentId_, name);
+  }
 
   @Override
   public CredentialName getFugueCredentialName(String owner)
@@ -382,6 +410,12 @@ public class NameFactory implements INameFactory
   public CredentialName getCredentialName(Integer podId, String owner)
   {
     return createCredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, "pod-" + podId, owner, CredentialName.SUFFIX);
+  }
+  
+  @Override
+  public CredentialName getMultiTenantCredentialName(String owner)
+  {
+    return new CredentialName(getGlobalNamePrefix(), environmentType_, environmentId_, owner, CredentialName.SUFFIX);
   }
   
   @Override

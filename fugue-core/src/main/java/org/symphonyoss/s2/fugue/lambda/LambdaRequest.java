@@ -30,11 +30,11 @@ import org.symphonyoss.s2.common.immutable.ImmutableByteArray;
 public abstract class LambdaRequest
 {
 
-  public abstract Map<String, String> getQueryParams();
+  public abstract String getParameter(String name);
 
   public abstract Map<String, String> getPathParams();
 
-  public abstract Map<String, String> getRequestHeaders();
+  public abstract String getHeader(String name);
   
   public abstract Map<String, String> getStageVariables();
 

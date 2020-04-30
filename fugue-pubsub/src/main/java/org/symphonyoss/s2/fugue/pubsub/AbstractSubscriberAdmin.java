@@ -139,7 +139,7 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     setLifeCycleState(FugueLifecycleState.Stopped);
   }
   
-  protected abstract void createSubcription(SubscriptionName subscriptionName, boolean dryRun);
+  protected abstract void createSubcription(SubscriptionName subscriptionName, ITopicSubscriptionAdmin subscription, boolean dryRun);
   
   protected abstract void deleteSubcription(SubscriptionName subscriptionName, boolean dryRun);
   
@@ -151,7 +151,7 @@ public abstract class AbstractSubscriberAdmin<T extends AbstractSubscriberAdmin<
     { 
       for(SubscriptionName subscriptionName : subscription.getSubscriptionNames())
       {
-        createSubcription(subscriptionName, dryRun);
+        createSubcription(subscriptionName, subscription, dryRun);
       }
     }
 

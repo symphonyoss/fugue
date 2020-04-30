@@ -24,7 +24,7 @@
 package org.symphonyoss.s2.fugue.store;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 
 import javax.annotation.Nullable;
 
@@ -44,36 +44,44 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
-   * @param payload                   The payload (if available).
-   * @param podId                     The podId if the message relates to a pod.
+   * @param payload                   The payload as a String (if available).
+   * @param deletionType              The type of deletion.
+   * @param fugueObjectPayload        The payload meta-data
+   * @param payloadLimit              Max size of payload which will be written to primary storage.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit, 
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace);
   
   /**
    * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
-   * @param payload                   The payload (if available).
-   * @param podId                     The podId if the message relates to a pod.
+   * @param payload                   The payload as a String (if available).
+   * @param deletionType              The type of deletion.
+   * @param fugueObjectPayload        The payload meta-data
+   * @param payloadLimit              Max size of payload which will be written to primary storage.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
    * @param hashCurrentSequenceHashes The list of hash current sequences to which the object should be added.
    * @param baseHash                  The base hash of the object to store.
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit, 
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
   
   /**
    * Save the given object to the given sequences.
    * 
    * @param absoluteHash              The absolute hash of the object to store.
-   * @param payload                   The payload (if available).
-   * @param podId                     The podId if the message relates to a pod.
+   * @param payload                   The payload as a String (if available).
+   * @param deletionType              The type of deletion.
+   * @param fugueObjectPayload        The payload meta-data
+   * @param payloadLimit              Max size of payload which will be written to primary storage.
    * @param absoluteSequenceHashes    The list of absolute sequences to which the object should be added.
    * @param createdDate               The created date of the object for sequencing.
    * @param currentSequenceHashes     The list of current sequences to which the object should be added.
@@ -82,9 +90,10 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * @param baseCreatedDate           The created date of the base object.
    * @param trace                     A trace context.
    */
-  void saveToSequences(Hash absoluteHash, @Nullable String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
+  void saveToSequences(Hash absoluteHash, @Nullable String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit, 
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace);
 
   /**
    * Save the given object to secondary storage.
@@ -95,5 +104,5 @@ public interface IFugueObjectStoreSecondaryWritable extends IFugueObjectStoreRea
    * 
    * @return The payload as a string, which may have been retrieved from storage if it is not provided as an input.
    */
-  String saveToSecondaryStorage(Hash absoluteHash, @Nullable IFugueObject payload, ITraceContext trace);
+  String saveToSecondaryStorage(Hash absoluteHash, @Nullable IFugueId payload, ITraceContext trace);
 }

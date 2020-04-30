@@ -31,7 +31,7 @@ import org.symphonyoss.s2.fugue.di.component.IRandomNumberProvider;
 /**
  * A component which provides an instance of a SecureRandom.
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public class RandomNumberProvider implements IRandomNumberProvider

@@ -27,6 +27,8 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
+import org.symphonyoss.s2.common.exception.NotFoundException;
+
 /**
  * A queue manager.
  * 
@@ -52,6 +54,15 @@ public interface IQueueManager
    * @return The queue event source name.
    */
   String createQueue(String queueName, @Nullable Map<String, String> tags, boolean dryRun);
+  
+  /**
+   * Check to see if the given queue exists.
+   * 
+   * @param queueName The name of the queue.
+   * 
+   * @return true if the queue exists.
+   */
+  boolean doesQueueExist(String queueName);
 
   /**
    * Return a sender for the given queue.
@@ -61,6 +72,17 @@ public interface IQueueManager
    * @return A sender for the given queue.
    */
   IQueueSender getSender(String queueName);
+
+  /**
+   * Return a receiver for the given queue.
+   * 
+   * @param queueName The name of the queue from which messages will be received.
+   * 
+   * @return A receiver for the given queue.
+   * 
+   * @throws NotFoundException If the queue does not exist. 
+   */
+  IQueueReceiver getReceiver(String queueName) throws NotFoundException;
 
   /**
    * Return the maximum allowed size of a message in bytes.

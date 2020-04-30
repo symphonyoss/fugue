@@ -28,13 +28,15 @@ import org.symphonyoss.s2.fugue.pipeline.IThreadSafeRetryableConsumer;
 /**
  * A subscription.
  * 
+ * @param <P> The type of the payload handled by this subscription. 
+ * 
  * @author Bruce Skingle
  */
-public interface ISubscription extends ISubscriptionAdmin
+public interface ISubscription<P> extends ISubscriptionAdmin
 {
   /**
    * 
    * @return The consumer for received messages.
    */
-  IThreadSafeRetryableConsumer<String> getConsumer();
+  IThreadSafeRetryableConsumer<P> getConsumer();
 }

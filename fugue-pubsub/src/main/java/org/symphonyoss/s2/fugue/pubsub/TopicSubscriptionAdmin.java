@@ -43,16 +43,48 @@ import com.google.common.collect.ImmutableSet;
 public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
 {
   private final ImmutableSet<SubscriptionName> subscriptionNames_;
+  private final String                         filterPropertyName_;
+  private final boolean                        filterExclude_;
+  private final ImmutableSet<String>           filterPropertyValues_;
+  private final String                         lambdaConsumer_;
 
   protected TopicSubscriptionAdmin(AbstractBuilder<?,?> builder)
   {
-    subscriptionNames_ = builder.subscriptionNames_;
+    subscriptionNames_    = builder.subscriptionNames_;
+    filterPropertyName_   = builder.filterPropertyName_;
+    filterExclude_        = builder.filterExclude_;
+    filterPropertyValues_ = ImmutableSet.copyOf(builder.filterPropertyValues_);
+    lambdaConsumer_       = builder.lambdaConsumer_;
   }
   
   @Override
   public ImmutableSet<SubscriptionName> getSubscriptionNames()
   {
     return subscriptionNames_;
+  }
+
+  @Override
+  public String getFilterPropertyName()
+  {
+    return filterPropertyName_;
+  }
+
+  @Override
+  public boolean isFilterExclude()
+  {
+    return filterExclude_;
+  }
+
+  @Override
+  public ImmutableSet<String> getFilterPropertyValues()
+  {
+    return filterPropertyValues_;
+  }
+
+  @Override
+  public String getLambdaConsumer()
+  {
+    return lambdaConsumer_;
   }
 
   /**
@@ -66,10 +98,14 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
    */
   public static abstract class AbstractBuilder<T extends AbstractBuilder<T,B>, B extends ISubscriptionAdmin> extends AbstractSubscription.AbstractBuilder<T,B>
   {
-    private Set<String>          topicIds_ = new HashSet<>();
-    private String               subscriptionId_;
-    private String               serviceId_;
+    private Set<String>                    topicIds_ = new HashSet<>();
+    private String                         subscriptionId_;
+    private String                         serviceId_;
+    private String                         filterPropertyName_;
+    private boolean                        filterExclude_;
+    private Set<String>                    filterPropertyValues_ = new HashSet<>();
     private ImmutableSet<SubscriptionName> subscriptionNames_;
+    private String                         lambdaConsumer_;
 
     protected AbstractBuilder(Class<T> type)
     {
@@ -105,7 +141,7 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
      */
     public T withServiceId(String serviceId)
     {
-      subscriptionId_ = serviceId;
+      serviceId_ = serviceId;
       
       return self();
     }
@@ -124,6 +160,66 @@ public class TopicSubscriptionAdmin implements ITopicSubscriptionAdmin
         for(String topicId : topicIds)
           topicIds_.add(topicId);
       }
+      
+      return self();
+    }
+    
+    /**
+     * Set the name of the property to be used for filtering.
+     * 
+     * @param filterPropertyName The name of the property to be used for filtering.
+     * 
+     * @return This (fluent method).
+     */
+    public T withFilterPropertyName(String filterPropertyName)
+    {
+      filterPropertyName_ = filterPropertyName;
+      
+      return self();
+    }
+    
+    /**
+     * Set the filtering to be inclusive or exclusive.
+     * 
+     * @param filterExclude If true then filtering is exclusive, the default is inclusive.
+     * 
+     * @return This (fluent method).
+     */
+    public T withFilterExclude(boolean filterExclude)
+    {
+      filterExclude_ = filterExclude;
+      
+      return self();
+    }
+    
+    /**
+     * Add the given values to the list of filterPropertyName values to be accepted or excluded.
+     * 
+     * @param value values of filterPropertyName values to be accepted or excluded.
+     * 
+     * @return This (fluent method).
+     */
+    public T withFilterPropertyValues(String ...value)
+    {
+      if(value != null)
+      {
+        for(String topicId : value)
+          filterPropertyValues_.add(topicId);
+      }
+      
+      return self();
+    }
+
+    /**
+     * Set the name of a lambda function to be triggered to process messages on this subscription.
+     * 
+     * @param lambdaConsumer The name of a lambda function to be triggered to process messages on this subscription.
+     * 
+     * @return this (fluent method).
+     */
+    public T withLambdaConsumer(String lambdaConsumer)
+    {
+      lambdaConsumer_ = lambdaConsumer;
       
       return self();
     }

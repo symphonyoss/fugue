@@ -77,6 +77,18 @@ public interface ITraceContext
    * @param subjectId The id of the subject of this operation.
    */
   void trace(String operationId, String subjectType, String subjectId);
+  
+  /**
+   * Record an operation having taken place within a trace context.
+   * 
+   * @param operationId The operation ID, which can be any String the caller chooses including one of the standard
+   * values defined in ITraceContext
+   * @param subject The subject of this operation
+   */
+  default void trace(String operationId, ITraceSubject subject)
+  {
+    trace(operationId, subject.getTraceSubjectType(), subject.getTraceSubjectId());
+  }
 
   /**
    * Create a sub-context relating to the processing of the given external subject.
@@ -121,4 +133,7 @@ public interface ITraceContext
    * @return A new ITraceContext which is a sub-context of the current context.
    */
   ITraceContextTransaction createSubContext(String subjectType, String subjectId, String tenantId, Instant time);
+
+  
+  void setCounter(int count);
 }

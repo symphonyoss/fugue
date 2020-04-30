@@ -56,28 +56,33 @@ public interface IFugueObjectStoreReadOnly
    * @return          The required object.
    * 
    * @throws NoSuchObjectException  If there is no object with the given baseHash.
+   * 
+   * Equivalent to fetchCurrent(baseHash, false);
    */
   @Nonnull String fetchCurrent(Hash baseHash) throws NoSuchObjectException;
-
+  
   /**
    * Return objects from the given sequence, with more recent objects before older ones.
    * 
    * @param sequenceHash  The hash ID of the sequence.
+   * @param scanForwards  If true then scan objects in chronological order, else in reverse order.
    * @param limit         An optional limit to the number of objects retrieved.
    * @param after         An optional page cursor to continue a previous query.
    * @param consumer      A consumer to receive the retrieved objects.
+   * 
    * @return              A new after token to allow a continuation query to be made.
    */
-  String fetchSequenceRecentObjects(Hash sequenceHash, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
+  String fetchSequenceObjects(Hash sequenceHash, boolean scanForwards, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
 
   /**
    * Return versions of the given object, with more recent versions before older ones.
    * 
    * @param baseHash      The ID of the required object.
+   * @param scanForwards  If true then scan objects in chronological order, else in reverse order.
    * @param limit         An optional limit to the number of versions retrieved.
    * @param after         An optional page cursor to continue a previous query.
    * @param consumer      A consumer to receive the retrieved objects.
    * @return              A new after token to allow a continuation query to be made.
    */
-  String fetchVersions(Hash baseHash, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
+  String fetchVersions(Hash baseHash, boolean scanForwards, @Nullable Integer limit, @Nullable String after, Consumer<String> consumer);
 }

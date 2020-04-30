@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.fault.CodingFault;
+import org.symphonyoss.s2.common.fault.TransactionFault;
+import org.symphonyoss.s2.common.fault.TransientTransactionFault;
 
 /**
  * An implementation of IBatch based on an Executor.
@@ -117,7 +119,7 @@ public class ExecutorBatch<T extends Runnable> implements IBatch<T>
     }
     catch (InterruptedException e)
     {
-      throw new IllegalStateException("Batch task interrupted", e);
+      throw new TransientTransactionFault("Batch task interrupted", e);
     }
     catch (ExecutionException e)
     {
@@ -126,6 +128,16 @@ public class ExecutorBatch<T extends Runnable> implements IBatch<T>
         // Something really bad happened, it's pointless attempting any error handling.
         
         throw (Error)e.getCause();
+      }
+      
+      if(e.getCause() instanceof TransientTransactionFault)
+      {
+        throw (TransientTransactionFault)e.getCause();
+      }
+      
+      if(e.getCause() instanceof TransactionFault)
+      {
+        throw (TransactionFault)e.getCause();
       }
       
       throw new IllegalStateException("Batch task failed", e);
@@ -164,7 +176,7 @@ public class ExecutorBatch<T extends Runnable> implements IBatch<T>
       }
       catch (InterruptedException e)
       {
-        throw new IllegalStateException("Batch task failed", e);
+        throw new TransientTransactionFault("Batch task failed", e);
       }
     }
   }

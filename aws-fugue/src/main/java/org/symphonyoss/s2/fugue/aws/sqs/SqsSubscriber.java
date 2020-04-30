@@ -26,6 +26,7 @@ package org.symphonyoss.s2.fugue.aws.sqs;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ import org.symphonyoss.s2.fugue.pubsub.IPullSubscriberMessage;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 
 /**
  * An SWS SNS subscriber.
@@ -74,7 +76,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
       String subscriptionName, ITraceContextTransactionFactory traceFactory,
       IThreadSafeRetryableConsumer<String> consumer, ICounter counter, IBusyCounter busyCounter, String tenantId)
   {
-    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS);
+    super(manager, subscriptionName, counter, busyCounter, EXTENSION_FREQUENCY_MILLIS, consumer);
     
     if(Fugue.isDebugSingleThread())
     {
@@ -139,14 +141,22 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 
     private Collection<IPullSubscriberMessage> pull(ReceiveMessageRequest pullRequest)
     {
-      List<IPullSubscriberMessage>result = new LinkedList<>();
-      
-      for(Message receivedMessage : sqsClient_.receiveMessage(pullRequest).getMessages())
+      try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSubPull:SQS", UUID.randomUUID().toString(), tenantId_))
       {
-        result.add(new SqsPullSubscriberMessage(receivedMessage));
+        ITraceContext trace = traceTransaction.open();
+        
+        List<IPullSubscriberMessage>result = new LinkedList<>();
+        
+        ReceiveMessageResult receiveResult = sqsClient_.receiveMessage(pullRequest);
+        
+        trace.trace("RECEIVED_SQS");
+        for(Message receivedMessage : receiveResult.getMessages())
+        {
+          result.add(new SqsPullSubscriberMessage(receivedMessage, trace));
+        }
+        
+        return result;
       }
-      
-      return result;
     }
 
     @Override
@@ -160,10 +170,12 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
   {
     private final Message message_;
     private boolean       running_ = true;
+    private ITraceContext trace_;
     
-    private SqsPullSubscriberMessage(Message message)
+    private SqsPullSubscriberMessage(Message message, ITraceContext trace)
     {
       message_ = message;
+      trace_ = trace;
     }
 
     @Override
@@ -175,7 +187,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
     @Override
     public void run()
     {
-      try(ITraceContextTransaction traceTransaction = traceFactory_.createTransaction("PubSub:SQS", message_.getMessageId(), tenantId_))
+      try(ITraceContextTransaction traceTransaction = trace_.createSubContext("PubSubHandle:SQS", message_.getMessageId(), tenantId_))
       {
         ITraceContext trace = traceTransaction.open();
         

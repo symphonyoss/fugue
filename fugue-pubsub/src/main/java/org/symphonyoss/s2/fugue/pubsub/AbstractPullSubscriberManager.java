@@ -30,9 +30,13 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.symphonyoss.s2.common.concurrent.NamedThreadFactory;
+import org.symphonyoss.s2.common.fault.ProgramFault;
 import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.config.IConfiguration;
 import org.symphonyoss.s2.fugue.counter.IBusyCounter;
+import org.symphonyoss.s2.fugue.counter.ITopicBusyCounterFactory;
+import org.symphonyoss.s2.fugue.naming.Name;
+import org.symphonyoss.s2.fugue.naming.SubscriptionName;
 
 /**
  * Base class for synchronous pull type implementations.
@@ -41,12 +45,12 @@ import org.symphonyoss.s2.fugue.counter.IBusyCounter;
  *
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscriberManager<T>> extends AbstractSubscriberManager<T>
+public abstract class AbstractPullSubscriberManager<P, T extends AbstractPullSubscriberManager<P,T>> extends AbstractSubscriberManager<P,T>
 {
   private static final Logger                 log_           = LoggerFactory
       .getLogger(AbstractPullSubscriberManager.class);
 
-  private final IBusyCounter                  busyCounter_;
+  private final ITopicBusyCounterFactory      busyCounterFactory_;
 
   private int                                 subscriberThreadPoolSize_;
   private int                                 handlerThreadPoolSize_;
@@ -54,12 +58,13 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   private final LinkedBlockingQueue<Runnable> handlerQueue_  = new LinkedBlockingQueue<Runnable>();
   private ThreadPoolExecutor                  subscriberExecutor_;
   private ThreadPoolExecutor                  handlerExecutor_;
+
   
-  protected AbstractPullSubscriberManager(Class<T> type, Builder<?,T> builder)
+  protected AbstractPullSubscriberManager(Class<T> type, Builder<?,P,T> builder)
   {
     super(type, builder);
     
-    busyCounter_  = builder.busyCounter_;
+    busyCounterFactory_  = builder.busyCounterFactory_;
     
     IConfiguration subscriberConfig = config_.getConfiguration(builder.getConfigPath());
     
@@ -77,11 +82,11 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  public static abstract class Builder<T extends Builder<T,B>, B extends AbstractPullSubscriberManager<B>>
-  extends AbstractSubscriberManager.Builder<T,B>
-  implements IPullSubscriberManagerBuilder<T,B>
+  public static abstract class Builder<T extends Builder<T,P,B>, P, B extends AbstractPullSubscriberManager<P,B>>
+  extends AbstractSubscriberManager.Builder<T,P,B>
+  implements IPullSubscriberManagerBuilder<T,P,B>
   {
-    private IBusyCounter         busyCounter_;
+    private ITopicBusyCounterFactory         busyCounterFactory_;
 
     protected Builder(Class<T> type)
     {
@@ -89,9 +94,9 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
     }
     
     @Override
-    public T withBusyCounter(IBusyCounter busyCounter)
+    public T withBusyCounterFactory(ITopicBusyCounterFactory busyCounterFactory)
     {
-      busyCounter_ = busyCounter;
+      busyCounterFactory_ = busyCounterFactory;
       
       return self();
     }
@@ -100,14 +105,20 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   }
 
   
-  protected IBusyCounter getBusyCounter()
+  protected ITopicBusyCounterFactory getBusyCounterFactory()
   {
-    return busyCounter_;
+    return busyCounterFactory_;
   }
 
   @Override
   public void start()
   {
+    if(totalSubscriptionCnt_ == 0)
+    {
+      log_.info("No subscriptions, not starting.");
+      return;
+    }
+    
     if(Fugue.isDebugSingleThread())
     {
       subscriberThreadPoolSize_ = totalSubscriptionCnt_ == 0 ? 1 : totalSubscriptionCnt_;
@@ -155,19 +166,32 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   @Override
   protected void stopSubscriptions()
   {
+    if(subscriberExecutor_ != null)
       subscriberExecutor_.shutdown();
+    
+    if(handlerExecutor_ != null)
+      handlerExecutor_.shutdown();
       
+    if(subscriberExecutor_ != null)
+      stop(subscriberExecutor_, 60);
+    
+    if(handlerExecutor_ != null)
+      stop(handlerExecutor_, 10);
+  }
+
+  private void stop(ThreadPoolExecutor executor, int delay)
+  {
     try {
       // Wait a while for existing tasks to terminate
-      if (!subscriberExecutor_.awaitTermination(60, TimeUnit.SECONDS)) {
-        subscriberExecutor_.shutdownNow(); // Cancel currently executing tasks
+      if (!executor.awaitTermination(delay, TimeUnit.SECONDS)) {
+        executor.shutdownNow(); // Cancel currently executing tasks
       // Wait a while for tasks to respond to being cancelled
-      if (!subscriberExecutor_.awaitTermination(60, TimeUnit.SECONDS))
+      if (!executor.awaitTermination(delay, TimeUnit.SECONDS))
           System.err.println("Pool did not terminate");
         }
       } catch (InterruptedException ie) {
         // (Re-)Cancel if current thread also interrupted
-      subscriberExecutor_.shutdownNow();
+      executor.shutdownNow();
       // Preserve interrupt status
         Thread.currentThread().interrupt();
     }
@@ -192,5 +216,18 @@ public abstract class AbstractPullSubscriberManager<T extends AbstractPullSubscr
   ThreadPoolExecutor getHandlerExecutor()
   {
     return handlerExecutor_;
+  }
+  
+  protected IBusyCounter createBusyCounter(Name subscriptionName)
+  {
+    if(getBusyCounterFactory() == null)
+      return null;
+    
+    if(subscriptionName instanceof SubscriptionName)
+    {
+      return getBusyCounterFactory().create(((SubscriptionName)subscriptionName).getTopicName().getTopicId());
+    }
+    
+    throw new ProgramFault("BusyCounter can only be set with SubscriptionName");
   }
 }

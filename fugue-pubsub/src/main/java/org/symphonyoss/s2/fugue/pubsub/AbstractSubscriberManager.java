@@ -53,9 +53,10 @@ import com.google.common.collect.ImmutableList;
  * 
  * @author Bruce Skingle
  *
+ * @param <P> Type of the payload.
  * @param <T> Type of concrete manager, needed for fluent methods.
  */
-public abstract class AbstractSubscriberManager<T extends AbstractSubscriberManager<T>> extends FugueLifecycleComponent<T>
+public abstract class AbstractSubscriberManager<P, T extends AbstractSubscriberManager<P,T>> extends FugueLifecycleComponent<T>
 implements ISubscriberManager<T>
 {
   protected static final long          FAILED_DEAD_LETTER_RETRY_TIME = TimeUnit.HOURS.toMillis(1);
@@ -63,16 +64,15 @@ implements ISubscriberManager<T>
   protected static final long          MESSAGE_PROCESSED_OK          = -1;
 
   private static final Logger                     log_                          = LoggerFactory.getLogger(AbstractSubscriberManager.class);
-  private static final Integer                    FAILURE_CNT_LIMIT             = 5;
+  private static final Integer                    FAILURE_CNT_LIMIT             = 25;
 
-
-  protected final INameFactory                     nameFactory_;
-  protected final ImmutableList<ISubscription>     subscribers_;
-  protected final ITraceContextTransactionFactory  traceFactory_;
-  protected final IThreadSafeErrorConsumer<String> unprocessableMessageConsumer_;
-  protected final IConfiguration                   config_;
-  protected final ICounter                         counter_;
-  protected final int                              totalSubscriptionCnt_;
+  protected final INameFactory                    nameFactory_;
+  protected final ImmutableList<ISubscription<P>> subscribers_;
+  protected final ITraceContextTransactionFactory traceFactory_;
+  protected final IThreadSafeErrorConsumer<P>     unprocessableMessageConsumer_;
+  protected final IConfiguration                  config_;
+  protected final ICounter                        counter_;
+  protected final int                             totalSubscriptionCnt_;
 
   // TODO: replace this with a local topic
   private Cache<String, Integer>            failureCache_                 = CacheBuilder.newBuilder()
@@ -81,7 +81,7 @@ implements ISubscriberManager<T>
                                                                             .build();
   
 
-  protected AbstractSubscriberManager(Class<T> type, Builder<?,T> builder)
+  protected AbstractSubscriberManager(Class<T> type, Builder<?,P,T> builder)
   {
     super(type);
     
@@ -108,14 +108,14 @@ implements ISubscriberManager<T>
    * @param <T>   The concrete type returned by fluent methods.
    * @param <B>   The concrete type of the built object.
    */
-  protected static abstract class Builder<T extends Builder<T,B>, B extends AbstractSubscriberManager<B>>
+  protected static abstract class Builder<T extends Builder<T,P,B>, P, B extends AbstractSubscriberManager<P,B>>
   extends BaseAbstractBuilder<T,B>
-  implements ISubscriberManagerBuilder<T,B>
+  implements ISubscriberManagerBuilder<T,P,B>
   {
     protected INameFactory                     nameFactory_;
-    protected List<ISubscription>              subscribers_ = new LinkedList<>();
+    protected List<ISubscription<P>>           subscribers_ = new LinkedList<>();
     protected ITraceContextTransactionFactory  traceFactory_;
-    protected IThreadSafeErrorConsumer<String> unprocessableMessageConsumer_;
+    protected IThreadSafeErrorConsumer<P>      unprocessableMessageConsumer_;
     protected IConfiguration                   config_;
     protected ICounter                         counter_;
     protected int                              totalSubscriptionCnt_;
@@ -167,7 +167,7 @@ implements ISubscriberManager<T>
 
 
     @Override
-    public T withSubscription(ISubscription subscription)
+    public T withSubscription(ISubscription<P> subscription)
     {
       subscribers_.add(subscription);
       
@@ -206,7 +206,7 @@ implements ISubscriberManager<T>
     }
 
     @Override
-    public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<String> unprocessableMessageConsumer)
+    public T withUnprocessableMessageConsumer(IThreadSafeErrorConsumer<P> unprocessableMessageConsumer)
     {
       unprocessableMessageConsumer_ = unprocessableMessageConsumer;
       
@@ -229,7 +229,7 @@ implements ISubscriberManager<T>
     return counter_;
   }
   
-  protected abstract void initSubscription(ISubscription subscription);
+  protected abstract void initSubscription(ISubscription<P> subscription);
   protected abstract void startSubscriptions();
   /**
    * Stop all subscribers.
@@ -246,7 +246,7 @@ implements ISubscriberManager<T>
   {
     setLifeCycleState(FugueLifecycleState.Starting);
     
-    for(ISubscription s : subscribers_)
+    for(ISubscription<P> s : subscribers_)
     {
       initSubscription(s);
     }
@@ -287,7 +287,7 @@ implements ISubscriberManager<T>
    * @return The number of milliseconds after which a retry should be made, or -1 if the message was
    * processed and no retry is necessary.
    */
-  public long handleMessage(IThreadSafeRetryableConsumer<String> consumer, String payload, ITraceContext trace, String messageId)
+  public long handleMessage(IThreadSafeRetryableConsumer<P> consumer, P payload, ITraceContext trace, String messageId)
   {
     try
     {
@@ -295,17 +295,13 @@ implements ISubscriberManager<T>
     }
     catch (TransientTransactionFault e)
     {
-      log_.warn("TransientTransactionFault, will retry (forever)", e);
-      return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, true);
+      log_.warn("Transient processing failure, will retry (forever)", e);
+      return retryMessage(payload, trace, e, messageId, e.getRetryTime(), e.getRetryTimeUnit(), true);
     }
-    catch (RetryableConsumerException e)
+    catch(RetryableConsumerException e)
     {
-      log_.warn("Unprocessable message, will retry", e);
-      
-      if(e.getRetryTime() == null || e.getRetryTimeUnit() == null)
-        return retryMessage(payload, trace, e, messageId, FAILED_CONSUMER_RETRY_TIME, false);
-      
-      return retryMessage(payload, trace, e, messageId, e.getRetryTimeUnit().toMillis(e.getRetryTime()), false);
+      log_.warn("Transient processing failure, will retry (forever)", e);
+      return retryMessage(payload, trace, e, messageId, e.getRetryTime(), e.getRetryTimeUnit(), true);
     }
     catch (RuntimeException  e)
     {
@@ -323,7 +319,15 @@ implements ISubscriberManager<T>
     return MESSAGE_PROCESSED_OK;
   }
 
-  private long retryMessage(String payload, ITraceContext trace, Throwable cause, String messageId, long retryTime, boolean retryForever)
+  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId,
+      Long retryTime, TimeUnit retryTimeUnit, boolean retryForever)
+  {
+    long delay =retryTime == null || retryTimeUnit == null ? FAILED_CONSUMER_RETRY_TIME : retryTimeUnit.toMillis(retryTime);
+    
+    return retryMessage(payload, trace, cause, messageId, delay, retryForever);
+  }
+
+  private long retryMessage(P payload, ITraceContext trace, Throwable cause, String messageId, long retryTime, boolean retryForever)
   {
     if(!retryForever)
     {
@@ -338,6 +342,7 @@ implements ISubscriberManager<T>
       {
         if(cnt >= FAILURE_CNT_LIMIT)
         {
+          log_.error("Retryable processing error failed " + cnt + " times, aborting messageId " + messageId);
           trace.trace("MESSAGE_RETRIES_EXCEEDED");
           failureCache_.invalidate(messageId);
           return abortMessage(payload, trace, cause);
@@ -350,7 +355,7 @@ implements ISubscriberManager<T>
     return retryTime;
   }
 
-  private long abortMessage(String payload, ITraceContext trace, Throwable e)
+  private long abortMessage(P payload, ITraceContext trace, Throwable e)
   {
     try
     {

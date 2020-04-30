@@ -22,17 +22,16 @@
 package org.symphonyoss.s2.fugue.inmemory.store;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
 import java.util.TreeMap;
-
-import javax.annotation.Nullable;
 
 import org.symphonyoss.s2.common.exception.NoSuchObjectException;
 import org.symphonyoss.s2.common.hash.Hash;
 import org.symphonyoss.s2.fugue.core.trace.ITraceContext;
-import org.symphonyoss.s2.fugue.store.IFugueObject;
+import org.symphonyoss.s2.fugue.store.FugueObjectDeletionType;
+import org.symphonyoss.s2.fugue.store.IFugueId;
+import org.symphonyoss.s2.fugue.store.IFugueObjectPayload;
 import org.symphonyoss.s2.fugue.store.IFugueObjectStoreSecondaryWritable;
-import org.symphonyoss.s2.fugue.store.IFuguePodId;
 
 /**
  * IFundamentalObjectStoreSecondaryWritable implementation based on DynamoDB and S3.
@@ -70,7 +69,7 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
   }
 
   @Override
-  public String saveToSecondaryStorage(Hash absoluteHash, IFugueObject payload, ITraceContext trace)
+  public String saveToSecondaryStorage(Hash absoluteHash, IFugueId payload, ITraceContext trace)
   {
     String  payloadString;
     
@@ -94,54 +93,57 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
     
     return payloadString;
   }
-  
+
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deletionType,
         absoluteSequenceHashes, createdDate,
         null, null, null, null);
   }
 
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deletionType,
         null, null,
         currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
   }
   
   @Override
-  public void saveToSequences(Hash absoluteHash, String payload, @Nullable IFuguePodId podId,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
+  public void saveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      IFugueObjectPayload fugueObjectPayload, int payloadLimit,
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate, ITraceContext trace)
   {
-    doSaveToSequences(absoluteHash, payload,
+    doSaveToSequences(absoluteHash, payload, deletionType,
         absoluteSequenceHashes, createdDate,
         currentSequenceHashes, hashCurrentSequenceHashes, baseHash, baseCreatedDate);
   }
 
-  private void doSaveToSequences(Hash absoluteHash, String payload,
-      List<Hash> absoluteSequenceHashes, Instant createdDate,
-      List<Hash> currentSequenceHashes, List<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
+  private void doSaveToSequences(Hash absoluteHash, String payload, FugueObjectDeletionType deletionType,
+      Collection<Hash> absoluteSequenceHashes, Instant createdDate,
+      Collection<Hash> currentSequenceHashes, Collection<Hash> hashCurrentSequenceHashes, Hash baseHash, Instant baseCreatedDate)
   {
     String payloadString = payload.toString();
     
     if(absoluteSequenceHashes != null)
-      processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, absoluteSequenceHashes);
+      processSequences(generateRangeKey(absoluteHash, createdDate), payloadString, deletionType.isAbsoluteIndex(), absoluteSequenceHashes);
 
     if(currentSequenceHashes != null)
-      processSequences(generateRangeKey(baseHash, baseCreatedDate), payloadString, currentSequenceHashes);
+      processSequences(generateRangeKey(baseHash, baseCreatedDate), payloadString, deletionType.isBaseIndex(), currentSequenceHashes);
     
     if(hashCurrentSequenceHashes != null)
     {
-      processSequences(baseHash.toStringBase64(), payloadString, hashCurrentSequenceHashes);
+      processSequences(baseHash.toStringBase64(), payloadString, deletionType.isBaseIndex(), hashCurrentSequenceHashes);
     } 
   }
   
-  private void processSequences(String rangeKey, String payload, List<Hash> sequenceHashes)
+  private void processSequences(String rangeKey, String payload, boolean deleted, Collection<Hash> sequenceHashes)
   {
     synchronized (sequenceMap_)
     {
@@ -149,17 +151,43 @@ public class InMemoryObjectStoreSecondaryWritable extends InMemoryObjectStoreRea
       {
         TreeMap<String, String> sequence = sequenceMap_.get(sequenceHash);
         
-        if(sequence == null)
+        if(deleted)
         {
-          sequence = new TreeMap<>();
-          
-          sequenceMap_.put(sequenceHash, sequence);
+          if(sequence != null)
+            sequence.remove(rangeKey);
         }
-        
-        sequence.put(rangeKey, payload);
+        else
+        {
+          if(sequence == null)
+          {
+            sequence = new TreeMap<>();
+            
+            sequenceMap_.put(sequenceHash, sequence);
+          }
+          
+          sequence.put(rangeKey, payload);
+        }
         
         //System.err.println("put " + hash + " to " + rangeKey.toBase64String());
       }
     }
   }
+
+//  @Override
+//  public void delete(Hash hash, Hash baseHash, ITraceContext trace)
+//  {
+//    List<Hash> baseList = baseMap_.get(baseHash);
+//    
+//    if(baseList != null)
+//    {
+//      for(Hash absoluteHash : baseList)
+//      {
+//        absoluteMap_.remove(absoluteHash);
+//      }
+//    }
+//    
+//    absoluteMap_.remove(hash);
+//    baseMap_.remove(baseHash);
+//    currentMap_.remove(baseHash);
+//  }
 }

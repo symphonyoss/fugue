@@ -151,6 +151,14 @@ public interface INameFactory
   INameFactory withRegionId(String regionId);
 
 
+  /**
+   * Create a new INameFactory with the given serviceId and inheriting all other attributes from the current factory.
+   * 
+   * @param serviceId  The serviceId for the new Name Factory.
+   * 
+   * @return a new INameFactory with the given serviceId and inheriting all other attributes from the current factory.
+   */
+  INameFactory withServiceId(String serviceId);
 
   /**
    * Create a new INameFactory with the given tenantId and inheriting all other attributes from the current factory.
@@ -193,6 +201,8 @@ public interface INameFactory
 
   CredentialName getFugueCredentialName(String owner);
 
+  CredentialName getMultiTenantCredentialName(String owner);
+  
   CredentialName getCredentialName(Integer podId, String owner);
 
   CredentialName getCredentialName(String owner);
@@ -203,4 +213,7 @@ public interface INameFactory
 
 
   ServiceName getServiceImageName();
+
+
+  Name getEnvironmentName(String name);
 }

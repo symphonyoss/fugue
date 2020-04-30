@@ -57,7 +57,7 @@ import io.grpc.StatusRuntimeException;
  * @author Bruce Skingle
  *
  */
-public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<GoogleAsyncSubscriberManager>
+public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<String, GoogleAsyncSubscriberManager>
 {
   private static final Logger log_            = LoggerFactory.getLogger(GoogleAsyncSubscriberManager.class);
 
@@ -84,7 +84,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Goog
    * @author Bruce Skingle
    *
    */
-  public static class Builder extends AbstractSubscriberManager.Builder<Builder, GoogleAsyncSubscriberManager>
+  public static class Builder extends AbstractSubscriberManager.Builder<Builder, String, GoogleAsyncSubscriberManager>
   {
     private String                 projectId_;
 
@@ -133,7 +133,7 @@ public class GoogleAsyncSubscriberManager extends AbstractSubscriberManager<Goog
   }
 
   @Override
-  protected void initSubscription(ISubscription subscription)
+  protected void initSubscription(ISubscription<String> subscription)
   { 
     for(Name subscriptionName : subscription.getSubscriptionNames())
     {

@@ -34,6 +34,12 @@ import java.util.Set;
 
 import org.symphonyoss.s2.fugue.http.ui.servlet.ISetter;
 
+/**
+ * Parser for command line flags and arguments.
+ * 
+ * @author Bruce Skingle
+ *
+ */
 public class CommandLineHandler
 {
   private Map<Character, AbstractFlag> shortMap_     = new HashMap<>();
@@ -45,11 +51,32 @@ public class CommandLineHandler
   private int                          paramCnt_;
   private int                          errors_;
   
+  /**
+   * Add a flag to the list of acceptable parameters.
+   * 
+   * @param <T>         Type of the value set by this flag.
+   * @param shortFlag   A single character flag which can be specified with -
+   * @param longFlag    A string flag which can be specified with --
+   * @param envName     An environment variable or system property name which may contain the flag value
+   * @param type        Type of the value set by this flag.
+   * @param multiple    If true then multiple values may be set.
+   * @param required    If true then a value must be provided.
+   * @param setter      A lambda which will be called with the value of this flag.
+   * 
+   * @return This (fluent method)
+   */
   public <T> CommandLineHandler withFlag(Character shortFlag, String longFlag, String envName, Class<T> type, boolean multiple, boolean required, ISetter<T> setter)
   {
-    return withFlag(new Flag(shortFlag, longFlag, envName, type, multiple, required, setter));
+    return withFlag(new Flag<T>(shortFlag, longFlag, envName, type, multiple, required, setter));
   }
   
+  /**
+   * Add a flag to the list of acceptable parameters.
+   * 
+   * @param flag  The flag.
+   * 
+   * @return This (fluent method)
+   */
   public CommandLineHandler withFlag(AbstractFlag flag)
   {
     if(flag.getShortFlag() != null)
@@ -82,6 +109,13 @@ public class CommandLineHandler
     return this;
   }
   
+  /**
+   * Add the given setter to handle non-flag parameters.
+   * 
+   * @param setter  A setter which will be called with the value of each non-flag parameter.
+   * 
+   * @return This (fluent method)
+   */
   public CommandLineHandler withParam(ISetter<String> setter)
   {
     paramSetters_.add(setter);
@@ -89,6 +123,15 @@ public class CommandLineHandler
     return this;
   }
   
+  /**
+   * Process the given command line arguments.
+   * 
+   * @param args Command line arguments.
+   * 
+   * @return This (fluent method)
+   * 
+   * @throws IllegalArgumentException if required flags are missing.
+   */
   public CommandLineHandler process(String[] args)
   {
     ArrayIterator it = new ArrayIterator(args);

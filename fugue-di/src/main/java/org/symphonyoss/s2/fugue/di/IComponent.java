@@ -26,7 +26,7 @@ package org.symphonyoss.s2.fugue.di;
 /**
  * All Fugue components must implement this interface. 
  * 
- * @author bruce.skingle
+ * @author Bruce Skingle
  *
  */
 public interface IComponent

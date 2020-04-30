@@ -23,12 +23,17 @@
 
 package org.symphonyoss.s2.fugue.aws.sns;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.symphonyoss.s2.fugue.Fugue;
 import org.symphonyoss.s2.fugue.naming.TopicName;
 import org.symphonyoss.s2.fugue.pubsub.IPublisher;
 import org.symphonyoss.s2.fugue.pubsub.IPublisherAdmin;
@@ -41,6 +46,8 @@ import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
 import com.amazonaws.services.sns.model.NotFoundException;
 import com.amazonaws.services.sns.model.SetTopicAttributesRequest;
 import com.amazonaws.services.sns.model.Subscription;
+import com.amazonaws.services.sns.model.Tag;
+import com.amazonaws.services.sns.model.TagResourceRequest;
 
 /**
  * The admin variation of an SnsPublisherManager.
@@ -54,7 +61,8 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
 
   private static final Object POLICY = "Policy";
 
-  private Set<TopicName>      topics_         = new HashSet<>();
+  private Set<TopicName>      topics_ = new HashSet<>();
+  private List<Tag>           tags_   = new LinkedList<>();
   
 //  /**
 //   * Constructor.
@@ -72,6 +80,14 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
   private SnsPublisherAdmin(Builder builder)
   {
     super(SnsPublisherAdmin.class, builder);
+    
+    for(Entry<String, String> tagEntry : builder.tags_.entrySet())
+    {
+      tags_.add(new Tag()
+          .withKey(tagEntry.getKey())
+          .withValue(tagEntry.getValue())
+          );
+    }
   }
 
   /**
@@ -81,12 +97,29 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
    */
   public static class Builder extends SnsPublisherBase.Builder<Builder, SnsPublisherAdmin>
   {
+    private  Map<String, String>    tags_ = new HashMap<>();
+    
     /**
      * Constructor.
      */
     public Builder()
     {
       super(Builder.class);
+    }
+    
+    /**
+     * Add the given tags to created queues.
+     * Multiple calls to this method are cumulative.
+     * 
+     * @param tags Tags to add.
+     * 
+     * @return this (fluent method)
+     */
+    public Builder withTags(Map<String, String> tags)
+    {
+      tags_.putAll(tags);
+      
+      return self();
     }
 
     @Override
@@ -176,9 +209,9 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
         else
           s.append(",");
         
-        s.append("\"");
+        s.append("\"arn:aws:iam::");
         s.append(subscriberAccountId);
-        s.append("\"");
+        s.append(":root\"");
       }
       
       s.append( 
@@ -241,6 +274,12 @@ public class SnsPublisherAdmin extends SnsPublisherBase<SnsPublisherAdmin> imple
             updateTopicPolicy(topicArn, getTopicPolicy(topicArn));
           }
         }
+        
+        snsClient_.tagResource(new TagResourceRequest()
+            .withResourceArn(topicArn)
+            .withTags(tags_)
+            .withTags(new Tag().withKey(Fugue.TAG_FUGUE_ITEM).withValue(topicName.toString()))
+            );
       }
       else
       {

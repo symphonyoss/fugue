@@ -23,6 +23,8 @@
 
 package org.symphonyoss.s2.fugue.aws.config;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -92,67 +94,77 @@ public class S3Configuration extends Configuration
     private S3Config()
     {
       String fugueConfig = Fugue.getRequiredProperty(Fugue.FUGUE_CONFIG);
-     
-      try
+      
+      if(fugueConfig.trim().startsWith("{"))
       {
-        URL configUrl = new URL(fugueConfig);
+        log_.info("Loading direct config " + fugueConfig);
         
-        log_.info("Loading config from {}", configUrl);
-        
-        String host = configUrl.getHost();
-        
-        if(host.endsWith(AWS_COM))
-        {
-          String region = host.substring(0, host.length() - AWS_COM.length());
-          
-          if(region.equals("s3"))
-          {
-            region = System.getenv("AWS_REGION");
-          }
-          else if(region.startsWith("s3"))
-          {
-            region = region.substring(3);
-          }
-          
-          String path = configUrl.getPath();
-          int i = path.indexOf('/', 1);
-          
-          String bucket = path.substring(0, i);
-          String key = path.substring(i+1);
-          
-          loadConfig(region, bucket, key);
-          name_ = configUrl + "#";
-        }
-        else
-        {
-          throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + configUrl + " a " + AWS_COM + " hostname is expected.");
-        }
+        loadConfig(fugueConfig);
+        name_ = "Direct Config";
       }
-      catch (MalformedURLException e)
+      else
       {
-        File file = new File(fugueConfig);
-        
-        if(file.exists())
+        try
         {
-          try(InputStream in = new FileInputStream(file))
+          URL configUrl = new URL(fugueConfig);
+          
+          log_.info("Loading config from {}", configUrl);
+          
+          String host = configUrl.getHost();
+          
+          if(host.endsWith(AWS_COM))
           {
-            log_.info("Loading config from file " + file.getAbsolutePath());
+            String region = host.substring(0, host.length() - AWS_COM.length());
             
-            loadConfig(in);
-            name_ = file.getAbsolutePath() + " ";
+            if(region.equals("s3"))
+            {
+              region = System.getenv("AWS_REGION");
+            }
+            else if(region.startsWith("s3"))
+            {
+              region = region.substring(3);
+            }
+            
+            String path = configUrl.getPath();
+            int i = path.indexOf('/', 1);
+            
+            String bucket = path.substring(0, i);
+            String key = path.substring(i+1);
+            
+            loadConfig(region, bucket, key);
+            name_ = configUrl + "#";
           }
-          catch (FileNotFoundException e1)
+          else
           {
-            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.", e1);
-          }
-          catch (IOException e1)
-          {
-            log_.warn("Failed to close config input", e1);
+            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + configUrl + " a " + AWS_COM + " hostname is expected.");
           }
         }
-        else
+        catch (MalformedURLException e)
         {
-          throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.");
+          File file = new File(fugueConfig);
+          
+          if(file.exists())
+          {
+            try(InputStream in = new FileInputStream(file))
+            {
+              log_.info("Loading config from file " + file.getAbsolutePath());
+              
+              loadConfig(in);
+              name_ = file.getAbsolutePath() + " ";
+            }
+            catch (FileNotFoundException e1)
+            {
+              throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.", e1);
+            }
+            catch (IOException e1)
+            {
+              log_.warn("Failed to close config input", e1);
+            }
+          }
+          else
+          {
+            throw new ProgramFault(Fugue.FUGUE_CONFIG + " is " + fugueConfig + " but this file does not exist.");
+          }
         }
       }
     }
@@ -165,9 +177,30 @@ public class S3Configuration extends Configuration
           .withRegion(region)
           .build();
     
+      
+      
+      ByteArrayOutputStream bout = new ByteArrayOutputStream();
+      
+      log_.info("About to read from S3");
+      
       S3Object s3object = s3Client.getObject(new GetObjectRequest(bucket, key));
       
       try(S3ObjectInputStream in = s3object.getObjectContent())
+      {
+        byte buf[] = new byte[1024];
+        int nbytes;
+        
+        while((nbytes = in.read(buf))>0)
+        {
+          bout.write(buf, 0, nbytes);
+        }
+      }
+      catch (IOException e)
+      {
+        log_.warn("Failed to close config input", e);
+      }
+      log_.info("Loaded " + bout.size() + " bytes from S3");
+      try(InputStream in = new ByteArrayInputStream(bout.toByteArray()))
       {
         loadConfig(in);
       }
@@ -175,6 +208,7 @@ public class S3Configuration extends Configuration
       {
         log_.warn("Failed to close config input", e);
       }
+      log_.info("Loaded " + tree_.size() + " top level config items");
     }
   
   
@@ -185,6 +219,22 @@ public class S3Configuration extends Configuration
       try
       {
         JsonNode configSpec = mapper.readTree(in);
+        
+        tree_ = configSpec;
+      }
+      catch (IOException e1)
+      {
+        throw new ProgramFault("Cannot parse config.", e1);
+      }
+    }
+    
+    private void loadConfig(String directConfig)
+    {
+      ObjectMapper mapper = new ObjectMapper();
+      
+      try
+      {
+        JsonNode configSpec = mapper.readTree(directConfig);
         
         tree_ = configSpec;
       }
